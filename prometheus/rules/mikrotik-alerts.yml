@@ -1,0 +1,48 @@
+groups:
+  - name: mikrotik-core
+    rules:
+      - alert: CoreRouterDown
+        expr: up{job="snmp-mikrotik"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "🔴 Core Router DOWN"
+          description: "Router {{ $labels.instance }} has been unreachable for 2 minutes."
+
+      # Edit the ifName regex below to match your actual WAN interface name(s)
+      - alert: WANInterfaceDown
+        expr: ifOperStatus{ifName=~"ether1|chiemerie-ppp"} == 2
+        for: 10s
+        labels:
+          severity: warning
+        annotations:
+          summary: "🟠 WAN Interface DOWN"
+          description: "{{ $labels.ifName }} on {{ $labels.instance }} has gone down."
+
+      - alert: WANInterfaceUp
+        expr: ifOperStatus{ifName=~"ether1|chiemerie-ppp"} == 1
+        for: 30s
+        labels:
+          severity: info
+        annotations:
+          summary: "🟢 WAN Interface UP"
+          description: "{{ $labels.ifName }} on {{ $labels.instance }} is up."
+
+      - alert: HighCPU
+        expr: hrProcessorLoad > 80
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "🟠 High CPU"
+          description: 'CPU on {{ $labels.instance }} has been above 80% for 5 minutes (currently {{ $value | printf "%.1f" }}%).'
+
+      - alert: HighMemory
+        expr: 100 * (hrStorageUsed{hrStorageDescr=~".*[Mm]emory.*"} / hrStorageSize{hrStorageDescr=~".*[Mm]emory.*"}) > 75
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "🟠 High Memory"
+          description: 'Memory on {{ $labels.instance }} has been above 75% for 3 minutes (currently {{ $value | printf "%.1f" }}%).'

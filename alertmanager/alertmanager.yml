@@ -1,0 +1,19 @@
+route:
+  receiver: telegram
+  group_by: ["alertname", "instance"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 3h
+
+receivers:
+  - name: telegram
+    telegram_configs:
+      - bot_token_file: /run/secrets/telegram_bot_token
+        chat_id: -1004387943176 # This is the alert group ID
+        api_url: https://api.telegram.org
+        parse_mode: HTML
+        send_resolved: true
+        message: |
+          {{ range .Alerts }}{{ if eq .Status "firing" }}<b>{{ .Annotations.summary }}</b>{{ else }}✅ <b>RESOLVED:</b> {{ .Annotations.summary }}{{ end }}
+          {{ .Annotations.description }}
+          {{ end }}

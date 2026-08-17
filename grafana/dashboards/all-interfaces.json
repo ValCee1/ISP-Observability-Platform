@@ -1,0 +1,348 @@
+{
+    "title": "MikroTik Overview",
+    "uid": "mikrotik-overview",
+    "schemaVersion": 39,
+    "version": 1,
+    "editable": true,
+    "timezone": "browser",
+    "time": {
+        "from": "now-6h",
+        "to": "now"
+    },
+    "refresh": "30s",
+    "templating": {
+        "list": [
+            {
+                "name": "instance",
+                "type": "query",
+                "datasource": "Prometheus",
+                "query": "label_values(up{job=\"snmp-mikrotik\"}, instance)",
+                "multi": true,
+                "includeAll": true,
+                "refresh": 2,
+                "sort": 1
+            }
+        ]
+    },
+    "panels": [
+        {
+            "id": 100,
+            "type": "row",
+            "title": "Health",
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 0
+            }
+        },
+        {
+            "id": 1,
+            "type": "stat",
+            "title": "Router Reachability",
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 0,
+                "y": 1
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "up{job=\"snmp-mikrotik\", instance=~\"$instance\"}",
+                    "legendFormat": "{{instance}}"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "mappings": [
+                        {
+                            "type": "value",
+                            "options": {
+                                "0": {
+                                    "text": "DOWN",
+                                    "color": "red"
+                                },
+                                "1": {
+                                    "text": "UP",
+                                    "color": "green"
+                                }
+                            }
+                        }
+                    ],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "value": 0,
+                                "color": "red"
+                            },
+                            {
+                                "value": 1,
+                                "color": "green"
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        {
+            "id": 2,
+            "type": "stat",
+            "title": "Uptime",
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 6,
+                "y": 1
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "sysUpTime{instance=~\"$instance\"} / 100",
+                    "legendFormat": "{{instance}}"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "s"
+                }
+            }
+        },
+        {
+            "id": 3,
+            "type": "gauge",
+            "title": "CPU Load",
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 12,
+                "y": 1
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "hrProcessorLoad{instance=~\"$instance\"}",
+                    "legendFormat": "{{instance}}"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percent",
+                    "min": 0,
+                    "max": 100,
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "value": 0,
+                                "color": "green"
+                            },
+                            {
+                                "value": 70,
+                                "color": "orange"
+                            },
+                            {
+                                "value": 90,
+                                "color": "red"
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        {
+            "id": 4,
+            "type": "gauge",
+            "title": "Memory Used %",
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 18,
+                "y": 1
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "100 * (hrStorageUsed{instance=~\"$instance\", hrStorageDescr=~\".*[Mm]emory.*\"} / hrStorageSize{instance=~\"$instance\", hrStorageDescr=~\".*[Mm]emory.*\"})",
+                    "legendFormat": "{{instance}}"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percent",
+                    "min": 0,
+                    "max": 100,
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "value": 0,
+                                "color": "green"
+                            },
+                            {
+                                "value": 75,
+                                "color": "orange"
+                            },
+                            {
+                                "value": 90,
+                                "color": "red"
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        {
+            "id": 101,
+            "type": "row",
+            "title": "Storage",
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 5
+            }
+        },
+        {
+            "id": 5,
+            "type": "gauge",
+            "title": "Disk Used %",
+            "gridPos": {
+                "h": 4,
+                "w": 8,
+                "x": 0,
+                "y": 6
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "100 * (hrStorageUsed{instance=~\"$instance\", hrStorageDescr!~\".*[Mm]emory.*\"} / hrStorageSize{instance=~\"$instance\", hrStorageDescr!~\".*[Mm]emory.*\"})",
+                    "legendFormat": "{{instance}} - {{hrStorageDescr}}"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percent",
+                    "min": 0,
+                    "max": 100,
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "value": 0,
+                                "color": "green"
+                            },
+                            {
+                                "value": 80,
+                                "color": "orange"
+                            },
+                            {
+                                "value": 95,
+                                "color": "red"
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        {
+            "id": 102,
+            "type": "row",
+            "title": "Interfaces",
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 10
+            }
+        },
+        {
+            "id": 6,
+            "type": "timeseries",
+            "title": "Inbound Traffic (bps)",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 11
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "rate(ifHCInOctets{instance=~\"$instance\"}[5m]) * 8",
+                    "legendFormat": "{{instance}} - {{ifName}}"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "bps"
+                }
+            }
+        },
+        {
+            "id": 7,
+            "type": "timeseries",
+            "title": "Outbound Traffic (bps)",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 11
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "rate(ifHCOutOctets{instance=~\"$instance\"}[5m]) * 8",
+                    "legendFormat": "{{instance}} - {{ifName}}"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "bps"
+                }
+            }
+        },
+        {
+            "id": 8,
+            "type": "state-timeline",
+            "title": "Interface Operational Status",
+            "gridPos": {
+                "h": 6,
+                "w": 24,
+                "x": 0,
+                "y": 19
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "ifOperStatus{instance=~\"$instance\"}",
+                    "legendFormat": "{{instance}} - {{ifName}}"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "mappings": [
+                        {
+                            "type": "value",
+                            "options": {
+                                "1": {
+                                    "text": "UP",
+                                    "color": "green"
+                                },
+                                "2": {
+                                    "text": "DOWN",
+                                    "color": "red"
+                                },
+                                "3": {
+                                    "text": "TESTING",
+                                    "color": "yellow"
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}

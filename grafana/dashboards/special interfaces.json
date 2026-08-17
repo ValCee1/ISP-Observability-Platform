@@ -1,0 +1,385 @@
+{
+    "title": "MikroTik Interfaces",
+    "uid": "mikrotik-interfaces",
+    "schemaVersion": 39,
+    "version": 1,
+    "editable": true,
+    "timezone": "browser",
+    "time": {
+        "from": "now-6h",
+        "to": "now"
+    },
+    "refresh": "30s",
+    "templating": {
+        "list": [
+            {
+                "name": "instance",
+                "type": "query",
+                "datasource": "Prometheus",
+                "query": "label_values(up{job=\"snmp-mikrotik\"}, instance)",
+                "multi": true,
+                "includeAll": true,
+                "refresh": 2,
+                "sort": 1
+            },
+            {
+                "name": "wan",
+                "type": "textbox",
+                "label": "WAN / Backhaul regex",
+                "current": {
+                    "value": "ether1",
+                    "text": "ether1"
+                },
+                "query": "ether1"
+            },
+            {
+                "name": "lan",
+                "type": "textbox",
+                "label": "LAN / Core regex",
+                "current": {
+                    "value": "ether2|bridge.*|lan.*",
+                    "text": "ether2|bridge.*|lan.*"
+                },
+                "query": "ether2|bridge.*|lan.*"
+            },
+            {
+                "name": "ppp",
+                "type": "textbox",
+                "label": "PPP regex",
+                "current": {
+                    "value": "pppoe.*|ppp.*",
+                    "text": "pppoe.*|ppp.*"
+                },
+                "query": "pppoe.*|ppp.*"
+            },
+            {
+                "name": "wireless",
+                "type": "textbox",
+                "label": "Wireless / backhaul regex",
+                "current": {
+                    "value": "wlan.*|backhaul.*|dish.*",
+                    "text": "wlan.*|backhaul.*|dish.*"
+                },
+                "query": "wlan.*|backhaul.*|dish.*"
+            }
+        ]
+    },
+    "panels": [
+        {
+            "id": 1,
+            "type": "row",
+            "title": "WAN / Backhaul",
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 0
+            }
+        },
+        {
+            "id": 2,
+            "type": "timeseries",
+            "title": "WAN Traffic (bps)",
+            "gridPos": {
+                "h": 7,
+                "w": 16,
+                "x": 0,
+                "y": 1
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "rate(ifHCInOctets{instance=~\"$instance\", ifName=~\"$wan\"}[5m]) * 8",
+                    "legendFormat": "{{instance}} - {{ifName}} in"
+                },
+                {
+                    "expr": "rate(ifHCOutOctets{instance=~\"$instance\", ifName=~\"$wan\"}[5m]) * 8",
+                    "legendFormat": "{{instance}} - {{ifName}} out"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "bps"
+                }
+            }
+        },
+        {
+            "id": 3,
+            "type": "state-timeline",
+            "title": "WAN Status",
+            "gridPos": {
+                "h": 7,
+                "w": 8,
+                "x": 16,
+                "y": 1
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "ifOperStatus{instance=~\"$instance\", ifName=~\"$wan\"}",
+                    "legendFormat": "{{instance}} - {{ifName}}"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "mappings": [
+                        {
+                            "type": "value",
+                            "options": {
+                                "1": {
+                                    "text": "UP",
+                                    "color": "green"
+                                },
+                                "2": {
+                                    "text": "DOWN",
+                                    "color": "red"
+                                },
+                                "3": {
+                                    "text": "TESTING",
+                                    "color": "yellow"
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "id": 4,
+            "type": "row",
+            "title": "LAN / Core",
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 8
+            }
+        },
+        {
+            "id": 5,
+            "type": "timeseries",
+            "title": "LAN Traffic (bps)",
+            "gridPos": {
+                "h": 7,
+                "w": 16,
+                "x": 0,
+                "y": 9
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "rate(ifHCInOctets{instance=~\"$instance\", ifName=~\"$lan\"}[5m]) * 8",
+                    "legendFormat": "{{instance}} - {{ifName}} in"
+                },
+                {
+                    "expr": "rate(ifHCOutOctets{instance=~\"$instance\", ifName=~\"$lan\"}[5m]) * 8",
+                    "legendFormat": "{{instance}} - {{ifName}} out"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "bps"
+                }
+            }
+        },
+        {
+            "id": 6,
+            "type": "state-timeline",
+            "title": "LAN Status",
+            "gridPos": {
+                "h": 7,
+                "w": 8,
+                "x": 16,
+                "y": 9
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "ifOperStatus{instance=~\"$instance\", ifName=~\"$lan\"}",
+                    "legendFormat": "{{instance}} - {{ifName}}"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "mappings": [
+                        {
+                            "type": "value",
+                            "options": {
+                                "1": {
+                                    "text": "UP",
+                                    "color": "green"
+                                },
+                                "2": {
+                                    "text": "DOWN",
+                                    "color": "red"
+                                },
+                                "3": {
+                                    "text": "TESTING",
+                                    "color": "yellow"
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "id": 7,
+            "type": "row",
+            "title": "PPP",
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 16
+            }
+        },
+        {
+            "id": 8,
+            "type": "timeseries",
+            "title": "PPP Traffic (bps)",
+            "gridPos": {
+                "h": 7,
+                "w": 16,
+                "x": 0,
+                "y": 17
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "rate(ifHCInOctets{instance=~\"$instance\", ifName=~\"$ppp\"}[5m]) * 8",
+                    "legendFormat": "{{instance}} - {{ifName}} in"
+                },
+                {
+                    "expr": "rate(ifHCOutOctets{instance=~\"$instance\", ifName=~\"$ppp\"}[5m]) * 8",
+                    "legendFormat": "{{instance}} - {{ifName}} out"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "bps"
+                }
+            }
+        },
+        {
+            "id": 9,
+            "type": "state-timeline",
+            "title": "PPP Status",
+            "gridPos": {
+                "h": 7,
+                "w": 8,
+                "x": 16,
+                "y": 17
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "ifOperStatus{instance=~\"$instance\", ifName=~\"$ppp\"}",
+                    "legendFormat": "{{instance}} - {{ifName}}"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "mappings": [
+                        {
+                            "type": "value",
+                            "options": {
+                                "1": {
+                                    "text": "UP",
+                                    "color": "green"
+                                },
+                                "2": {
+                                    "text": "DOWN",
+                                    "color": "red"
+                                },
+                                "3": {
+                                    "text": "TESTING",
+                                    "color": "yellow"
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "id": 10,
+            "type": "row",
+            "title": "Wireless / Backhaul",
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 24
+            }
+        },
+        {
+            "id": 11,
+            "type": "timeseries",
+            "title": "Wireless Traffic (bps)",
+            "gridPos": {
+                "h": 7,
+                "w": 16,
+                "x": 0,
+                "y": 25
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "rate(ifHCInOctets{instance=~\"$instance\", ifName=~\"$wireless\"}[5m]) * 8",
+                    "legendFormat": "{{instance}} - {{ifName}} in"
+                },
+                {
+                    "expr": "rate(ifHCOutOctets{instance=~\"$instance\", ifName=~\"$wireless\"}[5m]) * 8",
+                    "legendFormat": "{{instance}} - {{ifName}} out"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "bps"
+                }
+            }
+        },
+        {
+            "id": 12,
+            "type": "state-timeline",
+            "title": "Wireless Status",
+            "gridPos": {
+                "h": 7,
+                "w": 8,
+                "x": 16,
+                "y": 25
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "ifOperStatus{instance=~\"$instance\", ifName=~\"$wireless\"}",
+                    "legendFormat": "{{instance}} - {{ifName}}"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "mappings": [
+                        {
+                            "type": "value",
+                            "options": {
+                                "1": {
+                                    "text": "UP",
+                                    "color": "green"
+                                },
+                                "2": {
+                                    "text": "DOWN",
+                                    "color": "red"
+                                },
+                                "3": {
+                                    "text": "TESTING",
+                                    "color": "yellow"
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}

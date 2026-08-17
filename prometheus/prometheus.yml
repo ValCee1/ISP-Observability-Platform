@@ -1,0 +1,32 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: "snmp-mikrotik"
+    metrics_path: /snmp
+    params:
+      module: [mikrotik]
+    file_sd_configs:
+      - files:
+          - /etc/prometheus/targets/mikrotik-routers.yml #List out all the mikrotik routers in this file. This is already mounted in the prometheus container at /etc/prometheus/targets/mikrotik-routers.yml
+        refresh_interval: 1m
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: snmp-exporter:9116
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
+rule_files:
+  - /etc/prometheus/rules/*.yml

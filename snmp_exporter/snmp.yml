@@ -1,0 +1,92 @@
+auths:
+  public_v2:
+    community: monitoring
+    version: 2
+
+modules:
+  mikrotik:
+    walk:
+      - 1.3.6.1.2.1.1 # system
+      - 1.3.6.1.2.1.2 # ifTable
+      - 1.3.6.1.2.1.31.1.1 # ifXTable
+      - 1.3.6.1.2.1.25.3.3.1.2 # hrProcessorLoad
+      - 1.3.6.1.2.1.25.2.3.1 # hrStorageTable
+
+    metrics:
+      - name: sysUpTime
+        oid: 1.3.6.1.2.1.1.3
+        type: gauge
+        help: Time since last reboot (hundredths of a second)
+
+      - name: ifHCInOctets
+        oid: 1.3.6.1.2.1.31.1.1.1.6
+        type: counter
+        help: High-capacity inbound octet counter
+        indexes:
+          - labelname: ifIndex
+            type: gauge
+        lookups:
+          - labels: [ifIndex]
+            oid: 1.3.6.1.2.1.31.1.1.1.1
+            labelname: ifName
+            type: DisplayString
+
+      - name: ifHCOutOctets
+        oid: 1.3.6.1.2.1.31.1.1.1.10
+        type: counter
+        help: High-capacity outbound octet counter
+        indexes:
+          - labelname: ifIndex
+            type: gauge
+        lookups:
+          - labels: [ifIndex]
+            oid: 1.3.6.1.2.1.31.1.1.1.1
+            labelname: ifName
+            type: DisplayString
+
+      - name: ifOperStatus
+        oid: 1.3.6.1.2.1.2.2.1.8
+        type: gauge
+        help: Interface operational status (1=up, 2=down)
+        indexes:
+          - labelname: ifIndex
+            type: gauge
+        lookups:
+          - labels: [ifIndex]
+            oid: 1.3.6.1.2.1.31.1.1.1.1
+            labelname: ifName
+            type: DisplayString
+
+      - name: hrProcessorLoad
+        oid: 1.3.6.1.2.1.25.3.3.1.2
+        type: gauge
+        help: CPU load percentage
+        indexes:
+          - labelname: hrDeviceIndex
+            type: gauge
+
+      - name: hrStorageSize
+        oid: 1.3.6.1.2.1.25.2.3.1.5
+        type: gauge
+        help: Storage size units (memory/disk)
+        indexes:
+          - labelname: hrStorageIndex
+            type: gauge
+        lookups:
+          - labels: [hrStorageIndex]
+            oid: 1.3.6.1.2.1.25.2.3.1.3
+            labelname: hrStorageDescr
+            type: DisplayString
+
+      - name: hrStorageUsed
+        oid: 1.3.6.1.2.1.25.2.3.1.6
+        type: gauge
+        help: Storage units used (memory/disk)
+        indexes:
+          - labelname: hrStorageIndex
+            type: gauge
+        lookups:
+          - labels: [hrStorageIndex]
+            oid: 1.3.6.1.2.1.25.2.3.1.3
+            labelname: hrStorageDescr
+            type: DisplayString
