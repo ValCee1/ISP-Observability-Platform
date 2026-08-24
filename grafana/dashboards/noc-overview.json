@@ -3,7 +3,7 @@
     "description": "At-a-glance board for the NOC: link counts by state, then a color-coded table of every link's health score - click a row to drill into that link on PTP Link Monitoring.",
     "uid": "noc-overview",
     "schemaVersion": 39,
-    "version": 4,
+    "version": 9,
     "editable": true,
     "timezone": "browser",
     "time": {
@@ -16,14 +16,24 @@
             "id": 10,
             "type": "row",
             "title": "AT A GLANCE",
-            "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 0
+            }
         },
         {
             "id": 11,
             "type": "stat",
             "title": "Links Up",
             "description": "Count of PTP links currently reachable (link_up == 1), one series per link_id.",
-            "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 0,
+                "y": 1
+            },
             "datasource": "Prometheus",
             "targets": [
                 {
@@ -34,7 +44,10 @@
             ],
             "fieldConfig": {
                 "defaults": {
-                    "color": { "mode": "fixed", "fixedColor": "green" },
+                    "color": {
+                        "mode": "fixed",
+                        "fixedColor": "green"
+                    },
                     "noValue": "0"
                 }
             }
@@ -44,7 +57,12 @@
             "type": "stat",
             "title": "Links Down",
             "description": "Count of PTP links where either endpoint is unreachable right now - matches the LinkDown alert condition.",
-            "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 6,
+                "y": 1
+            },
             "datasource": "Prometheus",
             "targets": [
                 {
@@ -55,7 +73,10 @@
             ],
             "fieldConfig": {
                 "defaults": {
-                    "color": { "mode": "fixed", "fixedColor": "red" },
+                    "color": {
+                        "mode": "fixed",
+                        "fixedColor": "red"
+                    },
                     "noValue": "0"
                 }
             }
@@ -63,9 +84,14 @@
         {
             "id": 13,
             "type": "stat",
-            "title": "Links Degraded (up but unhealthy)",
+            "title": "Degraded",
             "description": "Links that are reachable (link_up == 1) but whose health score has dropped below the WARN threshold used in the table below (85) - the case a plain up/down view misses. Mirrors the intent of the LinkUpButDegrading alert.",
-            "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 12,
+                "y": 1
+            },
             "datasource": "Prometheus",
             "targets": [
                 {
@@ -76,7 +102,10 @@
             ],
             "fieldConfig": {
                 "defaults": {
-                    "color": { "mode": "fixed", "fixedColor": "yellow" },
+                    "color": {
+                        "mode": "fixed",
+                        "fixedColor": "yellow"
+                    },
                     "noValue": "0"
                 }
             }
@@ -85,7 +114,12 @@
             "id": 14,
             "type": "stat",
             "title": "Core Routers Down",
-            "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 18,
+                "y": 1
+            },
             "datasource": "Prometheus",
             "targets": [
                 {
@@ -96,7 +130,10 @@
             ],
             "fieldConfig": {
                 "defaults": {
-                    "color": { "mode": "fixed", "fixedColor": "red" },
+                    "color": {
+                        "mode": "fixed",
+                        "fixedColor": "red"
+                    },
                     "noValue": "0"
                 }
             }
@@ -113,6 +150,14 @@
                 "y": 5
             },
             "datasource": "Prometheus",
+            "options": {
+                "sortBy": [
+                    {
+                        "displayName": "Health Score",
+                        "desc": false
+                    }
+                ]
+            },
             "targets": [
                 {
                     "expr": "min by (link_id) (link_up)",
@@ -152,20 +197,34 @@
             ],
             "fieldConfig": {
                 "defaults": {
-                    "custom": {
-                        "displayMode": "color-background"
-                    },
-                    "links": [
-                        {
-                            "title": "View link details",
-                            "url": "/d/ptp-link-monitoring/ptp-link-monitoring?var-link_id=${__data.fields.link_id}",
-                            "targetBlank": false
-                        }
-                    ]
+                    "color": {
+                        "mode": "thresholds"
+                    }
                 },
                 "overrides": [
                     {
-                        "matcher": { "id": "byName", "options": "Status" },
+                        "matcher": {
+                            "id": "byName",
+                            "options": "link_id"
+                        },
+                        "properties": [
+                            {
+                                "id": "links",
+                                "value": [
+                                    {
+                                        "title": "View link details",
+                                        "url": "/d/ptp-link-monitoring/ptp-link-monitoring?var-link_id=${__data.fields.link_id}",
+                                        "targetBlank": false
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Status"
+                        },
                         "properties": [
                             {
                                 "id": "mappings",
@@ -173,22 +232,37 @@
                                     {
                                         "type": "value",
                                         "options": {
-                                            "1": { "text": "UP", "color": "green", "index": 0 },
-                                            "0": { "text": "DOWN", "color": "red", "index": 1 }
+                                            "1": {
+                                                "text": "UP",
+                                                "color": "green",
+                                                "index": 0
+                                            },
+                                            "0": {
+                                                "text": "DOWN",
+                                                "color": "red",
+                                                "index": 1
+                                            }
                                         }
                                     },
                                     {
                                         "type": "special",
                                         "options": {
                                             "match": "null+nan",
-                                            "result": { "text": "NO DATA", "color": "white", "index": 2 }
+                                            "result": {
+                                                "text": "NO DATA",
+                                                "color": "white",
+                                                "index": 2
+                                            }
                                         }
                                     }
                                 ]
                             },
                             {
-                                "id": "custom.displayMode",
-                                "value": "color-background"
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "type": "color-background",
+                                    "mode": "gradient"
+                                }
                             },
                             {
                                 "id": "noValue",
@@ -197,23 +271,41 @@
                         ]
                     },
                     {
-                        "matcher": { "id": "byName", "options": "Health Score" },
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Health Score"
+                        },
                         "properties": [
                             {
                                 "id": "thresholds",
                                 "value": {
                                     "mode": "absolute",
                                     "steps": [
-                                        { "value": null, "color": "white" },
-                                        { "value": 0, "color": "red" },
-                                        { "value": 60, "color": "yellow" },
-                                        { "value": 85, "color": "green" }
+                                        {
+                                            "value": null,
+                                            "color": "white"
+                                        },
+                                        {
+                                            "value": 0,
+                                            "color": "red"
+                                        },
+                                        {
+                                            "value": 60,
+                                            "color": "yellow"
+                                        },
+                                        {
+                                            "value": 85,
+                                            "color": "green"
+                                        }
                                     ]
                                 }
                             },
                             {
-                                "id": "custom.displayMode",
-                                "value": "color-background"
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "type": "color-background",
+                                    "mode": "gradient"
+                                }
                             },
                             {
                                 "id": "noValue",
