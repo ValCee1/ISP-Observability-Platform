@@ -3,7 +3,7 @@
     "description": "At-a-glance board across all MikroTik routers: reachability counts, then a color-coded table of every router's health - click a row to drill into that router on MikroTik Router Detail. Purpose: \"what requires my attention\" - for per-router diagnostics, see MikroTik Router Detail.",
     "uid": "mikrotik-fleet-overview",
     "schemaVersion": 39,
-    "version": 1,
+    "version": 3,
     "editable": true,
     "timezone": "browser",
     "time": {
@@ -16,24 +16,37 @@
             "id": 10,
             "type": "row",
             "title": "AT A GLANCE",
-            "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 0
+            }
         },
         {
             "id": 11,
             "type": "stat",
             "title": "Routers Up",
             "description": "Count of MikroTik routers currently reachable via SNMP (up == 1).",
-            "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 0,
+                "y": 1
+            },
             "datasource": "Prometheus",
             "targets": [
                 {
-                    "expr": "count(up{job=\"snmp-mikrotik\"} == 1) or vector(0)",
+                    "expr": "count(max by (instance) (up{job=\"snmp-mikrotik\"}) == 1) or vector(0)",
                     "instant": true
                 }
             ],
             "fieldConfig": {
                 "defaults": {
-                    "color": { "mode": "fixed", "fixedColor": "green" },
+                    "color": {
+                        "mode": "fixed",
+                        "fixedColor": "green"
+                    },
                     "noValue": "0"
                 }
             }
@@ -43,17 +56,25 @@
             "type": "stat",
             "title": "Routers Down",
             "description": "Count of MikroTik routers currently unreachable via SNMP (up == 0).",
-            "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 6,
+                "y": 1
+            },
             "datasource": "Prometheus",
             "targets": [
                 {
-                    "expr": "count(up{job=\"snmp-mikrotik\"} == 0) or vector(0)",
+                    "expr": "count(max by (instance) (up{job=\"snmp-mikrotik\"}) == 0) or vector(0)",
                     "instant": true
                 }
             ],
             "fieldConfig": {
                 "defaults": {
-                    "color": { "mode": "fixed", "fixedColor": "red" },
+                    "color": {
+                        "mode": "fixed",
+                        "fixedColor": "red"
+                    },
                     "noValue": "0"
                 }
             }
@@ -63,7 +84,12 @@
             "type": "stat",
             "title": "High CPU",
             "description": "Routers with CPU load at or above 90%.",
-            "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 12,
+                "y": 1
+            },
             "datasource": "Prometheus",
             "targets": [
                 {
@@ -73,7 +99,10 @@
             ],
             "fieldConfig": {
                 "defaults": {
-                    "color": { "mode": "fixed", "fixedColor": "yellow" },
+                    "color": {
+                        "mode": "fixed",
+                        "fixedColor": "yellow"
+                    },
                     "noValue": "0"
                 }
             }
@@ -83,7 +112,12 @@
             "type": "stat",
             "title": "High Memory",
             "description": "Routers with memory used at or above 90%.",
-            "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 18,
+                "y": 1
+            },
             "datasource": "Prometheus",
             "targets": [
                 {
@@ -93,7 +127,10 @@
             ],
             "fieldConfig": {
                 "defaults": {
-                    "color": { "mode": "fixed", "fixedColor": "yellow" },
+                    "color": {
+                        "mode": "fixed",
+                        "fixedColor": "yellow"
+                    },
                     "noValue": "0"
                 }
             }
@@ -103,22 +140,30 @@
             "type": "table",
             "title": "All Routers",
             "description": "One row per router. Status reflects SNMP reachability (green = UP, red = DOWN). CPU % and Memory % are colored green/orange/red against the same thresholds as the per-router gauges. Click a row to open that router's full diagnostics on MikroTik Router Detail.",
-            "gridPos": { "h": 10, "w": 24, "x": 0, "y": 5 },
+            "gridPos": {
+                "h": 10,
+                "w": 24,
+                "x": 0,
+                "y": 5
+            },
             "datasource": "Prometheus",
             "options": {
                 "sortBy": [
-                    { "displayName": "CPU %", "desc": true }
+                    {
+                        "displayName": "CPU %",
+                        "desc": true
+                    }
                 ]
             },
             "targets": [
                 {
-                    "expr": "up{job=\"snmp-mikrotik\"}",
+                    "expr": "max by (instance, site, role) (up{job=\"snmp-mikrotik\"})",
                     "refId": "Status",
                     "instant": true,
                     "format": "table"
                 },
                 {
-                    "expr": "sysUpTime / 100",
+                    "expr": "max by (instance, site, role) (sysUpTime) / 100",
                     "refId": "Uptime",
                     "instant": true,
                     "format": "table"
@@ -177,11 +222,16 @@
             ],
             "fieldConfig": {
                 "defaults": {
-                    "color": { "mode": "thresholds" }
+                    "color": {
+                        "mode": "thresholds"
+                    }
                 },
                 "overrides": [
                     {
-                        "matcher": { "id": "byName", "options": "Router" },
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Router"
+                        },
                         "properties": [
                             {
                                 "id": "links",
@@ -196,7 +246,10 @@
                         ]
                     },
                     {
-                        "matcher": { "id": "byName", "options": "Status" },
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Status"
+                        },
                         "properties": [
                             {
                                 "id": "mappings",
@@ -204,22 +257,37 @@
                                     {
                                         "type": "value",
                                         "options": {
-                                            "1": { "text": "UP", "color": "green", "index": 0 },
-                                            "0": { "text": "DOWN", "color": "red", "index": 1 }
+                                            "1": {
+                                                "text": "UP",
+                                                "color": "green",
+                                                "index": 0
+                                            },
+                                            "0": {
+                                                "text": "DOWN",
+                                                "color": "red",
+                                                "index": 1
+                                            }
                                         }
                                     },
                                     {
                                         "type": "special",
                                         "options": {
                                             "match": "null+nan",
-                                            "result": { "text": "NO DATA", "color": "white", "index": 2 }
+                                            "result": {
+                                                "text": "NO DATA",
+                                                "color": "white",
+                                                "index": 2
+                                            }
                                         }
                                     }
                                 ]
                             },
                             {
                                 "id": "custom.cellOptions",
-                                "value": { "type": "color-background", "mode": "gradient" }
+                                "value": {
+                                    "type": "color-background",
+                                    "mode": "gradient"
+                                }
                             },
                             {
                                 "id": "noValue",
@@ -228,62 +296,121 @@
                         ]
                     },
                     {
-                        "matcher": { "id": "byName", "options": "Uptime" },
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Uptime"
+                        },
                         "properties": [
-                            { "id": "unit", "value": "s" },
-                            { "id": "noValue", "value": "N/A" }
+                            {
+                                "id": "unit",
+                                "value": "s"
+                            },
+                            {
+                                "id": "noValue",
+                                "value": "N/A"
+                            }
                         ]
                     },
                     {
-                        "matcher": { "id": "byName", "options": "CPU %" },
+                        "matcher": {
+                            "id": "byName",
+                            "options": "CPU %"
+                        },
                         "properties": [
                             {
                                 "id": "thresholds",
                                 "value": {
                                     "mode": "absolute",
                                     "steps": [
-                                        { "value": null, "color": "white" },
-                                        { "value": 0, "color": "green" },
-                                        { "value": 70, "color": "orange" },
-                                        { "value": 90, "color": "red" }
+                                        {
+                                            "value": null,
+                                            "color": "white"
+                                        },
+                                        {
+                                            "value": 0,
+                                            "color": "green"
+                                        },
+                                        {
+                                            "value": 70,
+                                            "color": "orange"
+                                        },
+                                        {
+                                            "value": 90,
+                                            "color": "red"
+                                        }
                                     ]
                                 }
                             },
                             {
                                 "id": "custom.cellOptions",
-                                "value": { "type": "color-background", "mode": "gradient" }
+                                "value": {
+                                    "type": "color-background",
+                                    "mode": "gradient"
+                                }
                             },
-                            { "id": "unit", "value": "percent" },
-                            { "id": "noValue", "value": "N/A" }
+                            {
+                                "id": "unit",
+                                "value": "percent"
+                            },
+                            {
+                                "id": "noValue",
+                                "value": "N/A"
+                            }
                         ]
                     },
                     {
-                        "matcher": { "id": "byName", "options": "Memory %" },
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Memory %"
+                        },
                         "properties": [
                             {
                                 "id": "thresholds",
                                 "value": {
                                     "mode": "absolute",
                                     "steps": [
-                                        { "value": null, "color": "white" },
-                                        { "value": 0, "color": "green" },
-                                        { "value": 75, "color": "orange" },
-                                        { "value": 90, "color": "red" }
+                                        {
+                                            "value": null,
+                                            "color": "white"
+                                        },
+                                        {
+                                            "value": 0,
+                                            "color": "green"
+                                        },
+                                        {
+                                            "value": 75,
+                                            "color": "orange"
+                                        },
+                                        {
+                                            "value": 90,
+                                            "color": "red"
+                                        }
                                     ]
                                 }
                             },
                             {
                                 "id": "custom.cellOptions",
-                                "value": { "type": "color-background", "mode": "gradient" }
+                                "value": {
+                                    "type": "color-background",
+                                    "mode": "gradient"
+                                }
                             },
-                            { "id": "unit", "value": "percent" },
-                            { "id": "noValue", "value": "N/A" }
+                            {
+                                "id": "unit",
+                                "value": "percent"
+                            },
+                            {
+                                "id": "noValue",
+                                "value": "N/A"
+                            }
                         ]
                     }
                 ]
             }
         }
     ],
-    "annotations": { "list": [] },
+    "annotations": {
+        "list": []
+    },
     "links": []
 }

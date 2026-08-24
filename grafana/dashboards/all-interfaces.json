@@ -3,7 +3,7 @@
     "description": "Deep-dive diagnostics for a single MikroTik router: health, storage, and per-interface traffic/status. Arrive here via the Fleet Overview table's row link, or pick a router from the dropdown above. Purpose: \"I'm investigating this router\" - for \"what needs my attention\", see MikroTik Fleet Overview.",
     "uid": "mikrotik-router-overview",
     "schemaVersion": 39,
-    "version": 3,
+    "version": 4,
     "editable": true,
     "timezone": "browser",
     "time": {
@@ -51,7 +51,7 @@
             "datasource": "Prometheus",
             "targets": [
                 {
-                    "expr": "up{job=\"snmp-mikrotik\", instance=\"$instance\"}",
+                    "expr": "max by (instance) (up{job=\"snmp-mikrotik\", instance=\"$instance\"})",
                     "instant": true
                 }
             ],
@@ -106,7 +106,7 @@
             "datasource": "Prometheus",
             "targets": [
                 {
-                    "expr": "sysUpTime{instance=\"$instance\"} / 100",
+                    "expr": "max by (instance) (sysUpTime{instance=\"$instance\"}) / 100",
                     "instant": true
                 }
             ],
@@ -228,7 +228,7 @@
             "datasource": "Prometheus",
             "targets": [
                 {
-                    "expr": "100 * (hrStorageUsed{instance=\"$instance\", hrStorageDescr!~\".*[Mm]emory.*\"} / hrStorageSize{instance=\"$instance\", hrStorageDescr!~\".*[Mm]emory.*\"})",
+                    "expr": "max by (instance, hrStorageDescr) (100 * (hrStorageUsed{instance=\"$instance\", hrStorageDescr!~\".*[Mm]emory.*\"} / hrStorageSize{instance=\"$instance\", hrStorageDescr!~\".*[Mm]emory.*\"}))",
                     "legendFormat": "{{hrStorageDescr}}"
                 }
             ],
@@ -281,7 +281,7 @@
             "datasource": "Prometheus",
             "targets": [
                 {
-                    "expr": "rate(ifHCInOctets{instance=\"$instance\"}[5m]) * 8",
+                    "expr": "sum by (instance, ifName) (rate(ifHCInOctets{instance=\"$instance\"}[5m]) * 8)",
                     "legendFormat": "{{ifName}}"
                 }
             ],
@@ -304,7 +304,7 @@
             "datasource": "Prometheus",
             "targets": [
                 {
-                    "expr": "rate(ifHCOutOctets{instance=\"$instance\"}[5m]) * 8",
+                    "expr": "sum by (instance, ifName) (rate(ifHCOutOctets{instance=\"$instance\"}[5m]) * 8)",
                     "legendFormat": "{{ifName}}"
                 }
             ],
@@ -327,7 +327,7 @@
             "datasource": "Prometheus",
             "targets": [
                 {
-                    "expr": "ifOperStatus{instance=\"$instance\"}",
+                    "expr": "max by (instance, ifName) (ifOperStatus{instance=\"$instance\"})",
                     "legendFormat": "{{ifName}}"
                 }
             ],
