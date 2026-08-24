@@ -56,6 +56,59 @@ groups:
           summary: "🟠 Interface Errors"
           description: "{{ $labels.link_name }} ({{ $labels.ifName }}) is logging interface errors - possible cabling, duplex, or hardware issue."
 
+      # Two severity tiers on the same metric, same duration - `for: 5m` on
+      # both means only the higher threshold that's actually crossed fires
+      # (a link at 30% loss trips PacketLoss/critical, not both tiers
+      # separately notifying). Previously packet loss only surfaced
+      # indirectly via LinkUpButDegrading's failure_ratio>5% OR-condition,
+      # which had no separate signal for "severely lossy but still up" -
+      # the exact case a plain up/down monitor misses.
+      - alert: PacketLoss
+        expr: link_packet_loss_percent > 5
+        for: 5m
+        labels:
+          severity: warning
+          category: health
+        annotations:
+          summary: "🟠 Packet Loss"
+          description: '{{ $labels.link_name }} packet loss has been above 5% for 5 minutes (currently {{ $value | printf "%.1f" }}%).'
+
+      - alert: PacketLoss
+        expr: link_packet_loss_percent > 20
+        for: 5m
+        labels:
+          severity: critical
+          category: health
+        annotations:
+          summary: "🔴 Severe Packet Loss"
+          description: '{{ $labels.link_name }} packet loss has been above 20% for 5 minutes (currently {{ $value | printf "%.1f" }}%) - link is up but effectively unusable.'
+
+      # Distinct from HighLatencyVariability (jitter/instability) above -
+      # this is sustained absolute latency, the case where a link is
+      # consistently slow rather than merely inconsistent. Thresholds are
+      # starting points for a mostly-LAN/short-hop wireless deployment;
+      # tune per-link once real baseline latency is established (see
+      # link-schema-notes.md).
+      - alert: HighLatency
+        expr: link_latency_ms > 100
+        for: 5m
+        labels:
+          severity: warning
+          category: health
+        annotations:
+          summary: "🟠 High Latency"
+          description: '{{ $labels.link_name }} latency has been above 100ms for 5 minutes (currently {{ $value | printf "%.1f" }}ms).'
+
+      - alert: HighLatency
+        expr: link_latency_ms > 500
+        for: 5m
+        labels:
+          severity: critical
+          category: health
+        annotations:
+          summary: "🔴 Severe Latency"
+          description: '{{ $labels.link_name }} latency has been above 500ms for 5 minutes (currently {{ $value | printf "%.1f" }}ms) - link is up but barely usable.'
+
   # The actual point of separating state from health: a link that's UP but
   # visibly failing. This is the case a plain up/down monitor misses
   # entirely - signal/quality dropping while link_up still reads 1.

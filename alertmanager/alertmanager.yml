@@ -69,13 +69,25 @@ receivers:
         api_url: https://api.telegram.org
         parse_mode: HTML
         send_resolved: true   # also sends a "resolved" message when the alert clears
-        # One Telegram message per notification batch, listing every alert
-        # in the batch: bold summary line, then description, per alert. If
-        # a batch groups several alerts for one link/router (see routes
-        # above), they all appear stacked in this one message.
+        # One Telegram message per notification batch: a header naming the
+        # shared entity (link_id or instance - whichever this route grouped
+        # on, see `routes` above), then each alert in the batch. A firing
+        # alert shows an absolute start time ("since HH:MM:SS") rather than
+        # a live-updating "N minutes ago", since a push notification is read
+        # after the fact and a baked-in relative time would just go stale.
+        # A resolved alert instead shows real elapsed downtime via
+        # `.EndsAt.Sub .StartsAt` - time.Time.Sub is a plain Go method
+        # (single argument, one return value), so Alertmanager's stock Go
+        # text/template can call it directly with no extra template
+        # functions or relay service needed for this.
         message: |
-          {{ range .Alerts }}{{ if eq .Status "firing" }}<b>{{ .Annotations.summary }}</b>{{ else }}✅ <b>RESOLVED:</b> {{ .Annotations.summary }}{{ end }}
-          {{ .Annotations.description }}
+          {{ if .CommonLabels.link_id }}<b>Link: {{ .CommonLabels.link_id }}</b>
+          {{ else if .CommonLabels.instance }}<b>Router: {{ .CommonLabels.instance }}</b>
+          {{ end }}
+          {{ range .Alerts }}{{ if eq .Status "firing" }}<b>{{ .Annotations.summary }}</b> (since {{ .StartsAt.Format "15:04:05 MST" }})
+          {{ else }}✅ <b>RESOLVED:</b> {{ .Annotations.summary }} (down {{ .EndsAt.Sub .StartsAt }})
+          {{ end }}{{ if .Labels.link_name }}Endpoint: {{ .Labels.link_name }}
+          {{ end }}{{ .Annotations.description }}
           {{ end }}
 
 # Suppress lower-priority alerts about an entity that's already covered by
@@ -105,6 +117,19 @@ inhibit_rules:
     target_match:
       category: health
     equal: ["link_id"]
+
+  # PacketLoss and HighLatency (link-alerts.yml) are each defined as two
+  # rules sharing one alertname with different thresholds/severity (5%/20%
+  # loss, 100ms/500ms latency) - Prometheus evaluates both independently,
+  # so a link at 25% loss trips warning AND critical at once. Without this,
+  # that's a second Telegram message for the same signal the moment it
+  # crosses the higher bar. `equal` includes alertname so this only
+  # suppresses a warning of the SAME signal, not unrelated health alerts.
+  - source_match:
+      severity: critical
+    target_match:
+      severity: warning
+    equal: ["link_id", "alertname"]
 
   # A router that's fully unreachable will also trip its own CPU/memory/
   # WAN alerts as soon as SNMP starts timing out on stale data - those add
