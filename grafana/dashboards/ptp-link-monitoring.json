@@ -3,7 +3,7 @@
     "description": "Per-link detail view for a single point-to-point radio link (SAF, AirFiber, airMAX, MikroTik). Arrive here via the NOC Overview table's row link, or pick a link from the dropdown above. Every panel is scoped to the selected link_id only.",
     "uid": "ptp-link-monitoring",
     "schemaVersion": 39,
-    "version": 10,
+    "version": 11,
     "editable": true,
     "timezone": "browser",
     "time": {
@@ -433,14 +433,166 @@
             }
         },
         {
-            "id": 13,
-            "type": "timeseries",
-            "title": "Throughput vs Capacity",
+            "id": 21,
+            "type": "stat",
+            "title": "Current Util",
+            "description": "Current utilization = max(TX,RX) / capacity. Only available for vendors that report link capacity (SAF; AirFiber's capacity OID is currently broken on real hardware - see prometheus/rules/link-schema-notes.md. airMAX exposes no traffic-capacity data on this hardware at all).",
             "gridPos": {
-                "h": 8,
-                "w": 12,
+                "h": 4,
+                "w": 4,
                 "x": 12,
                 "y": 7
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "link_utilization_percent{link_id=\"$link_id\"}",
+                    "legendFormat": "{{link_name}}",
+                    "instant": true
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "unit": "percent",
+                    "min": 0,
+                    "max": 100,
+                    "noValue": "N/A",
+                    "mappings": [
+                        {
+                            "type": "special",
+                            "options": {
+                                "match": "null+nan",
+                                "result": {
+                                    "text": "N/A",
+                                    "color": "white",
+                                    "index": 0
+                                }
+                            }
+                        }
+                    ],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "value": 0,
+                                "color": "green"
+                            },
+                            {
+                                "value": 70,
+                                "color": "yellow"
+                            },
+                            {
+                                "value": 85,
+                                "color": "red"
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        {
+            "id": 22,
+            "type": "stat",
+            "title": "Peak Util",
+            "description": "Highest utilization observed in the selected time range.",
+            "gridPos": {
+                "h": 4,
+                "w": 4,
+                "x": 16,
+                "y": 7
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "max_over_time(link_utilization_percent{link_id=\"$link_id\"}[$__range])",
+                    "legendFormat": "{{link_name}}",
+                    "instant": true
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "unit": "percent",
+                    "min": 0,
+                    "max": 100,
+                    "noValue": "N/A",
+                    "mappings": [
+                        {
+                            "type": "special",
+                            "options": {
+                                "match": "null+nan",
+                                "result": {
+                                    "text": "N/A",
+                                    "color": "white",
+                                    "index": 0
+                                }
+                            }
+                        }
+                    ],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "value": 0,
+                                "color": "green"
+                            },
+                            {
+                                "value": 70,
+                                "color": "yellow"
+                            },
+                            {
+                                "value": 85,
+                                "color": "red"
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        {
+            "id": 23,
+            "type": "stat",
+            "title": "Capacity",
+            "description": "Vendor-reported link capacity (only SAF currently exposes this reliably - see link-schema-notes.md).",
+            "gridPos": {
+                "h": 4,
+                "w": 4,
+                "x": 20,
+                "y": 7
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "sum by (link_id, link_name, endpoint) (link_capacity_bps{link_id=\"$link_id\"})",
+                    "legendFormat": "{{link_name}}",
+                    "instant": true
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "fixed",
+                        "fixedColor": "text"
+                    },
+                    "unit": "bps",
+                    "noValue": "N/A"
+                }
+            }
+        },
+        {
+            "id": 24,
+            "type": "timeseries",
+            "title": "Traffic (TX/RX)",
+            "gridPos": {
+                "h": 4,
+                "w": 12,
+                "x": 12,
+                "y": 11
             },
             "datasource": "Prometheus",
             "targets": [
@@ -451,10 +603,6 @@
                 {
                     "expr": "sum by (link_id, link_name, endpoint) (link_rx_bps{link_id=\"$link_id\"})",
                     "legendFormat": "{{link_name}} RX"
-                },
-                {
-                    "expr": "sum by (link_id, link_name, endpoint) (link_capacity_bps{link_id=\"$link_id\"})",
-                    "legendFormat": "{{link_name}} capacity"
                 }
             ],
             "fieldConfig": {
@@ -475,12 +623,12 @@
             }
         },
         {
-            "id": 12,
+            "id": 25,
             "type": "timeseries",
-            "title": "Latency & Packet Loss",
+            "title": "Latency",
             "gridPos": {
                 "h": 7,
-                "w": 12,
+                "w": 6,
                 "x": 0,
                 "y": 16
             },
@@ -488,13 +636,38 @@
             "targets": [
                 {
                     "expr": "link_latency_ms{link_id=\"$link_id\"}",
-                    "legendFormat": "{{link_name}} latency (ms)"
-                },
+                    "legendFormat": "{{link_name}}"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "ms"
+                }
+            }
+        },
+        {
+            "id": 26,
+            "type": "timeseries",
+            "title": "Packet Loss",
+            "gridPos": {
+                "h": 7,
+                "w": 6,
+                "x": 6,
+                "y": 16
+            },
+            "datasource": "Prometheus",
+            "targets": [
                 {
                     "expr": "link_packet_loss_percent{link_id=\"$link_id\"}",
-                    "legendFormat": "{{link_name}} loss (%)"
+                    "legendFormat": "{{link_name}}"
                 }
-            ]
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percent",
+                    "min": 0
+                }
+            }
         },
         {
             "id": 15,

@@ -1,0 +1,289 @@
+{
+    "title": "MikroTik Fleet Overview",
+    "description": "At-a-glance board across all MikroTik routers: reachability counts, then a color-coded table of every router's health - click a row to drill into that router on MikroTik Router Detail. Purpose: \"what requires my attention\" - for per-router diagnostics, see MikroTik Router Detail.",
+    "uid": "mikrotik-fleet-overview",
+    "schemaVersion": 39,
+    "version": 1,
+    "editable": true,
+    "timezone": "browser",
+    "time": {
+        "from": "now-1h",
+        "to": "now"
+    },
+    "refresh": "30s",
+    "panels": [
+        {
+            "id": 10,
+            "type": "row",
+            "title": "AT A GLANCE",
+            "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+        },
+        {
+            "id": 11,
+            "type": "stat",
+            "title": "Routers Up",
+            "description": "Count of MikroTik routers currently reachable via SNMP (up == 1).",
+            "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "count(up{job=\"snmp-mikrotik\"} == 1) or vector(0)",
+                    "instant": true
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": { "mode": "fixed", "fixedColor": "green" },
+                    "noValue": "0"
+                }
+            }
+        },
+        {
+            "id": 12,
+            "type": "stat",
+            "title": "Routers Down",
+            "description": "Count of MikroTik routers currently unreachable via SNMP (up == 0).",
+            "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "count(up{job=\"snmp-mikrotik\"} == 0) or vector(0)",
+                    "instant": true
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": { "mode": "fixed", "fixedColor": "red" },
+                    "noValue": "0"
+                }
+            }
+        },
+        {
+            "id": 13,
+            "type": "stat",
+            "title": "High CPU",
+            "description": "Routers with CPU load at or above 90%.",
+            "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "count(sum by (instance) (hrProcessorLoad) >= 90) or vector(0)",
+                    "instant": true
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": { "mode": "fixed", "fixedColor": "yellow" },
+                    "noValue": "0"
+                }
+            }
+        },
+        {
+            "id": 14,
+            "type": "stat",
+            "title": "High Memory",
+            "description": "Routers with memory used at or above 90%.",
+            "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "count(sum by (instance) (100 * (hrStorageUsed{hrStorageDescr=~\".*[Mm]emory.*\"} / hrStorageSize{hrStorageDescr=~\".*[Mm]emory.*\"})) >= 90) or vector(0)",
+                    "instant": true
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": { "mode": "fixed", "fixedColor": "yellow" },
+                    "noValue": "0"
+                }
+            }
+        },
+        {
+            "id": 1,
+            "type": "table",
+            "title": "All Routers",
+            "description": "One row per router. Status reflects SNMP reachability (green = UP, red = DOWN). CPU % and Memory % are colored green/orange/red against the same thresholds as the per-router gauges. Click a row to open that router's full diagnostics on MikroTik Router Detail.",
+            "gridPos": { "h": 10, "w": 24, "x": 0, "y": 5 },
+            "datasource": "Prometheus",
+            "options": {
+                "sortBy": [
+                    { "displayName": "CPU %", "desc": true }
+                ]
+            },
+            "targets": [
+                {
+                    "expr": "up{job=\"snmp-mikrotik\"}",
+                    "refId": "Status",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "sysUpTime / 100",
+                    "refId": "Uptime",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "sum by (instance, site, role) (hrProcessorLoad)",
+                    "refId": "CPU",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "sum by (instance, site, role) (100 * (hrStorageUsed{hrStorageDescr=~\".*[Mm]emory.*\"} / hrStorageSize{hrStorageDescr=~\".*[Mm]emory.*\"}))",
+                    "refId": "Mem",
+                    "instant": true,
+                    "format": "table"
+                }
+            ],
+            "transformations": [
+                {
+                    "id": "merge",
+                    "options": {}
+                },
+                {
+                    "id": "organize",
+                    "options": {
+                        "excludeByName": {
+                            "Time": true,
+                            "Time 1": true,
+                            "Time 2": true,
+                            "Time 3": true,
+                            "Time 4": true,
+                            "__name__": true,
+                            "job": true,
+                            "wan_ifname": true
+                        },
+                        "indexByName": {
+                            "site": 0,
+                            "role": 1,
+                            "instance": 2,
+                            "Value #Status": 3,
+                            "Value #Uptime": 4,
+                            "Value #CPU": 5,
+                            "Value #Mem": 6
+                        },
+                        "renameByName": {
+                            "instance": "Router",
+                            "site": "Site",
+                            "role": "Role",
+                            "Value #Status": "Status",
+                            "Value #Uptime": "Uptime",
+                            "Value #CPU": "CPU %",
+                            "Value #Mem": "Memory %"
+                        }
+                    }
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": { "mode": "thresholds" }
+                },
+                "overrides": [
+                    {
+                        "matcher": { "id": "byName", "options": "Router" },
+                        "properties": [
+                            {
+                                "id": "links",
+                                "value": [
+                                    {
+                                        "title": "View router details",
+                                        "url": "/d/mikrotik-router-overview/mikrotik-router-detail?var-instance=${__data.fields.Router}",
+                                        "targetBlank": false
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": { "id": "byName", "options": "Status" },
+                        "properties": [
+                            {
+                                "id": "mappings",
+                                "value": [
+                                    {
+                                        "type": "value",
+                                        "options": {
+                                            "1": { "text": "UP", "color": "green", "index": 0 },
+                                            "0": { "text": "DOWN", "color": "red", "index": 1 }
+                                        }
+                                    },
+                                    {
+                                        "type": "special",
+                                        "options": {
+                                            "match": "null+nan",
+                                            "result": { "text": "NO DATA", "color": "white", "index": 2 }
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "custom.cellOptions",
+                                "value": { "type": "color-background", "mode": "gradient" }
+                            },
+                            {
+                                "id": "noValue",
+                                "value": "NO DATA"
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": { "id": "byName", "options": "Uptime" },
+                        "properties": [
+                            { "id": "unit", "value": "s" },
+                            { "id": "noValue", "value": "N/A" }
+                        ]
+                    },
+                    {
+                        "matcher": { "id": "byName", "options": "CPU %" },
+                        "properties": [
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        { "value": null, "color": "white" },
+                                        { "value": 0, "color": "green" },
+                                        { "value": 70, "color": "orange" },
+                                        { "value": 90, "color": "red" }
+                                    ]
+                                }
+                            },
+                            {
+                                "id": "custom.cellOptions",
+                                "value": { "type": "color-background", "mode": "gradient" }
+                            },
+                            { "id": "unit", "value": "percent" },
+                            { "id": "noValue", "value": "N/A" }
+                        ]
+                    },
+                    {
+                        "matcher": { "id": "byName", "options": "Memory %" },
+                        "properties": [
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        { "value": null, "color": "white" },
+                                        { "value": 0, "color": "green" },
+                                        { "value": 75, "color": "orange" },
+                                        { "value": 90, "color": "red" }
+                                    ]
+                                }
+                            },
+                            {
+                                "id": "custom.cellOptions",
+                                "value": { "type": "color-background", "mode": "gradient" }
+                            },
+                            { "id": "unit", "value": "percent" },
+                            { "id": "noValue", "value": "N/A" }
+                        ]
+                    }
+                ]
+            }
+        }
+    ],
+    "annotations": { "list": [] },
+    "links": []
+}

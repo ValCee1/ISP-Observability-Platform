@@ -1,8 +1,9 @@
 {
-    "title": "MikroTik Router Overview",
+    "title": "MikroTik Router Detail",
+    "description": "Deep-dive diagnostics for a single MikroTik router: health, storage, and per-interface traffic/status. Arrive here via the Fleet Overview table's row link, or pick a router from the dropdown above. Purpose: \"I'm investigating this router\" - for \"what needs my attention\", see MikroTik Fleet Overview.",
     "uid": "mikrotik-router-overview",
     "schemaVersion": 39,
-    "version": 1,
+    "version": 3,
     "editable": true,
     "timezone": "browser",
     "time": {
@@ -14,11 +15,12 @@
         "list": [
             {
                 "name": "instance",
+                "label": "Router",
                 "type": "query",
                 "datasource": "Prometheus",
                 "query": "label_values(up{job=\"snmp-mikrotik\"}, instance)",
-                "multi": true,
-                "includeAll": true,
+                "multi": false,
+                "includeAll": false,
                 "refresh": 2,
                 "sort": 1
             }
@@ -28,7 +30,7 @@
         {
             "id": 100,
             "type": "row",
-            "title": "Health",
+            "title": "HEALTH",
             "gridPos": {
                 "h": 1,
                 "w": 24,
@@ -39,7 +41,7 @@
         {
             "id": 1,
             "type": "stat",
-            "title": "Router Reachability",
+            "title": "Reachability",
             "gridPos": {
                 "h": 4,
                 "w": 6,
@@ -49,23 +51,28 @@
             "datasource": "Prometheus",
             "targets": [
                 {
-                    "expr": "up{job=\"snmp-mikrotik\", instance=~\"$instance\"}",
-                    "legendFormat": "{{instance}}"
+                    "expr": "up{job=\"snmp-mikrotik\", instance=\"$instance\"}",
+                    "instant": true
                 }
             ],
             "fieldConfig": {
                 "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
                     "mappings": [
                         {
                             "type": "value",
                             "options": {
                                 "0": {
                                     "text": "DOWN",
-                                    "color": "red"
+                                    "color": "red",
+                                    "index": 0
                                 },
                                 "1": {
                                     "text": "UP",
-                                    "color": "green"
+                                    "color": "green",
+                                    "index": 1
                                 }
                             }
                         }
@@ -99,13 +106,17 @@
             "datasource": "Prometheus",
             "targets": [
                 {
-                    "expr": "sysUpTime{instance=~\"$instance\"} / 100",
-                    "legendFormat": "{{instance}}"
+                    "expr": "sysUpTime{instance=\"$instance\"} / 100",
+                    "instant": true
                 }
             ],
             "fieldConfig": {
                 "defaults": {
-                    "unit": "s"
+                    "unit": "s",
+                    "color": {
+                        "mode": "fixed",
+                        "fixedColor": "text"
+                    }
                 }
             }
         },
@@ -122,8 +133,8 @@
             "datasource": "Prometheus",
             "targets": [
                 {
-                    "expr": "hrProcessorLoad{instance=~\"$instance\"}",
-                    "legendFormat": "{{instance}}"
+                    "expr": "sum by (instance) (hrProcessorLoad{instance=\"$instance\"})",
+                    "instant": true
                 }
             ],
             "fieldConfig": {
@@ -164,8 +175,8 @@
             "datasource": "Prometheus",
             "targets": [
                 {
-                    "expr": "100 * (hrStorageUsed{instance=~\"$instance\", hrStorageDescr=~\".*[Mm]emory.*\"} / hrStorageSize{instance=~\"$instance\", hrStorageDescr=~\".*[Mm]emory.*\"})",
-                    "legendFormat": "{{instance}}"
+                    "expr": "sum by (instance) (100 * (hrStorageUsed{instance=\"$instance\", hrStorageDescr=~\".*[Mm]emory.*\"} / hrStorageSize{instance=\"$instance\", hrStorageDescr=~\".*[Mm]emory.*\"}))",
+                    "instant": true
                 }
             ],
             "fieldConfig": {
@@ -196,7 +207,7 @@
         {
             "id": 101,
             "type": "row",
-            "title": "Storage",
+            "title": "STORAGE",
             "gridPos": {
                 "h": 1,
                 "w": 24,
@@ -217,8 +228,8 @@
             "datasource": "Prometheus",
             "targets": [
                 {
-                    "expr": "100 * (hrStorageUsed{instance=~\"$instance\", hrStorageDescr!~\".*[Mm]emory.*\"} / hrStorageSize{instance=~\"$instance\", hrStorageDescr!~\".*[Mm]emory.*\"})",
-                    "legendFormat": "{{instance}} - {{hrStorageDescr}}"
+                    "expr": "100 * (hrStorageUsed{instance=\"$instance\", hrStorageDescr!~\".*[Mm]emory.*\"} / hrStorageSize{instance=\"$instance\", hrStorageDescr!~\".*[Mm]emory.*\"})",
+                    "legendFormat": "{{hrStorageDescr}}"
                 }
             ],
             "fieldConfig": {
@@ -249,7 +260,7 @@
         {
             "id": 102,
             "type": "row",
-            "title": "Interfaces",
+            "title": "INTERFACES",
             "gridPos": {
                 "h": 1,
                 "w": 24,
@@ -270,8 +281,8 @@
             "datasource": "Prometheus",
             "targets": [
                 {
-                    "expr": "rate(ifHCInOctets{instance=~\"$instance\"}[5m]) * 8",
-                    "legendFormat": "{{instance}} - {{ifName}}"
+                    "expr": "rate(ifHCInOctets{instance=\"$instance\"}[5m]) * 8",
+                    "legendFormat": "{{ifName}}"
                 }
             ],
             "fieldConfig": {
@@ -293,8 +304,8 @@
             "datasource": "Prometheus",
             "targets": [
                 {
-                    "expr": "rate(ifHCOutOctets{instance=~\"$instance\"}[5m]) * 8",
-                    "legendFormat": "{{instance}} - {{ifName}}"
+                    "expr": "rate(ifHCOutOctets{instance=\"$instance\"}[5m]) * 8",
+                    "legendFormat": "{{ifName}}"
                 }
             ],
             "fieldConfig": {
@@ -316,8 +327,8 @@
             "datasource": "Prometheus",
             "targets": [
                 {
-                    "expr": "ifOperStatus{instance=~\"$instance\"}",
-                    "legendFormat": "{{instance}} - {{ifName}}"
+                    "expr": "ifOperStatus{instance=\"$instance\"}",
+                    "legendFormat": "{{ifName}}"
                 }
             ],
             "fieldConfig": {

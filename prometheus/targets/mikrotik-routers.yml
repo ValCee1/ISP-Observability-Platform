@@ -17,6 +17,13 @@
 - targets:
     - 192.168.10.1
   labels:
-    site: "main-office"
+    site: "HOME"
     role: "core-router"
     wan_ifname: "chiemerie-ppp"
+
+- targets:
+    - 192.168.10.39
+  labels:
+    site: "room-office"
+    role: "Repeater"
+    wan_ifname: "wlan1"
