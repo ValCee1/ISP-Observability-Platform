@@ -1,0 +1,161 @@
+{
+    "title": "NOC Overview",
+    "description": "At-a-glance board for the NOC: link counts by state, then a color-coded table of every link's health score - click a row to drill into that link on PTP Link Monitoring.",
+    "uid": "noc-overview",
+    "schemaVersion": 39,
+    "version": 2,
+    "editable": true,
+    "timezone": "browser",
+    "time": {
+        "from": "now-1h",
+        "to": "now"
+    },
+    "refresh": "30s",
+    "panels": [
+        {
+            "id": 10,
+            "type": "row",
+            "title": "AT A GLANCE",
+            "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+        },
+        {
+            "id": 11,
+            "type": "stat",
+            "title": "Links Up",
+            "description": "Count of PTP links currently reachable (link_up == 1), one series per link_id.",
+            "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "count(min by (link_id) (link_up) == 1)",
+                    "instant": true,
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": { "mode": "fixed", "fixedColor": "green" },
+                    "noValue": "0"
+                }
+            }
+        },
+        {
+            "id": 12,
+            "type": "stat",
+            "title": "Links Down",
+            "description": "Count of PTP links where either endpoint is unreachable right now - matches the LinkDown alert condition.",
+            "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "count(min by (link_id) (link_up) == 0) or vector(0)",
+                    "instant": true,
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": { "mode": "fixed", "fixedColor": "red" },
+                    "noValue": "0"
+                }
+            }
+        },
+        {
+            "id": 13,
+            "type": "stat",
+            "title": "Links Degraded (up but unhealthy)",
+            "description": "Links that are reachable (link_up == 1) but whose health score has dropped below the WARN threshold used in the table below (85) - the case a plain up/down view misses. Mirrors the intent of the LinkUpButDegrading alert.",
+            "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "count((min by (link_id) (link_up) == 1) and (link_health_score < 85)) or vector(0)",
+                    "instant": true,
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": { "mode": "fixed", "fixedColor": "orange" },
+                    "noValue": "0"
+                }
+            }
+        },
+        {
+            "id": 14,
+            "type": "stat",
+            "title": "Core Routers Down",
+            "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "count(up{job=\"snmp-mikrotik\"} == 0) or vector(0)",
+                    "instant": true,
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": { "mode": "fixed", "fixedColor": "red" },
+                    "noValue": "0"
+                }
+            }
+        },
+        {
+            "id": 1,
+            "type": "table",
+            "title": "All Links",
+            "description": "One row per link_id. Health score blends packet loss, SNR, interface errors, and reachability into 0-100 (see link_endpoint_health_score in prometheus/rules/link-normalization.yml for the exact weighting). Click a row to open that link on PTP Link Monitoring.",
+            "gridPos": {
+                "h": 10,
+                "w": 24,
+                "x": 0,
+                "y": 5
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "link_health_score",
+                    "refId": "Health",
+                    "instant": true,
+                    "format": "table"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "value": 0,
+                                "color": "red"
+                            },
+                            {
+                                "value": 60,
+                                "color": "orange"
+                            },
+                            {
+                                "value": 85,
+                                "color": "green"
+                            }
+                        ]
+                    },
+                    "custom": {
+                        "displayMode": "color-background"
+                    },
+                    "links": [
+                        {
+                            "title": "View link",
+                            "url": "/d/ptp-link-monitoring/ptp-link-monitoring?var-link_id=${__data.fields.link_id}",
+                            "targetBlank": false
+                        }
+                    ]
+                }
+            }
+        }
+    ],
+    "annotations": {
+        "list": []
+    },
+    "links": []
+}

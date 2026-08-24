@@ -1,0 +1,6 @@
+# Intentionally empty. Its presence stops Grafana logging
+# "Failed to read plugin provisioning files from directory" on startup -
+# the docker-compose bind mount of ./grafana/provisioning replaces the
+# image's default provisioning tree wholesale, which otherwise removes
+# this directory entirely. Add plugin provisioning YAML files here if/when
+# Grafana plugins are added to the stack.

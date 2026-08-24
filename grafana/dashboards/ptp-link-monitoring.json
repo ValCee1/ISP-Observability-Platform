@@ -1,0 +1,638 @@
+{
+    "title": "PTP Link Monitoring",
+    "description": "Drill-down health for every point-to-point radio link (SAF, AirFiber, airMAX, MikroTik) - use the link_id variable or arrive here via the NOC Overview table's row link.",
+    "uid": "ptp-link-monitoring",
+    "schemaVersion": 39,
+    "version": 1,
+    "editable": true,
+    "timezone": "browser",
+    "time": {
+        "from": "now-6h",
+        "to": "now"
+    },
+    "refresh": "30s",
+    "templating": {
+        "list": [
+            {
+                "name": "site",
+                "type": "query",
+                "datasource": "Prometheus",
+                "query": "label_values(link_up, site)",
+                "multi": true,
+                "includeAll": true,
+                "refresh": 2
+            },
+            {
+                "name": "role",
+                "type": "query",
+                "datasource": "Prometheus",
+                "query": "label_values(link_up, role)",
+                "multi": true,
+                "includeAll": true,
+                "refresh": 2
+            },
+            {
+                "name": "vendor",
+                "type": "query",
+                "datasource": "Prometheus",
+                "query": "label_values(link_up, vendor)",
+                "multi": true,
+                "includeAll": true,
+                "refresh": 2
+            },
+            {
+                "name": "link_name",
+                "type": "query",
+                "datasource": "Prometheus",
+                "query": "label_values(link_up{site=~\"$site\", role=~\"$role\", vendor=~\"$vendor\"}, link_name)",
+                "multi": true,
+                "includeAll": true,
+                "refresh": 2
+            },
+            {
+                "name": "link_id",
+                "type": "query",
+                "datasource": "Prometheus",
+                "query": "label_values(link_up, link_id)",
+                "multi": false,
+                "includeAll": false,
+                "refresh": 2
+            }
+        ]
+    },
+    "panels": [
+        {
+            "id": 1,
+            "type": "row",
+            "title": "LINK OVERVIEW",
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 0
+            }
+        },
+        {
+            "id": 2,
+            "type": "stat",
+            "title": "Link Status",
+            "gridPos": {
+                "h": 6,
+                "w": 6,
+                "x": 0,
+                "y": 1
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "link_up{site=~\"$site\", role=~\"$role\", vendor=~\"$vendor\", link_name=~\"$link_name\"}",
+                    "legendFormat": "{{link_name}}"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "mappings": [
+                        {
+                            "type": "value",
+                            "options": {
+                                "0": {
+                                    "text": "DOWN",
+                                    "color": "red"
+                                },
+                                "1": {
+                                    "text": "UP",
+                                    "color": "green"
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "id": 3,
+            "type": "stat",
+            "title": "Latency",
+            "gridPos": {
+                "h": 6,
+                "w": 6,
+                "x": 6,
+                "y": 1
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "link_latency_ms{site=~\"$site\", role=~\"$role\", vendor=~\"$vendor\", link_name=~\"$link_name\"}",
+                    "legendFormat": "{{link_name}}"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "ms",
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "value": 0,
+                                "color": "green"
+                            },
+                            {
+                                "value": 30,
+                                "color": "orange"
+                            },
+                            {
+                                "value": 100,
+                                "color": "red"
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        {
+            "id": 4,
+            "type": "stat",
+            "title": "Packet Loss",
+            "gridPos": {
+                "h": 6,
+                "w": 6,
+                "x": 12,
+                "y": 1
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "link_packet_loss_percent{site=~\"$site\", role=~\"$role\", vendor=~\"$vendor\", link_name=~\"$link_name\"}",
+                    "legendFormat": "{{link_name}}"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percent",
+                    "min": 0,
+                    "max": 100,
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "value": 0,
+                                "color": "green"
+                            },
+                            {
+                                "value": 2,
+                                "color": "orange"
+                            },
+                            {
+                                "value": 10,
+                                "color": "red"
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        {
+            "id": 5,
+            "type": "stat",
+            "title": "Utilization",
+            "gridPos": {
+                "h": 6,
+                "w": 6,
+                "x": 18,
+                "y": 1
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "link_utilization_percent{site=~\"$site\", role=~\"$role\", vendor=~\"$vendor\", link_name=~\"$link_name\"}",
+                    "legendFormat": "{{link_name}}"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percent",
+                    "min": 0,
+                    "max": 100,
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "value": 0,
+                                "color": "green"
+                            },
+                            {
+                                "value": 70,
+                                "color": "orange"
+                            },
+                            {
+                                "value": 85,
+                                "color": "red"
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        {
+            "id": 6,
+            "type": "row",
+            "title": "ENDPOINT / RADIO HEALTH",
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 7
+            }
+        },
+        {
+            "id": 7,
+            "type": "table",
+            "title": "Link Summary",
+            "gridPos": {
+                "h": 8,
+                "w": 24,
+                "x": 0,
+                "y": 8
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "link_signal_dbm{link_id=\"$link_id\"}",
+                    "refId": "Signal",
+                    "instant": true
+                },
+                {
+                    "expr": "link_noise_dbm{link_id=\"$link_id\"}",
+                    "refId": "Noise",
+                    "instant": true
+                },
+                {
+                    "expr": "link_quality_percent{link_id=\"$link_id\"}",
+                    "refId": "Quality",
+                    "instant": true
+                },
+                {
+                    "expr": "link_interface_state{link_id=\"$link_id\"}",
+                    "refId": "Interface",
+                    "instant": true
+                },
+                {
+                    "expr": "link_uptime_seconds{link_id=\"$link_id\"} / 86400",
+                    "refId": "UptimeDays",
+                    "instant": true
+                },
+                {
+                    "expr": "link_interface_in_errors{link_id=\"$link_id\"}",
+                    "refId": "InErrors",
+                    "instant": true
+                },
+                {
+                    "expr": "link_interface_out_errors{link_id=\"$link_id\"}",
+                    "refId": "OutErrors",
+                    "instant": true
+                },
+                {
+                    "expr": "link_up{link_id=\"$link_id\"}",
+                    "refId": "RFUp",
+                    "instant": true
+                }
+            ],
+            "transformations": [
+                {
+                    "id": "merge",
+                    "options": {}
+                }
+            ]
+        },
+        {
+            "id": 8,
+            "type": "row",
+            "title": "RF HEALTH & LINK QUALITY",
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 17
+            }
+        },
+        {
+            "id": 9,
+            "type": "timeseries",
+            "title": "Signal / Noise / SNR",
+            "gridPos": {
+                "h": 7,
+                "w": 16,
+                "x": 0,
+                "y": 18
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "link_signal_dbm{site=~\"$site\", role=~\"$role\", vendor=~\"$vendor\", link_name=~\"$link_name\"}",
+                    "legendFormat": "{{link_name}} signal"
+                },
+                {
+                    "expr": "link_noise_dbm{site=~\"$site\", role=~\"$role\", vendor=~\"$vendor\", link_name=~\"$link_name\"}",
+                    "legendFormat": "{{link_name}} noise"
+                },
+                {
+                    "expr": "link_snr_db{site=~\"$site\", role=~\"$role\", vendor=~\"$vendor\", link_name=~\"$link_name\"}",
+                    "legendFormat": "{{link_name}} SNR"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "dBm"
+                }
+            }
+        },
+        {
+            "id": 10,
+            "type": "gauge",
+            "title": "Link Quality / CCQ",
+            "gridPos": {
+                "h": 7,
+                "w": 8,
+                "x": 16,
+                "y": 18
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "link_quality_percent{site=~\"$site\", role=~\"$role\", vendor=~\"$vendor\", link_name=~\"$link_name\"}",
+                    "legendFormat": "{{link_name}}"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percent",
+                    "min": 0,
+                    "max": 100,
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "value": 0,
+                                "color": "red"
+                            },
+                            {
+                                "value": 70,
+                                "color": "orange"
+                            },
+                            {
+                                "value": 90,
+                                "color": "green"
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        {
+            "id": 11,
+            "type": "row",
+            "title": "PERFORMANCE & CAPACITY",
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 25
+            }
+        },
+        {
+            "id": 12,
+            "type": "timeseries",
+            "title": "Latency & Packet Loss",
+            "gridPos": {
+                "h": 7,
+                "w": 12,
+                "x": 0,
+                "y": 26
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "link_latency_ms{site=~\"$site\", role=~\"$role\", vendor=~\"$vendor\", link_name=~\"$link_name\"}",
+                    "legendFormat": "{{link_name}} latency"
+                },
+                {
+                    "expr": "link_packet_loss_percent{site=~\"$site\", role=~\"$role\", vendor=~\"$vendor\", link_name=~\"$link_name\"}",
+                    "legendFormat": "{{link_name}} loss"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {}
+            }
+        },
+        {
+            "id": 13,
+            "type": "timeseries",
+            "title": "Traffic / Capacity / Utilization",
+            "gridPos": {
+                "h": 7,
+                "w": 12,
+                "x": 12,
+                "y": 26
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "link_tx_bps{site=~\"$site\", role=~\"$role\", vendor=~\"$vendor\", link_name=~\"$link_name\"}",
+                    "legendFormat": "{{link_name}} TX"
+                },
+                {
+                    "expr": "link_rx_bps{site=~\"$site\", role=~\"$role\", vendor=~\"$vendor\", link_name=~\"$link_name\"}",
+                    "legendFormat": "{{link_name}} RX"
+                },
+                {
+                    "expr": "link_capacity_bps{site=~\"$site\", role=~\"$role\", vendor=~\"$vendor\", link_name=~\"$link_name\"}",
+                    "legendFormat": "{{link_name}} capacity"
+                },
+                {
+                    "expr": "link_utilization_percent{site=~\"$site\", role=~\"$role\", vendor=~\"$vendor\", link_name=~\"$link_name\"}",
+                    "legendFormat": "{{link_name}} utilization %"
+                }
+            ]
+        },
+        {
+            "id": 14,
+            "type": "row",
+            "title": "DEGRADATION & ERRORS",
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 34
+            }
+        },
+        {
+            "id": 15,
+            "type": "timeseries",
+            "title": "Interface Errors (rate/s)",
+            "gridPos": {
+                "h": 6,
+                "w": 12,
+                "x": 0,
+                "y": 35
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "rate(link_interface_in_errors{site=~\"$site\", role=~\"$role\", vendor=~\"$vendor\", link_name=~\"$link_name\"}[5m])",
+                    "legendFormat": "{{link_name}} in errors"
+                },
+                {
+                    "expr": "rate(link_interface_out_errors{site=~\"$site\", role=~\"$role\", vendor=~\"$vendor\", link_name=~\"$link_name\"}[5m])",
+                    "legendFormat": "{{link_name}} out errors"
+                }
+            ]
+        },
+        {
+            "id": 16,
+            "type": "timeseries",
+            "title": "RF / Capacity Trend",
+            "gridPos": {
+                "h": 6,
+                "w": 12,
+                "x": 12,
+                "y": 35
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "link_signal_dbm{site=~\"$site\", role=~\"$role\", vendor=~\"$vendor\", link_name=~\"$link_name\"}",
+                    "legendFormat": "{{link_name}} signal"
+                },
+                {
+                    "expr": "link_quality_percent{site=~\"$site\", role=~\"$role\", vendor=~\"$vendor\", link_name=~\"$link_name\"}",
+                    "legendFormat": "{{link_name}} quality"
+                },
+                {
+                    "expr": "link_capacity_bps{site=~\"$site\", role=~\"$role\", vendor=~\"$vendor\", link_name=~\"$link_name\"}",
+                    "legendFormat": "{{link_name}} capacity"
+                }
+            ]
+        },
+        {
+            "id": 17,
+            "type": "row",
+            "title": "VENDOR-SPECIFIC DIAGNOSTICS",
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 42
+            }
+        },
+        {
+            "id": 18,
+            "type": "timeseries",
+            "title": "SAF: MSE / FEC Error Ratio",
+            "gridPos": {
+                "h": 6,
+                "w": 12,
+                "x": 0,
+                "y": 43
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "link_mse_db{site=~\"$site\", link_name=~\"$link_name\"}",
+                    "legendFormat": "{{link_name}} MSE"
+                }
+            ]
+        },
+        {
+            "id": 19,
+            "type": "timeseries",
+            "title": "airMAX: Quality / Capacity %",
+            "gridPos": {
+                "h": 6,
+                "w": 12,
+                "x": 12,
+                "y": 43
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "ubiquiti_airmax_quality_percent{site=~\"$site\", link_name=~\"$link_name\"}",
+                    "legendFormat": "{{link_name}} airMAX quality"
+                },
+                {
+                    "expr": "ubiquiti_airmax_capacity_percent{site=~\"$site\", link_name=~\"$link_name\"}",
+                    "legendFormat": "{{link_name}} airMAX capacity"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percent",
+                    "min": 0,
+                    "max": 100
+                }
+            }
+        },
+        {
+            "id": 20,
+            "type": "gauge",
+            "title": "Link Health Score",
+            "gridPos": {
+                "h": 6,
+                "w": 6,
+                "x": 0,
+                "y": 49
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "link_endpoint_health_score{link_id=\"$link_id\"}",
+                    "legendFormat": "{{endpoint}}"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "min": 0,
+                    "max": 100,
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "value": 0,
+                                "color": "red"
+                            },
+                            {
+                                "value": 60,
+                                "color": "orange"
+                            },
+                            {
+                                "value": 85,
+                                "color": "green"
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        {
+            "id": 21,
+            "type": "timeseries",
+            "title": "SAF: Capacity & Modem Lock",
+            "gridPos": {
+                "h": 6,
+                "w": 18,
+                "x": 6,
+                "y": 49
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "link_capacity_bps{link_id=\"$link_id\"}",
+                    "legendFormat": "{{endpoint}} capacity"
+                }
+            ]
+        }
+    ],
+    "annotations": {
+        "list": []
+    },
+    "links": []
+}

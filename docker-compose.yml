@@ -1,20 +1,32 @@
+# ISP observability stack: Prometheus scrapes MikroTik routers + PTP link
+# radios via SNMP (through snmp-exporter) and checks link reachability via
+# ICMP (through blackbox-exporter). Grafana visualizes it, Alertmanager
+# routes firing alerts to Telegram. All services share the "monitoring"
+# bridge network so they can reach each other by container name.
 services:
+  # Metrics store + rule/alert evaluation engine. Reads its own config plus
+  # the recording/alerting rules and SNMP/ICMP target lists from the repo,
+  # all mounted read-only so containers can't modify our source of truth.
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.13.2
     container_name: prometheus
     restart: unless-stopped
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./prometheus/targets:/etc/prometheus/targets:ro
       - ./prometheus/rules:/etc/prometheus/rules:ro
-      - prometheus_data:/prometheus
+      - prometheus_data:/prometheus   # TSDB storage, persisted across restarts
     ports:
       - "9090:9090"
     networks:
       - monitoring
 
+  # Proxies SNMP walks as HTTP scrapes. Prometheus calls it with ?target=
+  # and ?module= (see prometheus.yml relabel_configs); it does the actual
+  # SNMP GET/WALK against the router or radio and returns Prometheus-format
+  # metrics. Module/OID definitions live in snmp_exporter/snmp.yml.
   snmp-exporter:
-    image: prom/snmp-exporter:latest
+    image: prom/snmp-exporter:v0.30.1
     container_name: snmp-exporter
     restart: unless-stopped
     volumes:
@@ -24,8 +36,13 @@ services:
     networks:
       - monitoring
 
+  # Dashboards. Auto-provisioned from grafana/provisioning (datasource +
+  # dashboard folder pointers) and grafana/dashboards (the dashboard JSON
+  # itself), so dashboards are version-controlled rather than edited only
+  # in the UI. Admin password is injected via a Docker secret, never a
+  # plaintext env var.
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:13.2.0
     container_name: grafana
     restart: unless-stopped
     environment:
@@ -44,8 +61,12 @@ services:
     networks:
       - monitoring
 
+  # Receives firing/resolved alerts from Prometheus (see the
+  # `alerting.alertmanagers` block in prometheus.yml) and forwards them to
+  # the NOC Telegram group per alertmanager/alertmanager.yml. Bot token is
+  # a Docker secret, kept out of the compose file and git history.
   alertmanager:
-    image: prom/alertmanager:latest
+    image: prom/alertmanager:v0.33.1
     container_name: alertmanager
     restart: unless-stopped
     volumes:
@@ -58,11 +79,34 @@ services:
     networks:
       - monitoring
 
+  # Active reachability probing (ICMP ping) for PTP links, independent of
+  # SNMP - this is what still tells you a link is down even if the radio's
+  # SNMP agent itself has gone unresponsive. Needs NET_RAW to open raw
+  # ICMP sockets inside the container.
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.28.0
+    container_name: blackbox-exporter
+    restart: unless-stopped
+    cap_add:
+      - NET_RAW   # required for the ICMP prober
+    volumes:
+      - ./blackbox/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+    ports:
+      - "9115:9115"
+    networks:
+      - monitoring
+
+# Docker secrets: mounted into containers as read-only files under
+# /run/secrets/<name>, never as environment variables. Fill these files in
+# locally before `docker compose up` - both are gitignored.
 secrets:
   grafana_admin_password:
     file: ./secrets/grafana_admin_password.txt
   telegram_bot_token:
     file: ./secrets/telegram_bot_token.txt
+
+# Named volumes persist container state across `docker compose down`/`up`.
+# Only removed by an explicit `docker compose down -v`.
 volumes:
   prometheus_data:
   grafana_data:

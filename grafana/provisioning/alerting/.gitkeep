@@ -1,0 +1,7 @@
+# Intentionally empty. Its presence stops Grafana logging
+# "can't read alerting provisioning files from directory" on startup - see
+# grafana/provisioning/plugins/.gitkeep for why.
+#
+# This project deliberately alerts via Prometheus + Alertmanager (see
+# prometheus/rules/*.yml and alertmanager/alertmanager.yml), not Grafana's
+# own alerting engine, so this directory is expected to stay empty.

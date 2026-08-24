@@ -1,0 +1,78 @@
+groups:
+  # STATE - the link is down. Critical, page immediately.
+  - name: link-state
+    rules:
+      - alert: LinkDown
+        expr: link_up == 0
+        for: 2m
+        labels:
+          severity: critical
+          category: state
+        annotations:
+          summary: "🔴 Link DOWN"
+          description: "{{ $labels.link_name }} has been unreachable for 2 minutes."
+
+  # HEALTH - the link is up, but degrading. Warning, not urgent, but worth
+  # catching before it becomes a state problem.
+  - name: link-health
+    rules:
+      - alert: WeakSignal
+        expr: link_signal_dbm < -80
+        for: 5m
+        labels:
+          severity: warning
+          category: health
+        annotations:
+          summary: "🟠 Weak Signal"
+          description: "{{ $labels.link_name }} signal has been below -80 dBm for 5 minutes (currently {{ $value }} dBm)."
+
+      - alert: LowLinkQuality
+        expr: link_quality_percent < 70
+        for: 5m
+        labels:
+          severity: warning
+          category: health
+        annotations:
+          summary: "🟠 Low Link Quality"
+          description: '{{ $labels.link_name }} quality has been below 70% for 5 minutes (currently {{ $value | printf "%.1f" }}%).'
+
+      - alert: HighLatencyVariability
+        expr: link_latency_variability_seconds > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          category: health
+        annotations:
+          summary: "🟠 Unstable Latency"
+          description: "{{ $labels.link_name }} latency variability has exceeded 50ms for 5 minutes - link is up but inconsistent."
+
+      - alert: RisingInterfaceErrors
+        expr: rate(link_interface_in_errors[5m]) > 0 or rate(link_interface_out_errors[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          category: health
+        annotations:
+          summary: "🟠 Interface Errors"
+          description: "{{ $labels.link_name }} ({{ $labels.ifName }}) is logging interface errors - possible cabling, duplex, or hardware issue."
+
+  # The actual point of separating state from health: a link that's UP but
+  # visibly failing. This is the case a plain up/down monitor misses
+  # entirely - signal/quality dropping while link_up still reads 1.
+  - name: link-degrading
+    rules:
+      - alert: LinkUpButDegrading
+        expr: |
+          link_up == 1
+          and on(link_id, endpoint, site, role, vendor, link_name) (
+            link_signal_dbm < -78
+            or link_quality_percent < 60
+            or link_probe_failure_ratio > 0.05
+          )
+        for: 10m
+        labels:
+          severity: warning
+          category: degrading
+        annotations:
+          summary: "🟡 Link degrading (still up)"
+          description: "{{ $labels.link_name }} is reachable but showing sustained signal/quality/reliability degradation - investigate before it goes down."

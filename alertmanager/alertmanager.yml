@@ -1,9 +1,65 @@
+global:
+  resolve_timeout: 5m
+
+# REWRITTEN (2026-08-23) to stop Telegram spam. The old config had one flat
+# route grouping by {alertname, instance}, which meant a single real event
+# (e.g. a link dropping) could fire LinkDown + WeakSignal + RisingInterfaceErrors
+# as three SEPARATE alertname groups -> three separate Telegram messages for
+# one problem. It also had no inhibition, so once a link/router is fully
+# down, its now-stale health/degrading alerts could still notify separately
+# instead of being suppressed by the more useful "it's down" alert.
+#
+# Fix has two parts:
+#   1. Route tree below groups every alert about the same *entity* (one PTP
+#      link, or one router) into a single notification, and gives critical
+#      alerts a shorter repeat_interval than warnings so paging cadence
+#      matches severity instead of one blanket 3h for everything.
+#   2. inhibit_rules (bottom of file) suppress the alerts that are just
+#      symptoms of a bigger one already firing for the same entity - e.g.
+#      once LinkDown is firing for a link, its WeakSignal/RisingInterfaceErrors
+#      alerts (which are actively noisy right as a link drops, per the
+#      live testing on 2026-08-23) go silent until LinkDown resolves.
 route:
   receiver: telegram
-  group_by: ["alertname", "instance"]
+  group_by: ["alertname"]   # only used if nothing below matches (shouldn't happen - every alert carries `instance`)
   group_wait: 30s
   group_interval: 5m
   repeat_interval: 3h
+
+  routes:
+    # PTP link alerts (link-alerts.yml) all carry a link_id label shared by
+    # both endpoints of the same physical link. Grouping by link_id (NOT
+    # instance, which differs per endpoint) means LinkDown + WeakSignal +
+    # RisingInterfaceErrors for the two ends of one link land in ONE
+    # Telegram message instead of up to six.
+    - match_re:
+        link_id: ".+"
+      group_by: ["link_id"]
+      group_wait: 30s
+      group_interval: 5m
+      routes:
+        - match:
+            severity: critical
+          repeat_interval: 1h    # a link actually down - keep reminding hourly until it's fixed
+        - match:
+            severity: warning
+          repeat_interval: 6h    # degraded-but-up - don't need hourly nagging
+
+    # Everything else (router-level alerts from mikrotik-alerts.yml - no
+    # link_id) groups by instance instead, so CoreRouterDown + HighCPU +
+    # HighMemory for the same router land in one message too.
+    - match_re:
+        instance: ".+"
+      group_by: ["instance"]
+      group_wait: 30s
+      group_interval: 5m
+      routes:
+        - match:
+            severity: critical
+          repeat_interval: 1h
+        - match:
+            severity: warning
+          repeat_interval: 6h
 
 receivers:
   - name: telegram
@@ -12,8 +68,58 @@ receivers:
         chat_id: -1004387943176 # This is the alert group ID
         api_url: https://api.telegram.org
         parse_mode: HTML
-        send_resolved: true
+        send_resolved: true   # also sends a "resolved" message when the alert clears
+        # One Telegram message per notification batch, listing every alert
+        # in the batch: bold summary line, then description, per alert. If
+        # a batch groups several alerts for one link/router (see routes
+        # above), they all appear stacked in this one message.
         message: |
           {{ range .Alerts }}{{ if eq .Status "firing" }}<b>{{ .Annotations.summary }}</b>{{ else }}✅ <b>RESOLVED:</b> {{ .Annotations.summary }}{{ end }}
           {{ .Annotations.description }}
           {{ end }}
+
+# Suppress lower-priority alerts about an entity that's already covered by
+# a bigger, currently-firing alert for that SAME entity (`equal:` is the
+# join key - both source and target alert must share that label value).
+# This is what actually stops the notification burst a real outage
+# produces: instead of getting LinkDown + WeakSignal + RisingInterfaceErrors
+# as separate messages, you get LinkDown, and the other two are inhibited
+# for as long as LinkDown keeps firing.
+inhibit_rules:
+  # A link that's fully down doesn't need its degrading/health-tier alerts
+  # (WeakSignal, LowLinkQuality, HighLatencyVariability, RisingInterfaceErrors,
+  # LinkUpButDegrading) also notifying - they're just noise once you already
+  # know it's down.
+  - source_match:
+      alertname: LinkDown
+    target_match_re:
+      category: "health|degrading"
+    equal: ["link_id"]
+
+  # LinkUpButDegrading is a deliberately-broader "something's wrong while
+  # still up" signal (link-alerts.yml) - once it's firing for a link, the
+  # narrower single-condition health alerts it was built to summarize
+  # (WeakSignal, LowLinkQuality, HighLatencyVariability) are redundant.
+  - source_match:
+      category: degrading
+    target_match:
+      category: health
+    equal: ["link_id"]
+
+  # A router that's fully unreachable will also trip its own CPU/memory/
+  # WAN alerts as soon as SNMP starts timing out on stale data - those add
+  # nothing once you already know the whole router is down.
+  - source_match:
+      alertname: CoreRouterDown
+    target_match_re:
+      category: "health"
+    equal: ["instance"]
+
+  # If the WAN link itself is down, CPU/memory alerts on that router
+  # (which may also be affected, e.g. retry storms) aren't the useful
+  # signal right now - the WAN outage is.
+  - source_match:
+      alertname: WANInterfaceDown
+    target_match:
+      severity: warning
+    equal: ["instance"]

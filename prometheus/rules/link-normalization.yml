@@ -1,0 +1,149 @@
+# Category 1: Availability (blackbox ICMP)
+# Raw signal is link_up - everything else here is DERIVED via PromQL over a
+# window, not a literal re-measurement. Naming reflects that: "failure
+# ratio" not "packet loss", "latency variability" not "jitter" - blackbox
+# does one probe per scrape, not a burst test, so the numbers mean
+# something different from `ping -c 5` and should be named accordingly.
+groups:
+  - name: link-availability
+    rules:
+      - record: link_up
+        expr: probe_success{job="link-availability"}
+
+      - record: link_latency_seconds
+        expr: probe_duration_seconds{job="link-availability"}
+
+      - record: link_probe_failure_ratio
+        expr: (1 - avg_over_time(probe_success{job="link-availability"}[5m]))
+
+      - record: link_latency_variability_seconds
+        expr: stddev_over_time(probe_duration_seconds{job="link-availability"}[5m])
+
+  - name: link-interface-health
+    rules:
+      # CONFIRMED against live devices (2026-08-23): a fixed ifName filter
+      # doesn't work across vendors. airMAX (LiteBeam) devices return an
+      # EMPTY ifName for every interface (SNMP agent quirk - the ifXTable
+      # entries exist but the DisplayString lookup comes back blank), and
+      # they don't expose the 64-bit HC octet counters at all, so there is
+      # nothing to filter on there regardless. AirFiber's radio interface
+      # is actually named "ath0", not "WLAN0"/"wlan*". SAF has no ifName
+      # label at all (its ports are indexed by port_index). A name-based
+      # filter can therefore only ever work for MikroTik-style devices.
+      #
+      # Instead: sum every non-loopback interface's octet rate per device
+      # and take the single highest-throughput interface (topk 1) as "the
+      # link's traffic" - on a single-purpose bridge/radio, whichever
+      # interface is actually forwarding the link's traffic will dominate
+      # the others (idle management ports, loopback, etc. stay near zero).
+      # This is vendor- and ifName-agnostic, so it keeps working even if a
+      # device's naming/labeling is broken or missing, at the cost of a
+      # (rare) chance of picking the wrong interface if two ports on the
+      # same device are pushing similar throughput. Revisit with a proper
+      # per-vendor ifName once each device's real radio ifName is
+      # confirmed via snmpwalk.
+      - record: link_tx_bps
+        expr: >
+          topk by (link_id, endpoint, site, role, vendor, link_name) (
+            1,
+            rate(link_interface_out_octets{job="link-interface-health", ifName!="lo"}[5m]) * 8
+          )
+
+      - record: link_rx_bps
+        expr: >
+          topk by (link_id, endpoint, site, role, vendor, link_name) (
+            1,
+            rate(link_interface_in_octets{job="link-interface-health", ifName!="lo"}[5m]) * 8
+          )
+
+  - name: link-derived-metrics
+    rules:
+      - record: link_latency_ms
+        expr: link_latency_seconds * 1000
+
+      - record: link_packet_loss_percent
+        expr: link_probe_failure_ratio * 100
+
+      # link_noise_dbm only exists where the vendor SNMP module maps a
+      # noise-floor OID (currently airMAX only - see link-schema-notes.md).
+      # AirFiber/SAF simply won't produce a link_snr_db series, which is
+      # correct (no fabricated numbers) but means anything joining on
+      # link_snr_db must tolerate it being absent - see
+      # link_endpoint_health_score below.
+      - record: link_snr_db
+        expr: link_signal_dbm - link_noise_dbm
+
+      # Vendor-agnostic link capacity, built from each vendor's raw units
+      # (see snmp_exporter/snmp.yml): AirFiber's OID is already bits/sec;
+      # SAF's is kb/s and needs the x1000. Was link_capacity_bps
+      # previously produced directly by both SNMP modules under the same
+      # name with DIFFERENT units - that made SAF's utilization read
+      # ~6000% (confirmed live, 2026-08-23) once link_tx_bps started
+      # working. Normalizing here, once, in one place, is the fix.
+      - record: link_capacity_bps
+        expr: airfiber_rx_capacity_bps or (saf_modem_capacity_kbps * 1000)
+
+      # SAF's raw MSE value is "the real number x10" per its MIB (e.g. raw
+      # -320 means -32.0 dB) - never actually divided back down until now.
+      - record: link_mse_db
+        expr: saf_modem_mse_raw / 10
+
+      # NOTE: link_capacity_bps only exists for AirFiber and SAF links -
+      # airMAX and MikroTik-radio links have no capacity metric yet, so
+      # this intentionally reports no data for those links until a
+      # capacity source is added for them.
+      - record: link_utilization_percent
+        expr: >
+          (link_tx_bps > link_rx_bps or link_rx_bps)
+          / on(link_id, endpoint, site, role, vendor, link_name)
+          link_capacity_bps * 100
+
+  - name: link-composite-health
+    rules:
+      # A single 0-100 score per link *endpoint*, built by starting at 100
+      # and subtracting weighted, capped penalties for each problem
+      # category - so one bad dimension can't single-handedly zero out an
+      # otherwise-healthy link, but a link that's actually down still hits
+      # 0 via the last term. Penalty budget: packet loss up to 40, low SNR
+      # up to 30, in/out interface errors up to 15 each, and link_up==0
+      # forces the full 100-point penalty.
+      #
+      # Each penalty term is written as `<penalty> or on(...) (link_up * 0)`
+      # - PromQL's `on()` binary-op join drops a result entirely when the
+      # right-hand series doesn't exist, and link_snr_db doesn't exist at
+      # all for AirFiber/SAF (no noise-floor OID mapped for them yet, see
+      # link_snr_db above). Without the `or` fallback, that missing SNR
+      # penalty would silently erase the ENTIRE health score for those two
+      # vendors - which is exactly the bug confirmed live on 2026-08-23
+      # (link_health_score only ever showed the airMAX link). The `or`
+      # falls back to a zero-penalty term for any link_id/endpoint that has
+      # a link_up series but no SNR data, so every vendor now produces a
+      # score. Once real per-vendor SNR data exists, this still prefers it
+      # over the zero fallback.
+      - record: link_endpoint_health_score
+        expr: >
+          clamp_min(
+            100
+            - clamp_max(link_packet_loss_percent * 5, 40)
+            - on(link_id, endpoint, site, role, vendor, link_name) (
+                clamp_max((25 - link_snr_db) * 2, 30)
+                or on(link_id, endpoint, site, role, vendor, link_name) (link_up * 0)
+              )
+            - on(link_id, endpoint, site, role, vendor, link_name) (
+                clamp_max(sum by (link_id, endpoint, site, role, vendor, link_name) (rate(link_interface_in_errors[5m])) * 10, 15)
+                or on(link_id, endpoint, site, role, vendor, link_name) (link_up * 0)
+              )
+            - on(link_id, endpoint, site, role, vendor, link_name) (
+                clamp_max(sum by (link_id, endpoint, site, role, vendor, link_name) (rate(link_interface_out_errors[5m])) * 10, 15)
+                or on(link_id, endpoint, site, role, vendor, link_name) (link_up * 0)
+              )
+            - on(link_id, endpoint, site, role, vendor, link_name) (1 - link_up) * 100,
+            0
+          )
+
+      # A PTP link has two endpoints (a/b) - the link as a whole is only as
+      # healthy as its worse-off side, so roll the two endpoint scores up
+      # to one link_health_score by taking the min per link_id. This is
+      # what noc-overview.json's "All Links" table displays.
+      - record: link_health_score
+        expr: min by (link_id) (link_endpoint_health_score)

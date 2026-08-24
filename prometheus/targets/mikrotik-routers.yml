@@ -1,5 +1,22 @@
+# MikroTik core routers scraped by the "snmp-mikrotik" job in
+# prometheus.yml, via the generic `mikrotik` SNMP module. One block per
+# router; add more `- targets: [...]` entries below as routers are added.
+# `site`/`role` are free-form labels attached to every metric from this
+# router - used by dashboards to group/filter by location or function.
+#
+# `wan_ifname` documents which ifName is this router's real WAN uplink
+# (dashboards use it, e.g. "WAN Interface: {{wan_ifname}}"). It is NOT
+# currently consumed by the WANInterfaceDown alert in mikrotik-alerts.yml -
+# PromQL can't dynamically join an alert's ifName match against a
+# per-instance label value, so that alert still hardcodes its ifName regex
+# per router. With one router this is a non-issue; if a second router with
+# a different WAN ifName is added, either give it its own alert rule or
+# switch to a generated rules file. Confirmed on this router
+# (2026-08-23): "ether1" is NOT the WAN - it's an unused/down physical
+# port, the real uplink is the "chiemerie-ppp" PPPoE interface.
 - targets:
     - 192.168.10.1
   labels:
     site: "main-office"
     role: "core-router"
+    wan_ifname: "chiemerie-ppp"

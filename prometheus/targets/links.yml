@@ -1,0 +1,77 @@
+# LINK-001: Tower A ↔ Tower B (AirMAX)
+- targets: ["192.168.10.2"]
+  labels:
+    {
+      module: ubiquiti_airmax_link,
+      auth: public_v1,
+      link_name: litebeam-a,
+      link_id: HOME-GSIA,
+      endpoint: a,
+      site: Home,
+      role: P2P,
+      vendor: ubiquiti_airmax,
+    }
+- targets: ["192.168.10.3"]
+  labels:
+    {
+      module: ubiquiti_airmax_link,
+      auth: public_v1,
+      link_name: litebeam-b,
+      link_id: HOME-GSIA,
+      endpoint: b,
+      site: GSIA,
+      role: P2P,
+      vendor: ubiquiti_airmax,
+    }
+
+# LINK-002: Tower A ↔ Tower B (AirFiber)
+- targets: ["10.10.6.82"]
+  labels:
+    {
+      module: ubiquiti_airfiber_link,
+      auth: public_v2,
+      link_name: AirFiber-a,
+      link_id: LINK-002,
+      endpoint: a,
+      site: "BASE A",
+      role: Backhaul,
+      vendor: ubiquiti_airfiber,
+    }
+- targets: ["10.10.6.83"]
+  labels:
+    {
+      module: ubiquiti_airfiber_link,
+      auth: public_v2,
+      link_name: AirFiber-b,
+      link_id: LINK-002,
+      endpoint: b,
+      site: "BASE B",
+      role: Backhaul,
+      vendor: ubiquiti_airfiber,
+    }
+
+# LINK-003: Tower B ↔ Branch (SAF)
+- targets: ["10.10.6.90"]
+  labels:
+    {
+      module: saf_link,
+      auth: saf_v2,
+      link_name: saf-a,
+      link_id: LINK003,
+      endpoint: a,
+      site: BASE A,
+      role: Backhaul,
+      vendor: saf,
+    }
+- targets: ["10.10.6.91"]
+  labels:
+    {
+      module: saf_link,
+      auth: saf_v2,
+      link_name: saf-b,
+      link_id: LINK003,
+      endpoint: b,
+      site: BASE B,
+      role: Backhaul,
+      vendor: saf,
+    }

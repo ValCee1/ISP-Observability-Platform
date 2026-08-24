@@ -1,9 +1,25 @@
+# SNMP exporter config. `auths` are named community/version credential
+# sets; `modules` define what OIDs to walk/read and how to name them as
+# Prometheus metrics. Prometheus selects an auth + module per-target via
+# the `auth`/`module` labels in prometheus/targets/*.yml (see
+# prometheus.yml's relabel_configs for how those become the __param_*
+# query params the exporter reads).
 auths:
   public_v2:
     community: monitoring
     version: 2
+  public_v1:
+    community: monitoring
+    version: 1
+  saf_v2:
+    community: saf-public
+    version: 2
 
 modules:
+  # Generic router health module (standard MIB-2/HOST-RESOURCES OIDs, works
+  # for any RouterOS device): uptime, per-interface counters/state via
+  # IF-MIB, CPU load, and memory/storage usage. Used by the "snmp-mikrotik"
+  # job for core routers - see prometheus/targets/mikrotik-routers.yml.
   mikrotik:
     walk:
       - 1.3.6.1.2.1.1 # system
@@ -90,3 +106,268 @@ modules:
             oid: 1.3.6.1.2.1.25.2.3.1.3
             labelname: hrStorageDescr
             type: DisplayString
+
+  # Vendor-neutral interface counters/state for PTP link endpoints
+  # (standard IF-MIB - same OIDs regardless of radio vendor). Paired with
+  # one of the vendor-specific radio modules below for a full picture of a
+  # link endpoint. Used by the "link-interface-health" job.
+  link_interface_health:
+    walk:
+      - 1.3.6.1.2.1.1 # system (adds sysUpTime)
+      - 1.3.6.1.2.1.2 # ifTable
+      - 1.3.6.1.2.1.31.1.1 # ifXTable
+      - 1.3.6.1.2.1.2.2.1.14 # ifInErrors
+      - 1.3.6.1.2.1.2.2.1.20 # ifOutErrors
+    metrics:
+      - name: link_uptime_seconds
+        oid: 1.3.6.1.2.1.1.3
+        type: gauge
+        # raw value is hundredths of a second - divide by 100 in a query/recording rule
+
+      - name: link_interface_state
+        oid: 1.3.6.1.2.1.2.2.1.8
+        type: gauge
+        indexes:
+          - labelname: ifIndex
+            type: gauge
+        lookups:
+          - labels: [ifIndex]
+            oid: 1.3.6.1.2.1.31.1.1.1.1
+            labelname: ifName
+            type: DisplayString
+
+      - name: link_interface_in_octets
+        oid: 1.3.6.1.2.1.31.1.1.1.6
+        type: counter
+        indexes:
+          - labelname: ifIndex
+            type: gauge
+        lookups:
+          - labels: [ifIndex]
+            oid: 1.3.6.1.2.1.31.1.1.1.1
+            labelname: ifName
+            type: DisplayString
+
+      - name: link_interface_out_octets
+        oid: 1.3.6.1.2.1.31.1.1.1.10
+        type: counter
+        indexes:
+          - labelname: ifIndex
+            type: gauge
+        lookups:
+          - labels: [ifIndex]
+            oid: 1.3.6.1.2.1.31.1.1.1.1
+            labelname: ifName
+            type: DisplayString
+
+      - name: link_interface_in_errors
+        oid: 1.3.6.1.2.1.2.2.1.14
+        type: counter
+        indexes:
+          - labelname: ifIndex
+            type: gauge
+        lookups:
+          - labels: [ifIndex]
+            oid: 1.3.6.1.2.1.31.1.1.1.1
+            labelname: ifName
+            type: DisplayString
+
+      - name: link_interface_out_errors
+        oid: 1.3.6.1.2.1.2.2.1.20
+        type: counter
+        indexes:
+          - labelname: ifIndex
+            type: gauge
+        lookups:
+          - labels: [ifIndex]
+            oid: 1.3.6.1.2.1.31.1.1.1.1
+            labelname: ifName
+            type: DisplayString
+
+  # Radio-side health for MikroTik wireless interfaces (sector APs and the
+  # client radios/CPEs associated to them), via the proprietary
+  # MIKROTIK-MIB wireless table. NOTE: as of this pass, no target file
+  # references this module yet - it's defined but not wired into any
+  # prometheus.yml job/target, so sector radio metrics aren't being
+  # collected until a targets file + job (or reuse of "link-radio-health")
+  # points at the sector/CPE IPs with module: mikrotik_wireless_link.
+  mikrotik_wireless_link:
+    # MikroTik's proprietary TxCCQ metric, which is the same as the
+    # "link_quality_percent" metric in the UBNT-AirMAX-MIB module below.
+    walk:
+      - 1.3.6.1.4.1.14988.1.1.1.1.1
+    metrics:
+      - name: link_signal_dbm
+        oid: 1.3.6.1.4.1.14988.1.1.1.1.1.4
+        type: gauge
+        indexes:
+          - labelname: wlan_index
+            type: gauge
+      - name: link_frequency_mhz
+        oid: 1.3.6.1.4.1.14988.1.1.1.1.1.7
+        type: gauge
+        indexes:
+          - labelname: wlan_index
+            type: gauge
+      - name: link_quality_percent
+        oid: 1.3.6.1.4.1.14988.1.1.1.1.1.9
+        type: gauge
+        indexes:
+          - labelname: wlan_index
+            type: gauge
+
+  # Radio-side health for Ubiquiti airMAX PTP links (LiteBeam, NanoBeam,
+  # etc.) - signal, noise, CCQ, channel width, plus airMAX-only extras
+  # (quality/capacity %) kept out of the common link_* schema since they
+  # have no equivalent on other vendors. Used by the "link-radio-health"
+  # job wherever a links.yml target sets module: ubiquiti_airmax_link.
+  ubiquiti_airmax_link:
+    # ubntWlStatTable: ubntAirMAX(4).ubntWlStatTable(5) -> 1.3.6.1.4.1.41112.1.4.5
+    # ubntRadioTable:  ubntAirMAX(4).ubntRadioTable(1)  -> 1.3.6.1.4.1.41112.1.4.1
+    # ubntAirMaxTable: ubntAirMAX(4).ubntAirMaxTable(6) -> 1.3.6.1.4.1.41112.1.4.6
+    walk:
+      - 1.3.6.1.4.1.41112.1.4.5.1 # ubntWlStatEntry
+      - 1.3.6.1.4.1.41112.1.4.1.1.4 # ubntRadioFreq
+      - 1.3.6.1.4.1.41112.1.4.6.1 # ubntAirMaxEntry
+    metrics:
+      - name: link_signal_dbm
+        oid: 1.3.6.1.4.1.41112.1.4.5.1.5 # ubntWlStatSignal (field 5 in the SEQUENCE)
+        type: gauge
+        indexes:
+          - labelname: wlan_index
+            type: gauge
+
+      - name: link_noise_dbm
+        oid: 1.3.6.1.4.1.41112.1.4.5.1.8 # ubntWlStatNoiseFloor (field 8)
+        type: gauge
+        indexes:
+          - labelname: wlan_index
+            type: gauge
+
+      - name: link_quality_percent
+        oid: 1.3.6.1.4.1.41112.1.4.5.1.7 # ubntWlStatCcq (field 7)
+        type: gauge
+        indexes:
+          - labelname: wlan_index
+            type: gauge
+
+      - name: link_channel_width_mhz
+        oid: 1.3.6.1.4.1.41112.1.4.5.1.14 # ubntWlStatChanWidth (field 14)
+        type: gauge
+        indexes:
+          - labelname: wlan_index
+            type: gauge
+
+      - name: link_frequency_mhz
+        oid: 1.3.6.1.4.1.41112.1.4.1.1.4 # ubntRadioFreq (separate table, field 4)
+        type: gauge
+        indexes:
+          - labelname: radio_index
+            type: gauge
+
+      # airMAX-specific extras - deliberately NOT named link_*, no equivalent
+      # on MikroTik/SAF/AirFiber. See link-schema-notes.md for the reasoning.
+      - name: ubiquiti_airmax_quality_percent
+        oid: 1.3.6.1.4.1.41112.1.4.6.1.3 # ubntAirMaxQuality (field 3)
+        type: gauge
+        indexes:
+          - labelname: radio_index
+            type: gauge
+
+      - name: ubiquiti_airmax_capacity_percent
+        oid: 1.3.6.1.4.1.41112.1.4.6.1.4 # ubntAirMaxCapacity (field 4)
+        type: gauge
+        indexes:
+          - labelname: radio_index
+            type: gauge
+
+  # Radio-side health for Ubiquiti AirFiber PTP backhaul links - rx power,
+  # link capacity (already bps, no unit conversion needed), and link state.
+  #
+  # NOTE: the raw capacity OID is named airfiber_rx_capacity_bps, NOT
+  # link_capacity_bps directly - SAF's equivalent OID is in kb/s, not bps
+  # (see saf_link below), so the two vendors' raw values aren't
+  # comparable. The normalized, vendor-agnostic `link_capacity_bps` is
+  # built from both raw metrics in prometheus/rules/link-normalization.yml
+  # - query that one, not the vendor-specific raw metrics, from dashboards
+  # or alerts.
+  ubiquiti_airfiber_link:
+    # airFiberStatusEntry: ubntAirFIBER(3).airFiberStatus(2) -> 1.3.6.1.4.1.41112.1.3.2
+    walk:
+      - 1.3.6.1.4.1.41112.1.3.2.1
+    metrics:
+      - name: link_signal_dbm
+        oid: 1.3.6.1.4.1.41112.1.3.2.1.11 # rxPower0 (field 11)
+        type: gauge
+        indexes:
+          - labelname: radio_index
+            type: gauge
+      - name: airfiber_rx_capacity_bps
+        oid: 1.3.6.1.4.1.41112.1.3.2.1.5 # rxCapacity, bits/sec already (field 5)
+        type: gauge
+        indexes:
+          - labelname: radio_index
+            type: gauge
+      - name: link_interface_state
+        oid: 1.3.6.1.4.1.41112.1.3.2.1.26 # radioLinkState: 0=down, 1=up (field 26)
+        type: gauge
+        indexes:
+          - labelname: radio_index
+            type: gauge
+
+  # Radio-side health for SAF Integra PTP backhaul links - rx level, MSE
+  # (modem error), capacity, modem acquire status, and port state/octets.
+  # MSE and capacity come off the wire in SAF-specific raw units (see the
+  # saf_modem_mse_raw / saf_modem_capacity_kbps comments below) and are
+  # normalized into the vendor-agnostic link_mse_db / link_capacity_bps in
+  # prometheus/rules/link-normalization.yml.
+  saf_link:
+    walk:
+      - 1.3.6.1.4.1.7571.100.1.1.7.1.2 # integraBradio
+      - 1.3.6.1.4.1.7571.100.1.1.7.1.3 # integraBmodem
+      - 1.3.6.1.4.1.7571.100.1.1.7.1.5.1.1 # integraBifStatusTable (port state)
+      - 1.3.6.1.4.1.7571.100.1.1.7.1.5.2.1 # integraBifStatisticsTable (octets)
+    metrics:
+      - name: link_signal_dbm
+        oid: 1.3.6.1.4.1.7571.100.1.1.7.1.2.3 # integraBradioRxLevel
+        type: gauge
+
+      - name: saf_modem_mse_raw
+        oid: 1.3.6.1.4.1.7571.100.1.1.7.1.3.2 # integraBmodemRadialMse
+        type: gauge
+        # MIB note: "floating point value multiplied by 10" (e.g. raw -320
+        # means -32.0 dB). Normalized (raw / 10) as link_mse_db in
+        # prometheus/rules/link-normalization.yml - query that, not this.
+
+      - name: saf_modem_capacity_kbps
+        oid: 1.3.6.1.4.1.7571.100.1.1.7.1.3.10 # integraBmodemRxCapacity, kb/s
+        type: gauge
+        # kb/s, NOT bps - see the airfiber_rx_capacity_bps note above.
+        # Normalized (raw * 1000) into the vendor-agnostic
+        # link_capacity_bps in prometheus/rules/link-normalization.yml.
+
+      - name: saf_modem_acquire_status
+        oid: 1.3.6.1.4.1.7571.100.1.1.7.1.3.1 # integraBmodemAcquireStatus: 1=inProgress,2=locked,3=failed
+        type: gauge
+        # fold into link_interface_state via recording rule: ==2 -> 1, else 0
+
+      - name: link_interface_state
+        oid: 1.3.6.1.4.1.7571.100.1.1.7.1.5.1.1.8 # integraBifPortOperStatus: 1=up,2=down,3=unknown
+        type: gauge
+        indexes:
+          - labelname: port_index
+            type: gauge
+
+      - name: link_interface_in_octets
+        oid: 1.3.6.1.4.1.7571.100.1.1.7.1.5.2.1.24 # integraBifIfInOctets
+        type: counter
+        indexes:
+          - labelname: port_index
+            type: gauge
+
+      - name: link_interface_out_octets
+        oid: 1.3.6.1.4.1.7571.100.1.1.7.1.5.2.1.25 # integraBifIfOutOctets
+        type: counter
+        indexes:
+          - labelname: port_index
+            type: gauge

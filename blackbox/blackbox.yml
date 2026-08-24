@@ -1,0 +1,9 @@
+# Blackbox exporter probe modules. Prometheus's "link-availability" job
+# (prometheus.yml) calls this exporter with ?target=<link-ip>&module=icmp
+# to actively ping each PTP link endpoint, independent of SNMP.
+modules:
+  icmp:
+    prober: icmp
+    timeout: 5s
+    icmp:
+      preferred_ip_protocol: "ip4"   # force IPv4 pings; avoids ICMPv6 surprises on dual-stack hosts

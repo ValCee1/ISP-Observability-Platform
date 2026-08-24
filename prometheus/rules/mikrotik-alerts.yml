@@ -6,34 +6,46 @@ groups:
         for: 30s
         labels:
           severity: critical
+          category: state
         annotations:
           summary: "🔴 Core Router DOWN"
-          description: "Router {{ $labels.instance }} has been unreachable for 2 minutes."
+          description: "Router {{ $labels.instance }} has been unreachable for 30 seconds."
 
-      # Edit the ifName regex below to match your actual WAN interface name(s)
+      # FIXED (2026-08-23): this used to also match "ether1", which on the
+      # live router is oper-down permanently because it's simply an unused
+      # port - not the WAN. That made WANInterfaceDown fire forever as a
+      # false positive alongside a permanently-firing WANInterfaceUp for
+      # chiemerie-ppp. "chiemerie-ppp" (the PPPoE session) is the actual
+      # WAN uplink - see the wan_ifname label/comment in
+      # prometheus/targets/mikrotik-routers.yml. If you add a second
+      # router with a different WAN interface name, this regex needs a
+      # second alternative (or its own rule) added explicitly - Prometheus
+      # alert expressions can't dynamically read the wan_ifname label of
+      # the instance they're evaluating.
       - alert: WANInterfaceDown
-        expr: ifOperStatus{ifName=~"ether1|chiemerie-ppp"} == 2
-        for: 10s
+        expr: ifOperStatus{ifName="chiemerie-ppp"} == 2
+        for: 2m
         labels:
-          severity: warning
+          severity: critical
+          category: state
         annotations:
-          summary: "🟠 WAN Interface DOWN"
+          summary: "🔴 WAN Interface DOWN"
           description: "{{ $labels.ifName }} on {{ $labels.instance }} has gone down."
 
-      - alert: WANInterfaceUp
-        expr: ifOperStatus{ifName=~"ether1|chiemerie-ppp"} == 1
-        for: 30s
-        labels:
-          severity: info
-        annotations:
-          summary: "🟢 WAN Interface UP"
-          description: "{{ $labels.ifName }} on {{ $labels.instance }} is up."
+      # REMOVED: WANInterfaceUp (fired continuously whenever the WAN was
+      # simply up, re-notifying Telegram every repeat_interval forever -
+      # confirmed firing throughout this session). Recovery is already
+      # covered for free: WANInterfaceDown's `send_resolved: true` in
+      # alertmanager.yml sends a "✅ RESOLVED" message the moment the WAN
+      # comes back, without needing a second always-on alert for the
+      # steady "everything is fine" state.
 
       - alert: HighCPU
         expr: hrProcessorLoad > 80
         for: 3m
         labels:
           severity: warning
+          category: health
         annotations:
           summary: "🟠 High CPU"
           description: 'CPU on {{ $labels.instance }} has been above 80% for 5 minutes (currently {{ $value | printf "%.1f" }}%).'
@@ -43,6 +55,25 @@ groups:
         for: 3m
         labels:
           severity: warning
+          category: health
         annotations:
           summary: "🟠 High Memory"
           description: 'Memory on {{ $labels.instance }} has been above 75% for 3 minutes (currently {{ $value | printf "%.1f" }}%).'
+
+      # NOTE: link_signal_dbm is the normalized link_* schema metric
+      # (populated by the link-radio-health job for PTP link endpoints,
+      # not by snmp-mikrotik). This rule intentionally duplicates the
+      # threshold check already covered by link-alerts.yml's WeakSignal
+      # rule; kept here as a router-scoped safety net in case a link
+      # radio ever gets scraped only via the mikrotik job. If that never
+      # happens, this rule simply never fires (no ifName/instance overlap
+      # with mikrotik-core's other alerts).
+      - alert: WeakSignal
+        expr: link_signal_dbm < -75
+        for: 5m
+        labels:
+          severity: warning
+          category: health
+        annotations:
+          summary: "🟠 Weak Signal"
+          description: 'Signal on {{ $labels.instance }} has been below -75 dBm for 5 minutes (currently {{ $value | printf "%.1f" }} dBm).'

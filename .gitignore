@@ -2,3 +2,4 @@ secrets/
 .env
 prometheus_data/
 grafana_data/
+.DS_Store

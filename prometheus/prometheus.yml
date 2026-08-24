@@ -2,11 +2,25 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
+# Each SNMP/ICMP job below follows the same "proxy scrape" pattern: the
+# real target device's address is moved into __param_target, and
+# __address__ is rewritten to point at the exporter container
+# (snmp-exporter / blackbox-exporter) instead. The exporter then receives
+# a request like GET /snmp?target=<device-ip>&module=<name> and does the
+# actual SNMP/ICMP work on Prometheus's behalf - this is the standard
+# "multi-target exporter" pattern used by both exporters.
 scrape_configs:
+  # Prometheus scraping its own /metrics - useful for monitoring the
+  # monitoring stack itself (scrape failures, rule eval duration, etc.).
   - job_name: "prometheus"
     static_configs:
       - targets: ["localhost:9090"]
 
+  # Core router health: CPU, memory, uptime, interface counters/state.
+  # Uses the generic `mikrotik` SNMP module (snmp_exporter/snmp.yml).
+  # Target list (router IPs + site/role labels) lives in
+  # prometheus/targets/mikrotik-routers.yml, reloaded every 1m without a
+  # Prometheus restart.
   - job_name: "snmp-mikrotik"
     metrics_path: /snmp
     params:
@@ -23,10 +37,102 @@ scrape_configs:
       - target_label: __address__
         replacement: snmp-exporter:9116
 
+  # PTP link reachability via ICMP ping (ping success + RTT), independent
+  # of SNMP - still tells you a link is down even if its SNMP agent has
+  # stopped responding too. Feeds the link_up / link_latency_seconds
+  # recording rules in prometheus/rules/link-normalization.yml.
+  - job_name: "link-availability"
+    metrics_path: /probe
+    params:
+      module: [icmp]
+    file_sd_configs:
+      - files:
+          - /etc/prometheus/targets/links.yml
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # Vendor-neutral interface stats (oper status, octets, errors) for link
+  # endpoints, via the standard IF-MIB. Same for every radio vendor, so one
+  # module (`link_interface_health`) covers all of them. `auth` is a
+  # per-target label (see links.yml) selecting which SNMP community/version
+  # to use - not every vendor uses the same community string.
+  # CONFIRMED (2026-08-23): SNMP walk duration against these real radios
+  # varies a lot (0.1s-7.1s observed for the same target between polls,
+  # occasionally with packet retries) - right up against the 10s default
+  # scrape_timeout (min(scrape_interval, 10s)), which produced real
+  # "context deadline exceeded" scrape failures during testing. Backhaul
+  # radio health doesn't need 15s resolution, so this job is slowed down
+  # to 30s/25s to give SNMP walks much more headroom before a slow poll
+  # counts as a failed scrape.
+  - job_name: "link-interface-health"
+    scrape_interval: 30s
+    scrape_timeout: 25s
+    metrics_path: /snmp
+    params:
+      module: [link_interface_health]
+    file_sd_configs:
+      - files:
+          - /etc/prometheus/targets/links.yml
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: snmp-exporter:9116
+      - source_labels: [auth]
+        target_label: __param_auth
+
+  # Vendor-specific radio health (signal, noise, quality, capacity, etc.).
+  # Unlike link-interface-health, the SNMP *module* itself varies per
+  # target (mikrotik_wireless_link / ubiquiti_airmax_link /
+  # ubiquiti_airfiber_link / saf_link) - so, unusually, `module` is a
+  # per-target label pulled from links.yml rather than a fixed `params:`
+  # value. All of these modules emit the same normalized link_* metric
+  # names (see prometheus/rules/link-schema-notes.md) so downstream
+  # dashboards/alerts don't need to know which vendor they're looking at.
+  # Same slow-scrape headroom as link-interface-health above - the SAF and
+  # AirFiber radios were the two observed timing out during testing.
+  - job_name: "link-radio-health"
+    scrape_interval: 30s
+    scrape_timeout: 25s
+    metrics_path: /snmp
+    file_sd_configs:
+      - files:
+          - /etc/prometheus/targets/links.yml
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [module]
+        target_label: __param_module
+      - source_labels: [auth]
+        target_label: __param_auth
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: snmp-exporter:9116
+    metric_relabel_configs:
+      # Drop the raw per-table SNMP index labels (wlan_index/radio_index/
+      # port_index) after scraping - they're vendor/table-specific noise
+      # that would otherwise multiply the label cardinality without adding
+      # meaning once metrics are joined on link_id/endpoint/site/etc.
+      - regex: "wlan_index|radio_index|port_index"
+        action: labeldrop
+
+# Where Prometheus sends firing/resolved alerts once rule_files below
+# evaluate them - routed onward to Telegram per alertmanager/alertmanager.yml.
 alerting:
   alertmanagers:
     - static_configs:
         - targets: ["alertmanager:9093"]
 
+# Recording rules (metric normalization/derivation) and alerting rules,
+# all under prometheus/rules/ - see link-normalization.yml, link-alerts.yml,
+# and mikrotik-alerts.yml.
 rule_files:
   - /etc/prometheus/rules/*.yml

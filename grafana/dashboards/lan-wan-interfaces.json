@@ -1,6 +1,6 @@
 {
-    "title": "MikroTik Interfaces",
-    "uid": "mikrotik-interfaces",
+    "title": "WAN/LAN Interfaces",
+    "uid": "wan-lan-interfaces",
     "schemaVersion": 39,
     "version": 1,
     "editable": true,
@@ -27,10 +27,10 @@
                 "type": "textbox",
                 "label": "WAN / Backhaul regex",
                 "current": {
-                    "value": "ether1",
-                    "text": "ether1"
+                    "value": "chiemerie-ppp",
+                    "text": "chiemerie-ppp"
                 },
-                "query": "ether1"
+                "query": "chiemerie-ppp"
             },
             {
                 "name": "lan",
@@ -47,10 +47,10 @@
                 "type": "textbox",
                 "label": "PPP regex",
                 "current": {
-                    "value": "pppoe.*|ppp.*",
-                    "text": "pppoe.*|ppp.*"
+                    "value": ".*ppp.*",
+                    "text": ".*ppp.*"
                 },
-                "query": "pppoe.*|ppp.*"
+                "query": ".*ppp.*"
             },
             {
                 "name": "wireless",
