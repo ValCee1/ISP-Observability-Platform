@@ -3,7 +3,7 @@
     "description": "At-a-glance board for the NOC: link counts by state, then a color-coded table of every link's health score - click a row to drill into that link on PTP Link Monitoring.",
     "uid": "noc-overview",
     "schemaVersion": 39,
-    "version": 2,
+    "version": 4,
     "editable": true,
     "timezone": "browser",
     "time": {
@@ -76,7 +76,7 @@
             ],
             "fieldConfig": {
                 "defaults": {
-                    "color": { "mode": "fixed", "fixedColor": "orange" },
+                    "color": { "mode": "fixed", "fixedColor": "yellow" },
                     "noValue": "0"
                 }
             }
@@ -105,7 +105,7 @@
             "id": 1,
             "type": "table",
             "title": "All Links",
-            "description": "One row per link_id. Health score blends packet loss, SNR, interface errors, and reachability into 0-100 (see link_endpoint_health_score in prometheus/rules/link-normalization.yml for the exact weighting). Click a row to open that link on PTP Link Monitoring.",
+            "description": "One row per link_id. Status reflects link_up (green = UP, red = DOWN, white/gray = no data reported). Health Score blends packet loss, SNR, interface errors, and reachability into 0-100 (see link_endpoint_health_score in prometheus/rules/link-normalization.yml) and is colored green (healthy, >=85), yellow (shaky, 60-84), or red (critical, <60). Click a row to open that link's detail graphs and radio diagnostics on PTP Link Monitoring.",
             "gridPos": {
                 "h": 10,
                 "w": 24,
@@ -115,42 +115,113 @@
             "datasource": "Prometheus",
             "targets": [
                 {
+                    "expr": "min by (link_id) (link_up)",
+                    "refId": "Status",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
                     "expr": "link_health_score",
                     "refId": "Health",
                     "instant": true,
                     "format": "table"
                 }
             ],
+            "transformations": [
+                {
+                    "id": "merge",
+                    "options": {}
+                },
+                {
+                    "id": "organize",
+                    "options": {
+                        "excludeByName": {
+                            "Time": true,
+                            "Time 1": true,
+                            "Time 2": true,
+                            "__name__": true,
+                            "job": true,
+                            "instance": true
+                        },
+                        "renameByName": {
+                            "Value #Status": "Status",
+                            "Value #Health": "Health Score"
+                        }
+                    }
+                }
+            ],
             "fieldConfig": {
                 "defaults": {
-                    "thresholds": {
-                        "mode": "absolute",
-                        "steps": [
-                            {
-                                "value": 0,
-                                "color": "red"
-                            },
-                            {
-                                "value": 60,
-                                "color": "orange"
-                            },
-                            {
-                                "value": 85,
-                                "color": "green"
-                            }
-                        ]
-                    },
                     "custom": {
                         "displayMode": "color-background"
                     },
                     "links": [
                         {
-                            "title": "View link",
+                            "title": "View link details",
                             "url": "/d/ptp-link-monitoring/ptp-link-monitoring?var-link_id=${__data.fields.link_id}",
                             "targetBlank": false
                         }
                     ]
-                }
+                },
+                "overrides": [
+                    {
+                        "matcher": { "id": "byName", "options": "Status" },
+                        "properties": [
+                            {
+                                "id": "mappings",
+                                "value": [
+                                    {
+                                        "type": "value",
+                                        "options": {
+                                            "1": { "text": "UP", "color": "green", "index": 0 },
+                                            "0": { "text": "DOWN", "color": "red", "index": 1 }
+                                        }
+                                    },
+                                    {
+                                        "type": "special",
+                                        "options": {
+                                            "match": "null+nan",
+                                            "result": { "text": "NO DATA", "color": "white", "index": 2 }
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "custom.displayMode",
+                                "value": "color-background"
+                            },
+                            {
+                                "id": "noValue",
+                                "value": "NO DATA"
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": { "id": "byName", "options": "Health Score" },
+                        "properties": [
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        { "value": null, "color": "white" },
+                                        { "value": 0, "color": "red" },
+                                        { "value": 60, "color": "yellow" },
+                                        { "value": 85, "color": "green" }
+                                    ]
+                                }
+                            },
+                            {
+                                "id": "custom.displayMode",
+                                "value": "color-background"
+                            },
+                            {
+                                "id": "noValue",
+                                "value": "NO DATA"
+                            }
+                        ]
+                    }
+                ]
             }
         }
     ],

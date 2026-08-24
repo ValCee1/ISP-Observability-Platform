@@ -3,7 +3,7 @@
     "description": "Drill-down health for every point-to-point radio link (SAF, AirFiber, airMAX, MikroTik) - use the link_id variable or arrive here via the NOC Overview table's row link.",
     "uid": "ptp-link-monitoring",
     "schemaVersion": 39,
-    "version": 1,
+    "version": 2,
     "editable": true,
     "timezone": "browser",
     "time": {
@@ -104,8 +104,16 @@
                                     "color": "green"
                                 }
                             }
+                        },
+                        {
+                            "type": "special",
+                            "options": {
+                                "match": "null+nan",
+                                "result": { "text": "NO DATA", "color": "white", "index": 2 }
+                            }
                         }
-                    ]
+                    ],
+                    "noValue": "NO DATA"
                 }
             }
         },
@@ -138,7 +146,7 @@
                             },
                             {
                                 "value": 30,
-                                "color": "orange"
+                                "color": "yellow"
                             },
                             {
                                 "value": 100,
@@ -180,7 +188,7 @@
                             },
                             {
                                 "value": 2,
-                                "color": "orange"
+                                "color": "yellow"
                             },
                             {
                                 "value": 10,
@@ -222,7 +230,7 @@
                             },
                             {
                                 "value": 70,
-                                "color": "orange"
+                                "color": "yellow"
                             },
                             {
                                 "value": 85,
@@ -377,7 +385,7 @@
                             },
                             {
                                 "value": 70,
-                                "color": "orange"
+                                "color": "yellow"
                             },
                             {
                                 "value": 90,
@@ -601,7 +609,7 @@
                             },
                             {
                                 "value": 60,
-                                "color": "orange"
+                                "color": "yellow"
                             },
                             {
                                 "value": 85,
