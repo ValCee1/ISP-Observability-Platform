@@ -90,10 +90,11 @@ scrape_configs:
 
   # Vendor-specific radio health (signal, noise, quality, capacity, etc.).
   # Unlike link-interface-health, the SNMP *module* itself varies per
-  # target (mikrotik_wireless_link / ubiquiti_airmax_link /
-  # ubiquiti_airfiber_link / saf_link) - so, unusually, `module` is a
-  # per-target label pulled from links.yml rather than a fixed `params:`
-  # value. All of these modules emit the same normalized link_* metric
+  # target (ubiquiti_airmax_link / ubiquiti_airfiber_link / saf_link) - so,
+  # unusually, `module` is a per-target label pulled from links.yml rather
+  # than a fixed `params:` value. (MikroTik *sector* radios are a separate
+  # thing - see the snmp-sectors job below.) All of these modules emit the
+  # same normalized link_* metric
   # names (see prometheus/rules/link-schema-notes.md) so downstream
   # dashboards/alerts don't need to know which vendor they're looking at.
   # Same slow-scrape headroom as link-interface-health above - the SAF and
@@ -122,6 +123,41 @@ scrape_configs:
       # that would otherwise multiply the label cardinality without adding
       # meaning once metrics are joined on link_id/endpoint/site/etc.
       - regex: "wlan_index|radio_index|port_index"
+        action: labeldrop
+
+  # MikroTik PtMP sector APs (mikrotik_sector module): per-CPE wireless
+  # registration table, AP-level noise floor / client count / frequency,
+  # plus the sector device's own IF-MIB interface counters and CPU/memory.
+  # One target per sector AP - the CPEs are NOT scraped directly, their
+  # telemetry rides in the sector's registration table. Targets (+ site/
+  # role labels) live in prometheus/targets/mikrotik-sectors.yml; capacity
+  # thresholds live in prometheus/rules/sector-thresholds.yml. Same slow
+  # 30s/25s cadence as the radio jobs - the registration table walk grows
+  # with client count and doesn't need 15s resolution.
+  - job_name: "snmp-sectors"
+    scrape_interval: 30s
+    scrape_timeout: 25s
+    metrics_path: /snmp
+    params:
+      module: [mikrotik_sector]
+    file_sd_configs:
+      - files:
+          - /etc/prometheus/targets/mikrotik-sectors.yml
+        refresh_interval: 1m
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - source_labels: [auth]
+        target_label: __param_auth
+      - target_label: __address__
+        replacement: snmp-exporter:9116
+    metric_relabel_configs:
+      # Drop the raw SNMP table index labels once scraped - ifName / cpe_mac
+      # / cpe_name / ssid carry all the meaning, the numeric indexes just
+      # add cardinality.
+      - regex: "wlan_ifindex|hrDeviceIndex|hrStorageIndex|ifIndex"
         action: labeldrop
 
 # Where Prometheus sends firing/resolved alerts once rule_files below

@@ -1,0 +1,153 @@
+# Recording rules for MikroTik PtMP sectors. Raw metrics come from the
+# `mikrotik_sector` SNMP module (see snmp_exporter/snmp.yml); everything
+# here is derived. Join key across the whole set is the `sector` label.
+#
+# Design notes:
+#  - Sector RF throughput is built from the per-CPE byte counters, NOT the
+#    wlan interface counter - the interface name varies per device and can
+#    come back blank over SNMP, whereas summing the registration table is
+#    always correct. The backhaul (ether1) side still uses the interface
+#    counter since that's the only source for it.
+#  - CCQ is absent under Nv2, so link quality is expressed via SNR and PHY
+#    rate, not CCQ.
+#  - The alignment score mirrors the link_endpoint_health_score approach in
+#    link-normalization.yml: start at 100, subtract capped penalties, so no
+#    single dimension can zero out an otherwise-fine CPE.
+
+groups:
+  - name: sector-availability
+    rules:
+      - record: sector_up
+        expr: up{job="snmp-sectors"}
+
+  - name: sector-aggregates
+    rules:
+      # Registered CPE count per sector (one wlan per sector in practice;
+      # max collapses multi-wlan devices to the busiest).
+      - record: sector:clients
+        expr: max by (sector, site) (sector_registered_clients)
+
+      # RF throughput; sum of the per-CPE byte counters, both directions.
+      - record: sector:rf_downlink_bps
+        expr: sum by (sector, site) (rate(sector_cpe_tx_bytes[5m])) * 8
+
+      - record: sector:rf_uplink_bps
+        expr: sum by (sector, site) (rate(sector_cpe_rx_bytes[5m])) * 8
+
+      # Total offered load on the sector, in Mbps - the number the capacity
+      # thresholds in sector-thresholds.yml are expressed against.
+      - record: sector:throughput_mbps
+        expr: (sector:rf_downlink_bps + sector:rf_uplink_bps) / 1e6
+
+      # Backhaul side: highest-throughput non-wireless interface on the
+      # sector device (ether1 in almost every case). topk keeps it robust
+      # to blank/odd ifName values.
+      - record: sector:backhaul_tx_bps
+        expr: >
+          topk by (sector, site) (1,
+            rate(sector_interface_out_octets{ifName!~"wlan.*|lo|bridge.*|"}[5m]) * 8)
+
+      - record: sector:backhaul_rx_bps
+        expr: >
+          topk by (sector, site) (1,
+            rate(sector_interface_in_octets{ifName!~"wlan.*|lo|bridge.*|"}[5m]) * 8)
+
+      - record: sector:worst_cpe_signal_dbm
+        expr: min by (sector, site) (sector_cpe_signal_dbm)
+
+  - name: sector-cpe
+    rules:
+      - record: sector:cpe:tx_bps
+        expr: rate(sector_cpe_tx_bytes[5m]) * 8
+
+      - record: sector:cpe:rx_bps
+        expr: rate(sector_cpe_rx_bytes[5m]) * 8
+
+      # Absolute dB gap between the two receive chains. A large gap means a
+      # connector / pigtail / polarity / alignment fault on one chain.
+      - record: sector:cpe:chain_imbalance_db
+        expr: abs(sector_cpe_rx_strength_ch0_dbm - sector_cpe_rx_strength_ch1_dbm)
+
+      # Element-wise min (most negative) of the two receive chains - the
+      # limiting chain for this CPE's link budget. PromQL has no element-wise
+      # min across two metric names, hence the bool-mask arithmetic.
+      - record: sector:cpe:worst_chain_dbm
+        expr: |
+          (sector_cpe_rx_strength_ch0_dbm <= bool sector_cpe_rx_strength_ch1_dbm) * sector_cpe_rx_strength_ch0_dbm
+          + (sector_cpe_rx_strength_ch0_dbm > bool sector_cpe_rx_strength_ch1_dbm) * sector_cpe_rx_strength_ch1_dbm
+
+      # 7-day rolling baseline and the CPE's current deviation from it.
+      # avg_over_time (not a quantile) to keep the 7d window cheap on the
+      # TSDB; it still returns a value with only partial history.
+      - record: sector:cpe:signal_avg7d
+        expr: avg_over_time(sector_cpe_signal_dbm[7d])
+
+      - record: sector:cpe:signal_drift_db
+        expr: sector_cpe_signal_dbm - sector:cpe:signal_avg7d
+
+      - record: sector:cpe:worst_chain_avg7d
+        expr: avg_over_time(sector:cpe:worst_chain_dbm[7d])
+
+      - record: sector:cpe:chain_drift_db
+        expr: sector:cpe:worst_chain_dbm - sector:cpe:worst_chain_avg7d
+
+      # 0-100 physical-alignment / link-quality score per CPE.
+      # Penalty budget: weak limiting chain up to 45, chain imbalance up to
+      # 25, low SNR up to 30, downward chain drift vs 7d up to 30.
+      - record: sector:cpe:alignment_score
+        expr: |
+          clamp_min(
+            100
+            - clamp_max(clamp_min((- sector:cpe:worst_chain_dbm) - 65, 0) * 4, 45)
+            - clamp_max(clamp_min(sector:cpe:chain_imbalance_db - 3, 0) * 3, 25)
+            - clamp_max(clamp_min(25 - sector_cpe_snr_db, 0) * 2, 30)
+            - clamp_max(clamp_min((- sector:cpe:chain_drift_db) - 3, 0) * 3, 30),
+            0
+          )
+
+  # 24h rollups for the capacity digest and the peak-hour panels. Evaluated
+  # every 5m (not every 15s) - the [24h:1m] subqueries are expensive.
+  - name: sector-24h
+    interval: 5m
+    rules:
+      - record: sector:throughput_mbps:avg24h
+        expr: avg_over_time(sector:throughput_mbps[24h])
+
+      - record: sector:throughput_mbps:max24h
+        expr: max_over_time(sector:throughput_mbps[24h])
+
+      - record: sector:throughput_mbps:p95_24h
+        expr: quantile_over_time(0.95, sector:throughput_mbps[24h])
+
+      - record: sector:clients:max24h
+        expr: max_over_time(sector:clients[24h])
+
+      - record: sector:clients:p95_24h
+        expr: quantile_over_time(0.95, sector:clients[24h])
+
+      # Minutes in the last 24h the sector was over its warn threshold -
+      # this is what the 08:00 digest reports ("above budget for N min,
+      # 24h avg X Mbps").
+      - record: sector:minutes_over_cap_mbps:24h
+        expr: sum_over_time((sector:throughput_mbps > bool on(sector) sector:cap_mbps_warn)[24h:1m])
+
+      - record: sector:minutes_over_cap_clients:24h
+        expr: sum_over_time((sector:clients >= bool on(sector) sector:cap_clients_warn)[24h:1m])
+
+  # Hourly averages, kept as a low-resolution series so the dashboard can
+  # show the daily traffic/load rhythm ("busy hours") over the last week
+  # without a heavy subquery at render time. Evaluated every 30m.
+  - name: sector-hourly
+    interval: 30m
+    rules:
+      - record: sector:throughput_mbps:hourly
+        expr: avg_over_time(sector:throughput_mbps[1h])
+
+      - record: sector:clients:hourly
+        expr: avg_over_time(sector:clients[1h])
+
+      - record: sector:cpu_percent:hourly
+        expr: avg_over_time(max by (sector, site) (sector_cpu_load_percent)[1h:1m])
+
+      - record: sector:backhaul_bps:hourly
+        expr: avg_over_time((sector:backhaul_tx_bps + sector:backhaul_rx_bps)[1h:1m])

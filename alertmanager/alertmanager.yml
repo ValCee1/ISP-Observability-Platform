@@ -1,6 +1,21 @@
 global:
   resolve_timeout: 5m
 
+# Named time windows referenced by `active_time_intervals` on routes below.
+# `morning-0800-lagos` is the daily delivery window for the sector capacity
+# digest: the underlying alerts (SectorOverClientCapacity /
+# SectorOverThroughputBudget) fire in Prometheus whenever a sector is over
+# budget, but Alertmanager only releases them to Telegram between 08:00 and
+# 08:15 Africa/Lagos, once per day (repeat_interval 24h), batched into one
+# message.
+time_intervals:
+  - name: morning-0800-lagos
+    time_intervals:
+      - location: "Africa/Lagos"
+        times:
+          - start_time: "08:00"
+            end_time: "08:15"
+
 # REWRITTEN (2026-08-23) to stop Telegram spam. The old config had one flat
 # route grouping by {alertname, instance}, which meant a single real event
 # (e.g. a link dropping) could fire LinkDown + WeakSignal + RisingInterfaceErrors
@@ -27,6 +42,37 @@ route:
   repeat_interval: 3h
 
   routes:
+    # Sector capacity alerts (category: capacity, from sector-alerts.yml):
+    # held back and delivered as a single once-a-day digest in the 08:00
+    # Africa/Lagos window. group_by alertname so every over-budget sector
+    # lands in one message; repeat_interval 24h so it's genuinely daily.
+    # MUST come before the `sector` route below (capacity alerts also carry
+    # a `sector` label and would otherwise match that first).
+    - match:
+        category: capacity
+      group_by: ["alertname"]
+      group_wait: 1m
+      group_interval: 10m
+      repeat_interval: 24h
+      active_time_intervals:
+        - morning-0800-lagos
+
+    # All other sector alerts (state + health, from sector-alerts.yml) carry
+    # a `sector` label. Group by it so SectorDown + its CPE symptom alerts
+    # for the same sector arrive as one real-time message.
+    - match_re:
+        sector: ".+"
+      group_by: ["sector"]
+      group_wait: 30s
+      group_interval: 5m
+      routes:
+        - match:
+            severity: critical
+          repeat_interval: 1h
+        - match:
+            severity: warning
+          repeat_interval: 6h
+
     # PTP link alerts (link-alerts.yml) all carry a link_id label shared by
     # both endpoints of the same physical link. Grouping by link_id (NOT
     # instance, which differs per endpoint) means LinkDown + WeakSignal +
@@ -82,11 +128,13 @@ receivers:
         # functions or relay service needed for this.
         message: |
           {{ if .CommonLabels.link_id }}<b>Link: {{ .CommonLabels.link_id }}</b>
+          {{ else if .CommonLabels.sector }}<b>Sector: {{ .CommonLabels.sector }}</b>
           {{ else if .CommonLabels.instance }}<b>Router: {{ .CommonLabels.instance }}</b>
           {{ end }}
           {{ range .Alerts }}{{ if eq .Status "firing" }}<b>{{ .Annotations.summary }}</b> (since {{ .StartsAt.Format "15:04:05 MST" }})
-          {{ else }}✅ <b>RESOLVED:</b> {{ .Annotations.summary }} (down {{ .EndsAt.Sub .StartsAt }})
+          {{ else }}✅ <b>RESOLVED:</b> {{ .Annotations.summary }} (firing for {{ .EndsAt.Sub .StartsAt }})
           {{ end }}{{ if .Labels.link_name }}Endpoint: {{ .Labels.link_name }}
+          {{ end }}{{ if .Labels.cpe_name }}CPE: {{ .Labels.cpe_name }}
           {{ end }}{{ .Annotations.description }}
           {{ end }}
 
@@ -130,6 +178,25 @@ inhibit_rules:
     target_match:
       severity: warning
     equal: ["link_id", "alertname"]
+
+  # A sector AP that's fully down will also trip every CPE-level symptom
+  # alert for that sector (weak signal, low SNR, flapping, rate collapse,
+  # congestion) as the registration table goes stale - suppress them, the
+  # "sector is down" message is the useful one. `equal: [sector]` scopes it
+  # to the same sector.
+  - source_match:
+      alertname: SectorDown
+    target_match_re:
+      category: "health|capacity"
+    equal: ["sector"]
+
+  # Likewise SectorNoClients (RF up on paper, nobody registered) covers its
+  # own downstream CPE/capacity noise.
+  - source_match:
+      alertname: SectorNoClients
+    target_match_re:
+      category: "health|capacity"
+    equal: ["sector"]
 
   # A router that's fully unreachable will also trip its own CPU/memory/
   # WAN alerts as soon as SNMP starts timing out on stale data - those add

@@ -71,10 +71,48 @@
   firmware dump / the UBNT Discovery Tool's OID list) and match field
   numbers against the sample walk above, then add the module the same way
   saf_link was added.
-- **MikroTik wireless sector radios** (`mikrotik_wireless_link` module):
-  OIDs from an earlier session are still in snmp.yml, unverified against a
-  live sector radio, and NOT referenced by any target file/job yet - see
-  the comment on that module in snmp_exporter/snmp.yml. This is the actual
-  gap against the "monitor MikroTik radios connected to sectors" goal from
-  the project brief - the router-level `mikrotik` module only covers the
-  router itself, not its sector AP radios or the CPEs attached to them.
+- ~~**MikroTik wireless sector radios**~~ DONE (2026-08-27). The stale,
+  unverified `mikrotik_wireless_link` module was replaced by
+  `mikrotik_sector`, decoded from a live `snmpwalk` of
+  `1.3.6.1.4.1.14988.1.1.1` on an Nv2 / 802.11ac sector (10.10.13.1). It is
+  wired into the `snmp-sectors` job (targets:
+  `prometheus/targets/mikrotik-sectors.yml`). Sector metrics use their own
+  `sector_*` namespace, NOT the `link_*` schema - a PtMP sector is a
+  different shape from a PTP link (one AP, N CPEs) and forcing it into
+  link_* would break the a/b-endpoint assumptions baked into
+  link-normalization.yml. See `sector-normalization.yml`,
+  `sector-thresholds.yml`, `sector-alerts.yml`.
+
+## MikroTik sector schema (`sector_*`) - live-decoded 2026-08-27
+
+Registration table `1.3.6.1.4.1.14988.1.1.1.2.1.<col>.<cpe_mac>.<wlanIfIndex>`:
+
+| col | metric | notes |
+|---|---|---|
+| .3  | sector_cpe_signal_dbm | combined signal |
+| .4/.5 | sector_cpe_tx/rx_bytes | Counter32 - sector RF throughput is summed from these |
+| .6/.7 | sector_cpe_tx/rx_packets | |
+| .8/.9 | sector_cpe_tx/rx_rate_bps | PHY/modulation rate, not traffic |
+| .11 | sector_cpe_session_uptime_seconds | resets on re-registration -> `resets()` = flap count |
+| .12 | sector_cpe_snr_db | primary quality metric (CCQ is dead under Nv2) |
+| .13/.14 | sector_cpe_tx/rx_strength_ch0_dbm | per-chain, physical alignment |
+| .15/.16 | sector_cpe_tx/rx_strength_ch1_dbm | |
+| .19 | sector_cpe_tx_signal_dbm | reverse-path combined |
+| .20 | (cpe_name label) | client name, e.g. "OFT_JULIO TANYI_RADIO" |
+
+AP table `1.3.6.1.4.1.14988.1.1.1.3.1.<col>.<wlanIfIndex>`:
+
+| col | metric / label | notes |
+|---|---|---|
+| .4 | (ssid label) | |
+| .6 | sector_registered_clients | |
+| .7 | sector_frequency_mhz | |
+| .8 | (channel label) | e.g. "5525/20-eeeC/ac" |
+| .9 | sector_noise_floor_dbm | best "interference appeared" signal |
+| .11 | sector_auth_clients | |
+
+- `sector_total_registered_clients` = scalar `...14988.1.1.1.4.0`.
+- **CCQ (`...3.1.10`) reads 0 under Nv2 - deliberately not mapped.**
+- **Airtime %** is not exposed by RouterOS on the old `wireless` package
+  (Nv2) via SNMP or the API - `SectorLikelyCongested` infers it from
+  simultaneous PHY-rate collapse + throughput over budget.

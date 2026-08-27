@@ -1,0 +1,46 @@
+# Per-sector capacity thresholds, exposed as numeric series that the
+# alert rules (sector-alerts.yml) and dashboards join against on the
+# `sector` label. THIS FILE is the single place to tune them.
+#
+# Design intent (from the network team):
+#   optimal   : < 15 clients  AND  < 20 Mbps total sector throughput
+#   warning   : 15-19 clients   OR  20-24 Mbps
+#   critical  : >= 20 clients   OR  >= 25 Mbps
+#
+# How the default works: `0 * group by (sector) (sector_registered_clients)`
+# produces one zero-valued series per live sector; adding the number turns
+# it into that threshold for every sector automatically - no per-sector
+# maintenance needed as sectors are added to mikrotik-sectors.yml.
+#
+# To OVERRIDE one sector, edit that record's expr and prepend a
+# label_replace(...) term joined with `or` - the left operand of `or` wins
+# when both produce a series for the same `sector`. Example, giving
+# BIG-TOWER-A a 30-client critical ceiling:
+#
+#   - record: sector:cap_clients_crit
+#     expr: |
+#       label_replace(vector(30), "sector", "BIG-TOWER-A", "", "")
+#       or (0 * group by (sector) (sector_registered_clients) + 20)
+#
+# Keep each record as ONE rule (don't add a second rule with the same
+# record name - that produces two series per sector and breaks the
+# one-to-one join in the alerts).
+
+groups:
+  - name: sector-capacity-thresholds
+    rules:
+      - record: sector:cap_clients_warn
+        expr: |
+          0 * group by (sector) (sector_registered_clients) + 15
+
+      - record: sector:cap_clients_crit
+        expr: |
+          0 * group by (sector) (sector_registered_clients) + 20
+
+      - record: sector:cap_mbps_warn
+        expr: |
+          0 * group by (sector) (sector_registered_clients) + 20
+
+      - record: sector:cap_mbps_crit
+        expr: |
+          0 * group by (sector) (sector_registered_clients) + 25

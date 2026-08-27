@@ -34,6 +34,15 @@ Links          --ICMP--> blackbox-exporter -> Prometheus -> Grafana
 - **PTP links** (`prometheus/targets/links.yml`): each link is two SNMP+ICMP-monitored
   radio endpoints (see `prometheus/rules/link-schema-notes.md` for the normalized
   `link_*` metric schema shared across vendors — AirMAX, AirFiber, SAF, MikroTik radios).
+- **PtMP sectors** (`prometheus/targets/mikrotik-sectors.yml`): each MikroTik sector AP,
+  via the `mikrotik_sector` SNMP module — the wireless registration table (per-CPE
+  signal, SNR, per-chain strength, PHY rate, traffic, session uptime keyed by client
+  name), AP-level noise floor / client count / frequency, and the sector device's own
+  interface counters and CPU/memory. The ~20 CPEs per sector are covered by the AP's
+  registration table, so they need no SNMP of their own. Capacity thresholds
+  (clients / Mbps) live in `prometheus/rules/sector-thresholds.yml`. See
+  `sector-normalization.yml` for the derived `sector_*` / `sector:*` series
+  (RF throughput, per-CPE chain imbalance / drift, alignment score, 24h rollups).
 - Recording rules (`prometheus/rules/link-normalization.yml`) turn raw per-vendor SNMP
   metrics into vendor-agnostic `link_*` series and a single `link_health_score` per link.
 - Alerting rules (`prometheus/rules/link-alerts.yml`, `mikrotik-alerts.yml`) cover both
@@ -50,6 +59,15 @@ Links          --ICMP--> blackbox-exporter -> Prometheus -> Grafana
   RF signal/noise/quality, capacity/utilization, vendor-specific diagnostics.
 - **MikroTik Router Overview** — reachability, CPU, memory, storage, interface traffic
   and state for core routers.
+- **Sector Fleet Overview** — one row per PtMP sector: clients / throughput vs
+  capacity, noise floor, worst-CPE signal, misaligned + flapping CPE counts, CPU.
+  Click through to...
+- **Sector Detail** — one sector: overview stats, clients/throughput/noise timeseries,
+  a per-CPE table (raw signal / SNR / per-chain / drift alongside the computed
+  alignment score, sorted worst-first), per-client signal+SNR graphs, 24h peak/budget
+  stats, device health.
+- **Capacity Planning** — 24h peak / p95 (busy-hour) / average traffic for every PTP
+  link, core-router interface, and sector, in one place.
 - **WAN/LAN Interfaces** — traffic and up/down state grouped by interface role
   (WAN, LAN, PPP, wireless backhaul), using textbox variables holding per-router
   ifName regexes — check these against `wan_ifname` in
@@ -60,6 +78,8 @@ Links          --ICMP--> blackbox-exporter -> Prometheus -> Grafana
 
 - Alerting is handled by Prometheus + Alertmanager, not Grafana's own alerting engine
   (see the `.gitkeep` comments under `grafana/provisioning/alerting/`).
-- `snmp_exporter/snmp.yml` also defines a `mikrotik_wireless_link` module for sector/CPE
-  wireless telemetry, but it isn't wired into any job/target yet — add a targets file
-  and job pointing at the relevant IPs to start collecting it.
+- Sector capacity alerts (`SectorOverClientCapacity`, `SectorOverThroughputBudget`)
+  don't page in real time — Alertmanager holds them and delivers one batched digest
+  daily in the 08:00–08:15 Africa/Lagos window (`time_intervals` +
+  `active_time_intervals` in `alertmanager/alertmanager.yml`). Real-time sector
+  alerting is limited to RF/state/device problems.

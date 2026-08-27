@@ -1,0 +1,441 @@
+{
+    "title": "Capacity Planning",
+    "description": "24h peak / busy-hour (p95) / average traffic for every PTP link, core-router interface, and sector. p95 is the 'sustained peak' (spike-resistant); use it to see what's actually filling up before it saturates.",
+    "uid": "capacity-planning",
+    "schemaVersion": 39,
+    "version": 1,
+    "editable": true,
+    "timezone": "browser",
+    "time": {
+        "from": "now-24h",
+        "to": "now"
+    },
+    "refresh": "5m",
+    "panels": [
+        {
+            "id": 1,
+            "type": "row",
+            "title": "PTP LINKS",
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 0
+            }
+        },
+        {
+            "id": 2,
+            "type": "table",
+            "title": "Link traffic - last 24h",
+            "description": "Sum of both directions. Util % (p95 of capacity) only shows for AirFiber / SAF, where link_capacity_bps exists. airMAX links have no HC octet counters over SNMP so they won't appear.",
+            "gridPos": {
+                "h": 10,
+                "w": 24,
+                "x": 0,
+                "y": 1
+            },
+            "datasource": "Prometheus",
+            "options": {
+                "sortBy": [
+                    {
+                        "displayName": "p95 (24h)",
+                        "desc": true
+                    }
+                ]
+            },
+            "targets": [
+                {
+                    "expr": "max by (link_name) (link:throughput_bps:p95_24h)",
+                    "refId": "P95",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "max by (link_name) (link:throughput_bps:max24h)",
+                    "refId": "Peak",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "max by (link_name) (link:throughput_bps:avg24h)",
+                    "refId": "Avg",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "max by (link_name) (link:utilization_p95_24h_percent)",
+                    "refId": "Util",
+                    "instant": true,
+                    "format": "table"
+                }
+            ],
+            "transformations": [
+                {
+                    "id": "organize",
+                    "options": {
+                        "excludeByName": {
+                            "Time": true,
+                            "__name__": true,
+                            "job": true
+                        }
+                    }
+                },
+                {
+                    "id": "merge",
+                    "options": {}
+                },
+                {
+                    "id": "organize",
+                    "options": {
+                        "excludeByName": {
+                            "Time": true,
+                            "__name__": true,
+                            "job": true,
+                            "instance": true
+                        },
+                        "renameByName": {
+                            "link_name": "Link",
+                            "Value #P95": "p95 (24h)",
+                            "Value #Peak": "Peak (24h)",
+                            "Value #Avg": "Avg (24h)",
+                            "Value #Util": "Util % (p95/cap)"
+                        }
+                    }
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "bps",
+                    "color": {
+                        "mode": "thresholds"
+                    }
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Util % (p95/cap)"
+                        },
+                        "properties": [
+                            {
+                                "id": "unit",
+                                "value": "percent"
+                            },
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        {
+                                            "value": null,
+                                            "color": "green"
+                                        },
+                                        {
+                                            "value": 60,
+                                            "color": "yellow"
+                                        },
+                                        {
+                                            "value": 80,
+                                            "color": "red"
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "type": "color-background",
+                                    "mode": "gradient"
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": 10,
+            "type": "row",
+            "title": "CORE ROUTER INTERFACES",
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 11
+            }
+        },
+        {
+            "id": 11,
+            "type": "table",
+            "title": "Router interface traffic - last 24h",
+            "gridPos": {
+                "h": 10,
+                "w": 24,
+                "x": 0,
+                "y": 12
+            },
+            "datasource": "Prometheus",
+            "options": {
+                "sortBy": [
+                    {
+                        "displayName": "p95 (24h)",
+                        "desc": true
+                    }
+                ]
+            },
+            "targets": [
+                {
+                    "expr": "max by (instance, ifName) (router:if_bps:p95_24h)",
+                    "refId": "P95",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "max by (instance, ifName) (router:if_bps:max24h)",
+                    "refId": "Peak",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "max by (instance, ifName) (router:if_bps:avg24h)",
+                    "refId": "Avg",
+                    "instant": true,
+                    "format": "table"
+                }
+            ],
+            "transformations": [
+                {
+                    "id": "organize",
+                    "options": {
+                        "excludeByName": {
+                            "Time": true,
+                            "__name__": true,
+                            "job": true
+                        }
+                    }
+                },
+                {
+                    "id": "merge",
+                    "options": {}
+                },
+                {
+                    "id": "filterByValue",
+                    "options": {
+                        "filters": [
+                            {
+                                "fieldName": "Value #Peak",
+                                "config": {
+                                    "id": "greater",
+                                    "options": {
+                                        "value": 1000
+                                    }
+                                }
+                            }
+                        ],
+                        "type": "include",
+                        "match": "all"
+                    }
+                },
+                {
+                    "id": "organize",
+                    "options": {
+                        "excludeByName": {
+                            "Time": true,
+                            "__name__": true,
+                            "job": true
+                        },
+                        "renameByName": {
+                            "instance": "Router",
+                            "ifName": "Interface",
+                            "Value #P95": "p95 (24h)",
+                            "Value #Peak": "Peak (24h)",
+                            "Value #Avg": "Avg (24h)"
+                        }
+                    }
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "bps",
+                    "color": {
+                        "mode": "thresholds"
+                    }
+                },
+                "overrides": []
+            }
+        },
+        {
+            "id": 20,
+            "type": "row",
+            "title": "SECTORS",
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 22
+            }
+        },
+        {
+            "id": 21,
+            "type": "table",
+            "title": "Sector traffic + client load - last 24h",
+            "gridPos": {
+                "h": 10,
+                "w": 24,
+                "x": 0,
+                "y": 23
+            },
+            "datasource": "Prometheus",
+            "options": {
+                "sortBy": [
+                    {
+                        "displayName": "Throughput p95 (24h, Mbps)",
+                        "desc": true
+                    }
+                ]
+            },
+            "targets": [
+                {
+                    "expr": "max by (sector) (sector:throughput_mbps:p95_24h)",
+                    "refId": "P95",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "max by (sector) (sector:throughput_mbps:max24h)",
+                    "refId": "Peak",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "max by (sector) (sector:throughput_mbps:avg24h)",
+                    "refId": "Avg",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "max by (sector) (sector:clients:p95_24h)",
+                    "refId": "ClientsP95",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "max by (sector) (sector:clients:max24h)",
+                    "refId": "ClientsPeak",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "max by (sector) (sector:minutes_over_cap_mbps:24h)",
+                    "refId": "MinOver",
+                    "instant": true,
+                    "format": "table"
+                }
+            ],
+            "transformations": [
+                {
+                    "id": "organize",
+                    "options": {
+                        "excludeByName": {
+                            "Time": true,
+                            "__name__": true,
+                            "job": true
+                        }
+                    }
+                },
+                {
+                    "id": "merge",
+                    "options": {}
+                },
+                {
+                    "id": "organize",
+                    "options": {
+                        "excludeByName": {
+                            "Time": true,
+                            "__name__": true,
+                            "job": true,
+                            "instance": true
+                        },
+                        "renameByName": {
+                            "sector": "Sector",
+                            "Value #P95": "Throughput p95 (24h, Mbps)",
+                            "Value #Peak": "Throughput peak (24h, Mbps)",
+                            "Value #Avg": "Throughput avg (24h, Mbps)",
+                            "Value #ClientsP95": "Clients p95 (24h)",
+                            "Value #ClientsPeak": "Clients peak (24h)",
+                            "Value #MinOver": "Min over Mbps budget (24h)"
+                        }
+                    }
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "decimals": 1,
+                    "color": {
+                        "mode": "thresholds"
+                    }
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Min over Mbps budget (24h)"
+                        },
+                        "properties": [
+                            {
+                                "id": "unit",
+                                "value": "m"
+                            },
+                            {
+                                "id": "decimals",
+                                "value": 0
+                            },
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        {
+                                            "value": null,
+                                            "color": "green"
+                                        },
+                                        {
+                                            "value": 30,
+                                            "color": "yellow"
+                                        },
+                                        {
+                                            "value": 120,
+                                            "color": "red"
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "type": "color-background",
+                                    "mode": "gradient"
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ],
+    "annotations": {
+        "list": []
+    },
+    "links": [
+        {
+            "title": "Sector Fleet Overview",
+            "url": "/d/sector-fleet-overview/sector-fleet-overview",
+            "type": "link"
+        },
+        {
+            "title": "NOC Overview",
+            "url": "/d/noc-overview/noc-overview",
+            "type": "link"
+        }
+    ]
+}

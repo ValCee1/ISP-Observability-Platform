@@ -1,0 +1,26 @@
+# MikroTik PtMP sector APs, scraped by the "snmp-sectors" job in
+# prometheus.yml via the `mikrotik_sector` SNMP module. One block per
+# sector AP. Only the sector radio is polled - the ~20 CPEs registered to
+# each sector are covered by that sector's wireless registration table, so
+# the CPEs do NOT need SNMP enabled on them.
+#
+# Labels:
+#   auth   - SNMP credential set from snmp_exporter/snmp.yml `auths`
+#            (these sectors use community "monitoring" v2c -> public_v2)
+#   sector - stable identifier, used as the join key everywhere (dashboards,
+#            recording rules, alerts, the 08:00 capacity digest). Keep it
+#            short and free of spaces.
+#   site   - tower / location grouping label
+#   role   - free-form; "sector-ap" for all of these
+#
+# Capacity thresholds (clients / Mbps before warn + critical) are NOT set
+# here - they live in prometheus/rules/sector-thresholds.yml, which
+# defaults every sector to 15/20 clients and 20/25 Mbps and lets you
+# override one sector in one place. See that file to change them.
+
+- targets: ["10.10.13.1"]
+  labels:
+    auth: public_v2
+    sector: OFFICE-ISP-5B
+    site: OFFICE
+    role: sector-ap

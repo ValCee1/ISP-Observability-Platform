@@ -1,0 +1,54 @@
+# Peak / average / busy-hour rollups over the last 24h for PTP links and
+# core-router interfaces, feeding the Capacity Planning dashboard. Sectors
+# have their own equivalents in sector-normalization.yml (sector-24h group).
+#
+# p95_24h is the "sustained busy-hour" figure (ignores one-off spikes);
+# max24h is the absolute peak; avg24h is the daily mean. Evaluated every
+# 5m - the [24h] windows are heavy.
+#
+# NOTE: link_tx_bps/link_rx_bps have no data for airMAX links (that
+# hardware doesn't expose HC octet counters over SNMP - see
+# link-schema-notes.md), so those links simply won't appear in the link
+# capacity table. That's correct, not a bug.
+
+groups:
+  - name: capacity-links
+    interval: 5m
+    rules:
+      - record: link:throughput_bps
+        expr: link_tx_bps + link_rx_bps
+
+      - record: link:throughput_bps:avg24h
+        expr: avg_over_time(link:throughput_bps[24h])
+
+      - record: link:throughput_bps:p95_24h
+        expr: quantile_over_time(0.95, link:throughput_bps[24h])
+
+      - record: link:throughput_bps:max24h
+        expr: max_over_time(link:throughput_bps[24h])
+
+      # Where link_capacity_bps exists (AirFiber, SAF), express the 24h peak
+      # as a % of link capacity - the number that says "this backhaul needs
+      # an upgrade soon".
+      - record: link:utilization_p95_24h_percent
+        expr: >
+          link:throughput_bps:p95_24h
+          / on(link_id, endpoint, site, role, vendor, link_name) link_capacity_bps
+          * 100
+
+  - name: capacity-routers
+    interval: 5m
+    rules:
+      - record: router:if_bps
+        expr: >
+          (rate(ifHCInOctets{job="snmp-mikrotik"}[5m])
+           + rate(ifHCOutOctets{job="snmp-mikrotik"}[5m])) * 8
+
+      - record: router:if_bps:avg24h
+        expr: avg_over_time(router:if_bps[24h])
+
+      - record: router:if_bps:p95_24h
+        expr: quantile_over_time(0.95, router:if_bps[24h])
+
+      - record: router:if_bps:max24h
+        expr: max_over_time(router:if_bps[24h])
