@@ -13,10 +13,19 @@
 
 groups:
   - name: capacity-links
-    interval: 5m
+    interval: 2m
     rules:
+      # link_tx_bps / link_rx_bps are each a topk-1 pick of the busiest
+      # interface *per direction*, so tx and rx often land on different
+      # ifName/ifIndex (confirmed live: saf-a tx=WAN, rx=LAN1). A plain
+      # `link_tx_bps + link_rx_bps` then matches on those differing
+      # interface labels and produces nothing - sum each side down to the
+      # link identity first, then add on() that identity.
       - record: link:throughput_bps
-        expr: link_tx_bps + link_rx_bps
+        expr: >
+          sum by (link_id, endpoint, site, role, vendor, link_name) (link_tx_bps)
+          + on (link_id, endpoint, site, role, vendor, link_name)
+          sum by (link_id, endpoint, site, role, vendor, link_name) (link_rx_bps)
 
       - record: link:throughput_bps:avg24h
         expr: avg_over_time(link:throughput_bps[24h])
@@ -37,7 +46,7 @@ groups:
           * 100
 
   - name: capacity-routers
-    interval: 5m
+    interval: 2m
     rules:
       - record: router:if_bps
         expr: >

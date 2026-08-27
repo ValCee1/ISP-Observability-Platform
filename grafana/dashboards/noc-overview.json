@@ -3,7 +3,7 @@
     "description": "At-a-glance board for the NOC: link counts by state, then a color-coded table of every link's health score - click a row to drill into that link on PTP Link Monitoring.",
     "uid": "noc-overview",
     "schemaVersion": 39,
-    "version": 9,
+    "version": 10,
     "editable": true,
     "timezone": "browser",
     "time": {
@@ -320,5 +320,83 @@
     "annotations": {
         "list": []
     },
-    "links": []
+    "links": [
+        {
+            "title": "MikroTik Fleet Overview",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/mikrotik-fleet-overview",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "Sector Fleet Overview",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/sector-fleet-overview",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "Capacity Planning",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/capacity-planning",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "PTP Link Monitoring",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/ptp-link-monitoring",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "Sector Detail",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/sector-detail",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "MikroTik Router Detail",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/mikrotik-router-overview",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "WAN/LAN Interfaces",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/wan-lan-interfaces",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        }
+    ]
 }

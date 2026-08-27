@@ -3,7 +3,7 @@
     "description": "At-a-glance board across all MikroTik routers: reachability counts, then a color-coded table of every router's health - click a row to drill into that router on MikroTik Router Detail. Purpose: \"what requires my attention\" - for per-router diagnostics, see MikroTik Router Detail.",
     "uid": "mikrotik-fleet-overview",
     "schemaVersion": 39,
-    "version": 3,
+    "version": 4,
     "editable": true,
     "timezone": "browser",
     "time": {
@@ -412,5 +412,83 @@
     "annotations": {
         "list": []
     },
-    "links": []
+    "links": [
+        {
+            "title": "NOC Overview",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/noc-overview",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "Sector Fleet Overview",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/sector-fleet-overview",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "Capacity Planning",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/capacity-planning",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "PTP Link Monitoring",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/ptp-link-monitoring",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "Sector Detail",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/sector-detail",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "MikroTik Router Detail",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/mikrotik-router-overview",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "WAN/LAN Interfaces",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/wan-lan-interfaces",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        }
+    ]
 }

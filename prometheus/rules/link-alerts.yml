@@ -4,13 +4,13 @@ groups:
     rules:
       - alert: LinkDown
         expr: link_up == 0
-        for: 2m
+        for: 5m
         labels:
           severity: critical
           category: state
         annotations:
           summary: "🔴 Link DOWN"
-          description: "{{ $labels.link_name }} has been unreachable for 2 minutes."
+          description: "{{ $labels.link_name }} has been unreachable for 5 minutes."
 
   # HEALTH - the link is up, but degrading. Warning, not urgent, but worth
   # catching before it becomes a state problem.
@@ -18,37 +18,37 @@ groups:
     rules:
       - alert: WeakSignal
         expr: link_signal_dbm < -80
-        for: 5m
+        for: 10m
         labels:
           severity: warning
           category: health
         annotations:
           summary: "🟠 Weak Signal"
-          description: "{{ $labels.link_name }} signal has been below -80 dBm for 5 minutes (currently {{ $value }} dBm)."
+          description: "{{ $labels.link_name }} signal has been below -80 dBm for 10 minutes (currently {{ $value }} dBm)."
 
       - alert: LowLinkQuality
         expr: link_quality_percent < 70
-        for: 5m
+        for: 10m
         labels:
           severity: warning
           category: health
         annotations:
           summary: "🟠 Low Link Quality"
-          description: '{{ $labels.link_name }} quality has been below 70% for 5 minutes (currently {{ $value | printf "%.1f" }}%).'
+          description: '{{ $labels.link_name }} quality has been below 70% for 10 minutes (currently {{ $value | printf "%.1f" }}%).'
 
       - alert: HighLatencyVariability
         expr: link_latency_variability_seconds > 0.05
-        for: 5m
+        for: 10m
         labels:
           severity: warning
           category: health
         annotations:
           summary: "🟠 Unstable Latency"
-          description: "{{ $labels.link_name }} latency variability has exceeded 50ms for 5 minutes - link is up but inconsistent."
+          description: "{{ $labels.link_name }} latency variability has exceeded 50ms for 10 minutes - link is up but inconsistent."
 
       - alert: RisingInterfaceErrors
         expr: rate(link_interface_in_errors[5m]) > 0 or rate(link_interface_out_errors[5m]) > 0
-        for: 5m
+        for: 10m
         labels:
           severity: warning
           category: health
@@ -56,32 +56,25 @@ groups:
           summary: "🟠 Interface Errors"
           description: "{{ $labels.link_name }} ({{ $labels.ifName }}) is logging interface errors - possible cabling, duplex, or hardware issue."
 
-      # Two severity tiers on the same metric, same duration - `for: 5m` on
-      # both means only the higher threshold that's actually crossed fires
-      # (a link at 30% loss trips PacketLoss/critical, not both tiers
-      # separately notifying). Previously packet loss only surfaced
-      # indirectly via LinkUpButDegrading's failure_ratio>5% OR-condition,
-      # which had no separate signal for "severely lossy but still up" -
-      # the exact case a plain up/down monitor misses.
       - alert: PacketLoss
         expr: link_packet_loss_percent > 5
-        for: 5m
+        for: 10m
         labels:
           severity: warning
           category: health
         annotations:
           summary: "🟠 Packet Loss"
-          description: '{{ $labels.link_name }} packet loss has been above 5% for 5 minutes (currently {{ $value | printf "%.1f" }}%).'
+          description: '{{ $labels.link_name }} packet loss has been above 5% for 10 minutes (currently {{ $value | printf "%.1f" }}%).'
 
       - alert: PacketLoss
         expr: link_packet_loss_percent > 20
-        for: 5m
+        for: 10m
         labels:
           severity: critical
           category: health
         annotations:
           summary: "🔴 Severe Packet Loss"
-          description: '{{ $labels.link_name }} packet loss has been above 20% for 5 minutes (currently {{ $value | printf "%.1f" }}%) - link is up but effectively unusable.'
+          description: '{{ $labels.link_name }} packet loss has been above 20% for 10 minutes (currently {{ $value | printf "%.1f" }}%) - link is up but effectively unusable.'
 
       # Distinct from HighLatencyVariability (jitter/instability) above -
       # this is sustained absolute latency, the case where a link is
@@ -91,23 +84,23 @@ groups:
       # link-schema-notes.md).
       - alert: HighLatency
         expr: link_latency_ms > 100
-        for: 5m
+        for: 10m
         labels:
           severity: warning
           category: health
         annotations:
           summary: "🟠 High Latency"
-          description: '{{ $labels.link_name }} latency has been above 100ms for 5 minutes (currently {{ $value | printf "%.1f" }}ms).'
+          description: '{{ $labels.link_name }} latency has been above 100ms for 10 minutes (currently {{ $value | printf "%.1f" }}ms).'
 
       - alert: HighLatency
         expr: link_latency_ms > 500
-        for: 5m
+        for: 10m
         labels:
           severity: critical
           category: health
         annotations:
           summary: "🔴 Severe Latency"
-          description: '{{ $labels.link_name }} latency has been above 500ms for 5 minutes (currently {{ $value | printf "%.1f" }}ms) - link is up but barely usable.'
+          description: '{{ $labels.link_name }} latency has been above 500ms for 10 minutes (currently {{ $value | printf "%.1f" }}ms) - link is up but barely usable.'
 
   # The actual point of separating state from health: a link that's UP but
   # visibly failing. This is the case a plain up/down monitor misses

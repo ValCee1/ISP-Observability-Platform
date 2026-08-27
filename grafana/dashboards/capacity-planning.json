@@ -3,7 +3,7 @@
     "description": "24h peak / busy-hour (p95) / average traffic for every PTP link, core-router interface, and sector. p95 is the 'sustained peak' (spike-resistant); use it to see what's actually filling up before it saturates.",
     "uid": "capacity-planning",
     "schemaVersion": 39,
-    "version": 1,
+    "version": 2,
     "editable": true,
     "timezone": "browser",
     "time": {
@@ -428,14 +428,81 @@
     },
     "links": [
         {
-            "title": "Sector Fleet Overview",
-            "url": "/d/sector-fleet-overview/sector-fleet-overview",
-            "type": "link"
+            "title": "NOC Overview",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/noc-overview",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
         },
         {
-            "title": "NOC Overview",
-            "url": "/d/noc-overview/noc-overview",
-            "type": "link"
+            "title": "MikroTik Fleet Overview",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/mikrotik-fleet-overview",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "Sector Fleet Overview",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/sector-fleet-overview",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "PTP Link Monitoring",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/ptp-link-monitoring",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "Sector Detail",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/sector-detail",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "MikroTik Router Detail",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/mikrotik-router-overview",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "WAN/LAN Interfaces",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/wan-lan-interfaces",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
         }
     ]
 }

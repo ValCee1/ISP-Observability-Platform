@@ -2,7 +2,7 @@
     "title": "WAN/LAN Interfaces",
     "uid": "wan-lan-interfaces",
     "schemaVersion": 39,
-    "version": 1,
+    "version": 2,
     "editable": true,
     "timezone": "browser",
     "time": {
@@ -380,6 +380,85 @@
                     ]
                 }
             }
+        }
+    ],
+    "links": [
+        {
+            "title": "NOC Overview",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/noc-overview",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "MikroTik Fleet Overview",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/mikrotik-fleet-overview",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "Sector Fleet Overview",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/sector-fleet-overview",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "Capacity Planning",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/capacity-planning",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "PTP Link Monitoring",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/ptp-link-monitoring",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "Sector Detail",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/sector-detail",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "MikroTik Router Detail",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/mikrotik-router-overview",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
         }
     ]
 }

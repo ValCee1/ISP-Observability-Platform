@@ -3,10 +3,13 @@
     "description": "Per-sector drill-down for one MikroTik PtMP sector. Pick a sector above or arrive from the Sector Fleet Overview. The Clients table lists every CPE with its raw RF figures alongside the computed alignment score, worst-first.",
     "uid": "sector-detail",
     "schemaVersion": 39,
-    "version": 2,
+    "version": 3,
     "editable": true,
     "timezone": "browser",
-    "time": { "from": "now-6h", "to": "now" },
+    "time": {
+        "from": "now-6h",
+        "to": "now"
+    },
     "refresh": "30s",
     "templating": {
         "list": [
@@ -23,117 +26,522 @@
         ]
     },
     "panels": [
-        { "id": 1, "type": "row", "title": "SECTOR OVERVIEW", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 } },
         {
-            "id": 2, "type": "stat", "title": "Status",
+            "id": 1,
+            "type": "row",
+            "title": "SECTOR OVERVIEW",
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 0
+            }
+        },
+        {
+            "id": 2,
+            "type": "stat",
+            "title": "Status",
             "description": "Is the sector AP responding to SNMP right now.",
-            "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 }, "datasource": "Prometheus",
-            "targets": [ { "expr": "max(sector_up{sector=\"$sector\"})", "instant": true } ],
-            "fieldConfig": { "defaults": { "mappings": [
-                { "type": "value", "options": { "1": { "text": "UP", "color": "green" }, "0": { "text": "DOWN", "color": "red" } } }
-            ], "color": { "mode": "thresholds" }, "noValue": "NO DATA" } }
+            "gridPos": {
+                "h": 4,
+                "w": 4,
+                "x": 0,
+                "y": 1
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "max(sector_up{sector=\"$sector\"})",
+                    "instant": true
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "mappings": [
+                        {
+                            "type": "value",
+                            "options": {
+                                "1": {
+                                    "text": "UP",
+                                    "color": "green"
+                                },
+                                "0": {
+                                    "text": "DOWN",
+                                    "color": "red"
+                                }
+                            }
+                        }
+                    ],
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "noValue": "NO DATA"
+                }
+            }
         },
         {
-            "id": 3, "type": "stat", "title": "Clients / capacity",
+            "id": 3,
+            "type": "stat",
+            "title": "Clients / capacity",
             "description": "Registered CPEs now vs this sector's warn / critical client ceiling (sector-thresholds.yml). Green = room to grow, amber = at planned capacity, red = oversubscribed.",
-            "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 }, "datasource": "Prometheus",
-            "targets": [ { "expr": "max(sector:clients{sector=\"$sector\"})", "instant": true, "legendFormat": "clients" } ],
-            "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [ { "value": null, "color": "green" }, { "value": 15, "color": "yellow" }, { "value": 20, "color": "red" } ] } } }
+            "gridPos": {
+                "h": 4,
+                "w": 4,
+                "x": 4,
+                "y": 1
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "max(sector:clients{sector=\"$sector\"})",
+                    "instant": true,
+                    "legendFormat": "clients"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "value": null,
+                                "color": "green"
+                            },
+                            {
+                                "value": 15,
+                                "color": "yellow"
+                            },
+                            {
+                                "value": 20,
+                                "color": "red"
+                            }
+                        ]
+                    }
+                }
+            }
         },
         {
-            "id": 4, "type": "stat", "title": "Throughput now",
+            "id": 4,
+            "type": "stat",
+            "title": "Throughput now",
             "description": "Total offered load on the sector (downlink + uplink), summed from the per-CPE counters. Amber at the 20 Mbps warn line, red at the 25 Mbps critical line.",
-            "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 }, "datasource": "Prometheus",
-            "targets": [ { "expr": "max(sector:throughput_mbps{sector=\"$sector\"})", "instant": true } ],
-            "fieldConfig": { "defaults": { "unit": "none", "decimals": 1, "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [ { "value": null, "color": "green" }, { "value": 20, "color": "yellow" }, { "value": 25, "color": "red" } ] } } }
+            "gridPos": {
+                "h": 4,
+                "w": 4,
+                "x": 8,
+                "y": 1
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "max(sector:throughput_mbps{sector=\"$sector\"})",
+                    "instant": true
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "none",
+                    "decimals": 1,
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "value": null,
+                                "color": "green"
+                            },
+                            {
+                                "value": 20,
+                                "color": "yellow"
+                            },
+                            {
+                                "value": 25,
+                                "color": "red"
+                            }
+                        ]
+                    }
+                }
+            }
         },
         {
-            "id": 5, "type": "stat", "title": "Noise Floor",
+            "id": 5,
+            "type": "stat",
+            "title": "Noise Floor",
             "description": "Sector receive noise floor. A clean channel sits below -95 dBm; rising toward -80 means external interference.",
-            "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 }, "datasource": "Prometheus",
-            "targets": [ { "expr": "max(sector_noise_floor_dbm{sector=\"$sector\"})", "instant": true } ],
-            "fieldConfig": { "defaults": { "unit": "dBm", "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [ { "value": null, "color": "green" }, { "value": -90, "color": "yellow" }, { "value": -80, "color": "red" } ] } } }
+            "gridPos": {
+                "h": 4,
+                "w": 4,
+                "x": 12,
+                "y": 1
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "max(sector_noise_floor_dbm{sector=\"$sector\"})",
+                    "instant": true
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "dBm",
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "value": null,
+                                "color": "green"
+                            },
+                            {
+                                "value": -90,
+                                "color": "yellow"
+                            },
+                            {
+                                "value": -80,
+                                "color": "red"
+                            }
+                        ]
+                    }
+                }
+            }
         },
         {
-            "id": 6, "type": "stat", "title": "Worst CPE signal",
+            "id": 6,
+            "type": "stat",
+            "title": "Worst CPE signal",
             "description": "The weakest client on the sector right now. Below -70 needs a look, below -78 is failing.",
-            "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 }, "datasource": "Prometheus",
-            "targets": [ { "expr": "min(sector_cpe_signal_dbm{sector=\"$sector\"})", "instant": true } ],
-            "fieldConfig": { "defaults": { "unit": "dBm", "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [ { "value": null, "color": "red" }, { "value": -78, "color": "yellow" }, { "value": -68, "color": "green" } ] } } }
+            "gridPos": {
+                "h": 4,
+                "w": 4,
+                "x": 16,
+                "y": 1
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "min(sector_cpe_signal_dbm{sector=\"$sector\"})",
+                    "instant": true
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "dBm",
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "value": null,
+                                "color": "red"
+                            },
+                            {
+                                "value": -78,
+                                "color": "yellow"
+                            },
+                            {
+                                "value": -68,
+                                "color": "green"
+                            }
+                        ]
+                    }
+                }
+            }
         },
         {
-            "id": 7, "type": "stat", "title": "CPU",
+            "id": 7,
+            "type": "stat",
+            "title": "CPU",
             "description": "Sector AP CPU load. Nv2 encryption + high packet rates drive this; sustained >85% risks forwarding delay.",
-            "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 }, "datasource": "Prometheus",
-            "targets": [ { "expr": "max(sector_cpu_load_percent{sector=\"$sector\"})", "instant": true } ],
-            "fieldConfig": { "defaults": { "unit": "percent", "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [ { "value": null, "color": "green" }, { "value": 70, "color": "yellow" }, { "value": 85, "color": "red" } ] } } }
+            "gridPos": {
+                "h": 4,
+                "w": 4,
+                "x": 20,
+                "y": 1
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "max(sector_cpu_load_percent{sector=\"$sector\"})",
+                    "instant": true
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percent",
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "value": null,
+                                "color": "green"
+                            },
+                            {
+                                "value": 70,
+                                "color": "yellow"
+                            },
+                            {
+                                "value": 85,
+                                "color": "red"
+                            }
+                        ]
+                    }
+                }
+            }
         },
         {
-            "id": 8, "type": "timeseries", "title": "Clients vs capacity",
+            "id": 8,
+            "type": "timeseries",
+            "title": "Clients vs capacity",
             "description": "Registered CPE count against the warn and critical ceilings.",
-            "gridPos": { "h": 8, "w": 12, "x": 0, "y": 5 }, "datasource": "Prometheus",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 5
+            },
+            "datasource": "Prometheus",
             "targets": [
-                { "expr": "max(sector:clients{sector=\"$sector\"})", "legendFormat": "clients" },
-                { "expr": "max(sector:cap_clients_warn{sector=\"$sector\"})", "legendFormat": "warn" },
-                { "expr": "max(sector:cap_clients_crit{sector=\"$sector\"})", "legendFormat": "critical" }
+                {
+                    "expr": "max(sector:clients{sector=\"$sector\"})",
+                    "legendFormat": "clients"
+                },
+                {
+                    "expr": "max(sector:cap_clients_warn{sector=\"$sector\"})",
+                    "legendFormat": "warn"
+                },
+                {
+                    "expr": "max(sector:cap_clients_crit{sector=\"$sector\"})",
+                    "legendFormat": "critical"
+                }
             ]
         },
         {
-            "id": 9, "type": "timeseries", "title": "Sector RF throughput vs budget",
+            "id": 9,
+            "type": "timeseries",
+            "title": "Sector RF throughput vs budget",
             "description": "Downlink + uplink RF traffic, with the warn budget marked.",
-            "gridPos": { "h": 8, "w": 12, "x": 12, "y": 5 }, "datasource": "Prometheus",
-            "fieldConfig": { "defaults": { "unit": "bps" } },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 5
+            },
+            "datasource": "Prometheus",
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "bps"
+                }
+            },
             "targets": [
-                { "expr": "sector:rf_downlink_bps{sector=\"$sector\"}", "legendFormat": "downlink" },
-                { "expr": "sector:rf_uplink_bps{sector=\"$sector\"}", "legendFormat": "uplink" },
-                { "expr": "max(sector:cap_mbps_warn{sector=\"$sector\"}) * 1e6", "legendFormat": "warn budget" }
+                {
+                    "expr": "sector:rf_downlink_bps{sector=\"$sector\"}",
+                    "legendFormat": "downlink"
+                },
+                {
+                    "expr": "sector:rf_uplink_bps{sector=\"$sector\"}",
+                    "legendFormat": "uplink"
+                },
+                {
+                    "expr": "max(sector:cap_mbps_warn{sector=\"$sector\"}) * 1e6",
+                    "legendFormat": "warn budget"
+                }
             ]
         },
         {
-            "id": 10, "type": "timeseries", "title": "Noise floor",
-            "gridPos": { "h": 7, "w": 12, "x": 0, "y": 13 }, "datasource": "Prometheus",
-            "fieldConfig": { "defaults": { "unit": "dBm" } },
-            "targets": [ { "expr": "sector_noise_floor_dbm{sector=\"$sector\"}", "legendFormat": "noise floor" } ]
-        },
-        {
-            "id": 11, "type": "timeseries", "title": "Backhaul (ether1) traffic",
-            "gridPos": { "h": 7, "w": 12, "x": 12, "y": 13 }, "datasource": "Prometheus",
-            "fieldConfig": { "defaults": { "unit": "bps" } },
+            "id": 10,
+            "type": "timeseries",
+            "title": "Noise floor",
+            "gridPos": {
+                "h": 7,
+                "w": 12,
+                "x": 0,
+                "y": 13
+            },
+            "datasource": "Prometheus",
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "dBm"
+                }
+            },
             "targets": [
-                { "expr": "sector:backhaul_tx_bps{sector=\"$sector\"}", "legendFormat": "tx" },
-                { "expr": "sector:backhaul_rx_bps{sector=\"$sector\"}", "legendFormat": "rx" }
+                {
+                    "expr": "sector_noise_floor_dbm{sector=\"$sector\"}",
+                    "legendFormat": "noise floor"
+                }
             ]
         },
-
-        { "id": 20, "type": "row", "title": "PER-CLIENT RF", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 20 } },
         {
-            "id": 21, "type": "table", "title": "Clients (worst alignment first)",
-            "description": "Rx Ch0 / Ch1 are the receive-chain strengths - the physical-alignment reading (~-67 manageable, worse than -70 bad, worse than -75 very bad). Chain Δ is the gap between them. Drift 7d is signal vs the CPE's own 7-day average. Align Score folds weak-chain / imbalance / low-SNR / downward chain-drift into 0-100.",
-            "gridPos": { "h": 16, "w": 24, "x": 0, "y": 21 }, "datasource": "Prometheus",
-            "options": { "sortBy": [ { "displayName": "Align Score", "desc": false } ], "cellHeight": "sm" },
+            "id": 11,
+            "type": "timeseries",
+            "title": "Backhaul (ether1) traffic",
+            "gridPos": {
+                "h": 7,
+                "w": 12,
+                "x": 12,
+                "y": 13
+            },
+            "datasource": "Prometheus",
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "bps"
+                }
+            },
             "targets": [
-                { "expr": "sector_cpe_signal_dbm{sector=\"$sector\"}", "refId": "Signal", "instant": true, "format": "table" },
-                { "expr": "sector_cpe_snr_db{sector=\"$sector\"}", "refId": "SNR", "instant": true, "format": "table" },
-                { "expr": "sector_cpe_rx_strength_ch0_dbm{sector=\"$sector\"}", "refId": "Ch0", "instant": true, "format": "table" },
-                { "expr": "sector_cpe_rx_strength_ch1_dbm{sector=\"$sector\"}", "refId": "Ch1", "instant": true, "format": "table" },
-                { "expr": "sector:cpe:chain_imbalance_db{sector=\"$sector\"}", "refId": "ChainDelta", "instant": true, "format": "table" },
-                { "expr": "sector:cpe:signal_drift_db{sector=\"$sector\"}", "refId": "Drift", "instant": true, "format": "table" },
-                { "expr": "sector_cpe_tx_rate_bps{sector=\"$sector\"} / 1e6", "refId": "TxPhy", "instant": true, "format": "table" },
-                { "expr": "(sector:cpe:tx_bps{sector=\"$sector\"} + sector:cpe:rx_bps{sector=\"$sector\"}) / 1e6", "refId": "Traffic", "instant": true, "format": "table" },
-                { "expr": "sector_cpe_session_uptime_seconds{sector=\"$sector\"} / 360000", "refId": "Session", "instant": true, "format": "table" },
-                { "expr": "sector:cpe:alignment_score{sector=\"$sector\"}", "refId": "Align", "instant": true, "format": "table" }
+                {
+                    "expr": "sector:backhaul_tx_bps{sector=\"$sector\"}",
+                    "legendFormat": "tx"
+                },
+                {
+                    "expr": "sector:backhaul_rx_bps{sector=\"$sector\"}",
+                    "legendFormat": "rx"
+                }
+            ]
+        },
+        {
+            "id": 20,
+            "type": "row",
+            "title": "PER-CLIENT RF",
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 20
+            }
+        },
+        {
+            "id": 21,
+            "type": "table",
+            "title": "Clients (worst alignment first)",
+            "description": "Rx Ch0 / Ch1 are the receive-chain strengths - the physical-alignment reading (~-67 manageable, worse than -70 bad, worse than -75 very bad). Chain \u0394 is the gap between them. Drift 7d is signal vs the CPE's own 7-day average. Align Score folds weak-chain / imbalance / low-SNR / downward chain-drift into 0-100.",
+            "gridPos": {
+                "h": 16,
+                "w": 24,
+                "x": 0,
+                "y": 21
+            },
+            "datasource": "Prometheus",
+            "options": {
+                "sortBy": [
+                    {
+                        "displayName": "Align Score",
+                        "desc": false
+                    }
+                ],
+                "cellHeight": "sm"
+            },
+            "targets": [
+                {
+                    "expr": "sector_cpe_signal_dbm{sector=\"$sector\"}",
+                    "refId": "Signal",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "sector_cpe_snr_db{sector=\"$sector\"}",
+                    "refId": "SNR",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "sector_cpe_rx_strength_ch0_dbm{sector=\"$sector\"}",
+                    "refId": "Ch0",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "sector_cpe_rx_strength_ch1_dbm{sector=\"$sector\"}",
+                    "refId": "Ch1",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "sector:cpe:chain_imbalance_db{sector=\"$sector\"}",
+                    "refId": "ChainDelta",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "sector:cpe:signal_drift_db{sector=\"$sector\"}",
+                    "refId": "Drift",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "sector_cpe_tx_rate_bps{sector=\"$sector\"} / 1e6",
+                    "refId": "TxPhy",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "(sector:cpe:tx_bps{sector=\"$sector\"} + sector:cpe:rx_bps{sector=\"$sector\"}) / 1e6",
+                    "refId": "Traffic",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "sector_cpe_session_uptime_seconds{sector=\"$sector\"} / 360000",
+                    "refId": "Session",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "sector:cpe:alignment_score{sector=\"$sector\"}",
+                    "refId": "Align",
+                    "instant": true,
+                    "format": "table"
+                }
             ],
             "transformations": [
-                { "id": "organize", "options": { "excludeByName": { "Time": true, "__name__": true, "auth": true, "instance": true, "job": true, "role": true, "site": true, "sector": true, "cpe_mac": true } } },
-                { "id": "merge", "options": {} },
                 {
                     "id": "organize",
                     "options": {
-                        "excludeByName": { "cpe_mac": true },
+                        "excludeByName": {
+                            "Time": true,
+                            "__name__": true,
+                            "auth": true,
+                            "instance": true,
+                            "job": true,
+                            "role": true,
+                            "site": true,
+                            "sector": true,
+                            "cpe_mac": true
+                        }
+                    }
+                },
+                {
+                    "id": "merge",
+                    "options": {}
+                },
+                {
+                    "id": "organize",
+                    "options": {
+                        "excludeByName": {
+                            "cpe_mac": true
+                        },
                         "indexByName": {
-                            "cpe_name": 0, "Value #Align": 1, "Value #Signal": 2, "Value #SNR": 3,
-                            "Value #Ch0": 4, "Value #Ch1": 5, "Value #ChainDelta": 6, "Value #Drift": 7,
-                            "Value #TxPhy": 8, "Value #Traffic": 9, "Value #Session": 10
+                            "cpe_name": 0,
+                            "Value #Align": 1,
+                            "Value #Signal": 2,
+                            "Value #SNR": 3,
+                            "Value #Ch0": 4,
+                            "Value #Ch1": 5,
+                            "Value #ChainDelta": 6,
+                            "Value #Drift": 7,
+                            "Value #TxPhy": 8,
+                            "Value #Traffic": 9,
+                            "Value #Session": 10
                         },
                         "renameByName": {
                             "cpe_name": "CPE",
@@ -142,7 +550,7 @@
                             "Value #SNR": "SNR (dB)",
                             "Value #Ch0": "Rx Ch0 (dBm)",
                             "Value #Ch1": "Rx Ch1 (dBm)",
-                            "Value #ChainDelta": "Chain Δ (dB)",
+                            "Value #ChainDelta": "Chain \u0394 (dB)",
                             "Value #Drift": "Drift 7d (dB)",
                             "Value #TxPhy": "Tx PHY (Mbps)",
                             "Value #Traffic": "Traffic (Mbps)",
@@ -152,140 +560,659 @@
                 }
             ],
             "fieldConfig": {
-                "defaults": { "color": { "mode": "thresholds" }, "decimals": 1, "custom": { "cellOptions": { "type": "auto" } } },
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "decimals": 1,
+                    "custom": {
+                        "cellOptions": {
+                            "type": "auto"
+                        }
+                    }
+                },
                 "overrides": [
                     {
-                        "matcher": { "id": "byName", "options": "Align Score" },
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Align Score"
+                        },
                         "properties": [
-                            { "id": "decimals", "value": 0 },
-                            { "id": "thresholds", "value": { "mode": "absolute", "steps": [ { "value": null, "color": "red" }, { "value": 40, "color": "orange" }, { "value": 70, "color": "green" } ] } },
-                            { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } }
+                            {
+                                "id": "decimals",
+                                "value": 0
+                            },
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        {
+                                            "value": null,
+                                            "color": "red"
+                                        },
+                                        {
+                                            "value": 40,
+                                            "color": "orange"
+                                        },
+                                        {
+                                            "value": 70,
+                                            "color": "green"
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "type": "color-background",
+                                    "mode": "gradient"
+                                }
+                            }
                         ]
                     },
                     {
-                        "matcher": { "id": "byRegexp", "options": "Signal \\(dBm\\)|Rx Ch0 \\(dBm\\)|Rx Ch1 \\(dBm\\)" },
+                        "matcher": {
+                            "id": "byRegexp",
+                            "options": "Signal \\(dBm\\)|Rx Ch0 \\(dBm\\)|Rx Ch1 \\(dBm\\)"
+                        },
                         "properties": [
-                            { "id": "decimals", "value": 0 },
-                            { "id": "thresholds", "value": { "mode": "absolute", "steps": [ { "value": null, "color": "red" }, { "value": -75, "color": "orange" }, { "value": -70, "color": "yellow" }, { "value": -67, "color": "green" } ] } },
-                            { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } }
+                            {
+                                "id": "decimals",
+                                "value": 0
+                            },
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        {
+                                            "value": null,
+                                            "color": "red"
+                                        },
+                                        {
+                                            "value": -75,
+                                            "color": "orange"
+                                        },
+                                        {
+                                            "value": -70,
+                                            "color": "yellow"
+                                        },
+                                        {
+                                            "value": -67,
+                                            "color": "green"
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "type": "color-background",
+                                    "mode": "gradient"
+                                }
+                            }
                         ]
                     },
                     {
-                        "matcher": { "id": "byName", "options": "Chain Δ (dB)" },
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Chain \u0394 (dB)"
+                        },
                         "properties": [
-                            { "id": "decimals", "value": 0 },
-                            { "id": "thresholds", "value": { "mode": "absolute", "steps": [ { "value": null, "color": "green" }, { "value": 5, "color": "yellow" }, { "value": 10, "color": "red" } ] } },
-                            { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } }
+                            {
+                                "id": "decimals",
+                                "value": 0
+                            },
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        {
+                                            "value": null,
+                                            "color": "green"
+                                        },
+                                        {
+                                            "value": 5,
+                                            "color": "yellow"
+                                        },
+                                        {
+                                            "value": 10,
+                                            "color": "red"
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "type": "color-background",
+                                    "mode": "gradient"
+                                }
+                            }
                         ]
                     },
                     {
-                        "matcher": { "id": "byName", "options": "SNR (dB)" },
+                        "matcher": {
+                            "id": "byName",
+                            "options": "SNR (dB)"
+                        },
                         "properties": [
-                            { "id": "decimals", "value": 0 },
-                            { "id": "thresholds", "value": { "mode": "absolute", "steps": [ { "value": null, "color": "red" }, { "value": 18, "color": "yellow" }, { "value": 25, "color": "green" } ] } },
-                            { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } }
+                            {
+                                "id": "decimals",
+                                "value": 0
+                            },
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        {
+                                            "value": null,
+                                            "color": "red"
+                                        },
+                                        {
+                                            "value": 18,
+                                            "color": "yellow"
+                                        },
+                                        {
+                                            "value": 25,
+                                            "color": "green"
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "type": "color-background",
+                                    "mode": "gradient"
+                                }
+                            }
                         ]
                     },
                     {
-                        "matcher": { "id": "byName", "options": "Drift 7d (dB)" },
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Drift 7d (dB)"
+                        },
                         "properties": [
-                            { "id": "thresholds", "value": { "mode": "absolute", "steps": [ { "value": null, "color": "red" }, { "value": -6, "color": "yellow" }, { "value": -2, "color": "green" }, { "value": 6, "color": "orange" } ] } },
-                            { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } }
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        {
+                                            "value": null,
+                                            "color": "red"
+                                        },
+                                        {
+                                            "value": -6,
+                                            "color": "yellow"
+                                        },
+                                        {
+                                            "value": -2,
+                                            "color": "green"
+                                        },
+                                        {
+                                            "value": 6,
+                                            "color": "orange"
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "type": "color-background",
+                                    "mode": "gradient"
+                                }
+                            }
                         ]
                     }
                 ]
             }
         },
         {
-            "id": 22, "type": "timeseries", "title": "Sector signal (average / worst / best)",
+            "id": 22,
+            "type": "timeseries",
+            "title": "Sector signal (average / worst / best)",
             "description": "One line each across all CPEs, instead of a line per client. If 'average' trends down, the whole sector is degrading; if only 'worst' drops, it's one CPE (check the table).",
-            "gridPos": { "h": 8, "w": 12, "x": 0, "y": 37 }, "datasource": "Prometheus",
-            "fieldConfig": { "defaults": { "unit": "dBm" } },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 37
+            },
+            "datasource": "Prometheus",
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "dBm"
+                }
+            },
             "targets": [
-                { "expr": "avg(sector_cpe_signal_dbm{sector=\"$sector\"})", "legendFormat": "average" },
-                { "expr": "min(sector_cpe_signal_dbm{sector=\"$sector\"})", "legendFormat": "worst" },
-                { "expr": "max(sector_cpe_signal_dbm{sector=\"$sector\"})", "legendFormat": "best" }
+                {
+                    "expr": "avg(sector_cpe_signal_dbm{sector=\"$sector\"})",
+                    "legendFormat": "average"
+                },
+                {
+                    "expr": "min(sector_cpe_signal_dbm{sector=\"$sector\"})",
+                    "legendFormat": "worst"
+                },
+                {
+                    "expr": "max(sector_cpe_signal_dbm{sector=\"$sector\"})",
+                    "legendFormat": "best"
+                }
             ]
         },
         {
-            "id": 23, "type": "timeseries", "title": "Sector SNR (average / worst)",
+            "id": 23,
+            "type": "timeseries",
+            "title": "Sector SNR (average / worst)",
             "description": "Average and worst SNR across all CPEs. Below ~18 dB the worst client is near the modulation floor.",
-            "gridPos": { "h": 8, "w": 12, "x": 12, "y": 37 }, "datasource": "Prometheus",
-            "fieldConfig": { "defaults": { "unit": "none" } },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 37
+            },
+            "datasource": "Prometheus",
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "none"
+                }
+            },
             "targets": [
-                { "expr": "avg(sector_cpe_snr_db{sector=\"$sector\"})", "legendFormat": "average" },
-                { "expr": "min(sector_cpe_snr_db{sector=\"$sector\"})", "legendFormat": "worst" }
+                {
+                    "expr": "avg(sector_cpe_snr_db{sector=\"$sector\"})",
+                    "legendFormat": "average"
+                },
+                {
+                    "expr": "min(sector_cpe_snr_db{sector=\"$sector\"})",
+                    "legendFormat": "worst"
+                }
             ]
         },
-
-        { "id": 30, "type": "row", "title": "TRAFFIC PATTERN & BUDGET", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 45 } },
         {
-            "id": 36, "type": "timeseries", "title": "Busy hours - hourly averages (7d)",
+            "id": 30,
+            "type": "row",
+            "title": "TRAFFIC PATTERN & BUDGET",
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 45
+            }
+        },
+        {
+            "id": 36,
+            "type": "timeseries",
+            "title": "Busy hours - hourly averages (7d)",
             "description": "Hourly-average throughput, backhaul and client count over the last 7 days. The recurring tall points are this sector's peak period - the hours to size capacity around.",
-            "gridPos": { "h": 9, "w": 24, "x": 0, "y": 46 }, "datasource": "Prometheus",
+            "gridPos": {
+                "h": 9,
+                "w": 24,
+                "x": 0,
+                "y": 46
+            },
+            "datasource": "Prometheus",
             "timeFrom": "7d",
-            "fieldConfig": { "defaults": {}, "overrides": [
-                { "matcher": { "id": "byName", "options": "clients (hourly avg)" }, "properties": [ { "id": "custom.axisPlacement", "value": "right" }, { "id": "unit", "value": "none" } ] }
-            ] },
+            "fieldConfig": {
+                "defaults": {},
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "clients (hourly avg)"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.axisPlacement",
+                                "value": "right"
+                            },
+                            {
+                                "id": "unit",
+                                "value": "none"
+                            }
+                        ]
+                    }
+                ]
+            },
             "targets": [
-                { "expr": "sector:throughput_mbps:hourly{sector=\"$sector\"}", "legendFormat": "throughput Mbps (hourly avg)" },
-                { "expr": "sector:backhaul_bps:hourly{sector=\"$sector\"} / 1e6", "legendFormat": "backhaul Mbps (hourly avg)" },
-                { "expr": "sector:clients:hourly{sector=\"$sector\"}", "legendFormat": "clients (hourly avg)" }
+                {
+                    "expr": "sector:throughput_mbps:hourly{sector=\"$sector\"}",
+                    "legendFormat": "throughput Mbps (hourly avg)"
+                },
+                {
+                    "expr": "sector:backhaul_bps:hourly{sector=\"$sector\"} / 1e6",
+                    "legendFormat": "backhaul Mbps (hourly avg)"
+                },
+                {
+                    "expr": "sector:clients:hourly{sector=\"$sector\"}",
+                    "legendFormat": "clients (hourly avg)"
+                }
             ]
         },
         {
-            "id": 31, "type": "stat", "title": "Busy-hour throughput (24h p95)",
+            "id": 31,
+            "type": "stat",
+            "title": "Busy-hour throughput (24h p95)",
             "description": "95th-percentile throughput over the last 24h - what the sector sustains at its busiest, ignoring one-off spikes.",
-            "gridPos": { "h": 4, "w": 5, "x": 0, "y": 55 }, "datasource": "Prometheus",
-            "targets": [ { "expr": "max(sector:throughput_mbps:p95_24h{sector=\"$sector\"})", "instant": true } ],
-            "fieldConfig": { "defaults": { "unit": "none", "decimals": 1, "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [ { "value": null, "color": "green" }, { "value": 20, "color": "yellow" }, { "value": 25, "color": "red" } ] } } }
+            "gridPos": {
+                "h": 4,
+                "w": 5,
+                "x": 0,
+                "y": 55
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "max(sector:throughput_mbps:p95_24h{sector=\"$sector\"})",
+                    "instant": true
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "none",
+                    "decimals": 1,
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "value": null,
+                                "color": "green"
+                            },
+                            {
+                                "value": 20,
+                                "color": "yellow"
+                            },
+                            {
+                                "value": 25,
+                                "color": "red"
+                            }
+                        ]
+                    }
+                }
+            }
         },
         {
-            "id": 32, "type": "stat", "title": "Peak throughput (24h)",
+            "id": 32,
+            "type": "stat",
+            "title": "Peak throughput (24h)",
             "description": "Highest single reading in the last 24h.",
-            "gridPos": { "h": 4, "w": 5, "x": 5, "y": 55 }, "datasource": "Prometheus",
-            "targets": [ { "expr": "max(sector:throughput_mbps:max24h{sector=\"$sector\"})", "instant": true } ],
-            "fieldConfig": { "defaults": { "decimals": 1 } }
+            "gridPos": {
+                "h": 4,
+                "w": 5,
+                "x": 5,
+                "y": 55
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "max(sector:throughput_mbps:max24h{sector=\"$sector\"})",
+                    "instant": true
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "decimals": 1
+                }
+            }
         },
         {
-            "id": 33, "type": "stat", "title": "Average throughput (24h)",
+            "id": 33,
+            "type": "stat",
+            "title": "Average throughput (24h)",
             "description": "Mean over the last 24h.",
-            "gridPos": { "h": 4, "w": 5, "x": 10, "y": 55 }, "datasource": "Prometheus",
-            "targets": [ { "expr": "max(sector:throughput_mbps:avg24h{sector=\"$sector\"})", "instant": true } ],
-            "fieldConfig": { "defaults": { "decimals": 1 } }
+            "gridPos": {
+                "h": 4,
+                "w": 5,
+                "x": 10,
+                "y": 55
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "max(sector:throughput_mbps:avg24h{sector=\"$sector\"})",
+                    "instant": true
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "decimals": 1
+                }
+            }
         },
         {
-            "id": 34, "type": "stat", "title": "Time over Mbps budget (24h)",
+            "id": 34,
+            "type": "stat",
+            "title": "Time over Mbps budget (24h)",
             "description": "How long in the last 24h the sector's throughput sat above its warn threshold (20 Mbps default). 0 = comfortably within budget; hours = chronically oversubscribed.",
-            "gridPos": { "h": 4, "w": 5, "x": 15, "y": 55 }, "datasource": "Prometheus",
-            "targets": [ { "expr": "max(sector:minutes_over_cap_mbps:24h{sector=\"$sector\"})", "instant": true } ],
-            "fieldConfig": { "defaults": { "unit": "m", "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [ { "value": null, "color": "green" }, { "value": 30, "color": "yellow" }, { "value": 120, "color": "red" } ] } } }
+            "gridPos": {
+                "h": 4,
+                "w": 5,
+                "x": 15,
+                "y": 55
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "max(sector:minutes_over_cap_mbps:24h{sector=\"$sector\"})",
+                    "instant": true
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "m",
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "value": null,
+                                "color": "green"
+                            },
+                            {
+                                "value": 30,
+                                "color": "yellow"
+                            },
+                            {
+                                "value": 120,
+                                "color": "red"
+                            }
+                        ]
+                    }
+                }
+            }
         },
         {
-            "id": 35, "type": "stat", "title": "Time over client budget (24h)",
+            "id": 35,
+            "type": "stat",
+            "title": "Time over client budget (24h)",
             "description": "How long in the last 24h the sector had at least as many clients as its warn ceiling (15 default).",
-            "gridPos": { "h": 4, "w": 4, "x": 20, "y": 55 }, "datasource": "Prometheus",
-            "targets": [ { "expr": "max(sector:minutes_over_cap_clients:24h{sector=\"$sector\"})", "instant": true } ],
-            "fieldConfig": { "defaults": { "unit": "m", "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [ { "value": null, "color": "green" }, { "value": 30, "color": "yellow" }, { "value": 120, "color": "red" } ] } } }
+            "gridPos": {
+                "h": 4,
+                "w": 4,
+                "x": 20,
+                "y": 55
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "max(sector:minutes_over_cap_clients:24h{sector=\"$sector\"})",
+                    "instant": true
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "m",
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "value": null,
+                                "color": "green"
+                            },
+                            {
+                                "value": 30,
+                                "color": "yellow"
+                            },
+                            {
+                                "value": 120,
+                                "color": "red"
+                            }
+                        ]
+                    }
+                }
+            }
         },
-
-        { "id": 40, "type": "row", "title": "DEVICE", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 59 } },
         {
-            "id": 41, "type": "timeseries", "title": "CPU",
-            "gridPos": { "h": 7, "w": 12, "x": 0, "y": 60 }, "datasource": "Prometheus",
-            "fieldConfig": { "defaults": { "unit": "percent" } },
-            "targets": [ { "expr": "max(sector_cpu_load_percent{sector=\"$sector\"})", "legendFormat": "cpu" } ]
+            "id": 40,
+            "type": "row",
+            "title": "DEVICE",
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 59
+            }
         },
         {
-            "id": 42, "type": "timeseries", "title": "Memory used",
-            "gridPos": { "h": 7, "w": 12, "x": 12, "y": 60 }, "datasource": "Prometheus",
-            "fieldConfig": { "defaults": { "unit": "percent" } },
-            "targets": [ { "expr": "100 * sector_storage_used{sector=\"$sector\", hrStorageDescr=~\".*[Mm]emory.*\"} / sector_storage_size{sector=\"$sector\", hrStorageDescr=~\".*[Mm]emory.*\"}", "legendFormat": "memory" } ]
+            "id": 41,
+            "type": "timeseries",
+            "title": "CPU",
+            "gridPos": {
+                "h": 7,
+                "w": 12,
+                "x": 0,
+                "y": 60
+            },
+            "datasource": "Prometheus",
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percent"
+                }
+            },
+            "targets": [
+                {
+                    "expr": "max(sector_cpu_load_percent{sector=\"$sector\"})",
+                    "legendFormat": "cpu"
+                }
+            ]
+        },
+        {
+            "id": 42,
+            "type": "timeseries",
+            "title": "Memory used",
+            "gridPos": {
+                "h": 7,
+                "w": 12,
+                "x": 12,
+                "y": 60
+            },
+            "datasource": "Prometheus",
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percent"
+                }
+            },
+            "targets": [
+                {
+                    "expr": "100 * sector_storage_used{sector=\"$sector\", hrStorageDescr=~\".*[Mm]emory.*\"} / sector_storage_size{sector=\"$sector\", hrStorageDescr=~\".*[Mm]emory.*\"}",
+                    "legendFormat": "memory"
+                }
+            ]
         }
     ],
-    "annotations": { "list": [] },
+    "annotations": {
+        "list": []
+    },
     "links": [
-        { "title": "Sector Fleet Overview", "url": "/d/sector-fleet-overview/sector-fleet-overview", "type": "link" },
-        { "title": "Capacity Planning", "url": "/d/capacity-planning/capacity-planning", "type": "link" }
+        {
+            "title": "NOC Overview",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/noc-overview",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "MikroTik Fleet Overview",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/mikrotik-fleet-overview",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "Sector Fleet Overview",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/sector-fleet-overview",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "Capacity Planning",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/capacity-planning",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "PTP Link Monitoring",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/ptp-link-monitoring",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "MikroTik Router Detail",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/mikrotik-router-overview",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "WAN/LAN Interfaces",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/wan-lan-interfaces",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        }
     ]
 }

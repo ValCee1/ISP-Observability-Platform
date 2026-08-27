@@ -3,7 +3,7 @@
     "description": "Front door for MikroTik PtMP sectors: at-a-glance counts, then one row per sector (clients / throughput vs capacity, noise floor, worst-CPE signal, misaligned + flapping CPE counts, ether1, CPU). Click a sector to drill into Sector Detail.",
     "uid": "sector-fleet-overview",
     "schemaVersion": 39,
-    "version": 1,
+    "version": 2,
     "editable": true,
     "timezone": "browser",
     "time": {
@@ -16,95 +16,290 @@
             "id": 10,
             "type": "row",
             "title": "AT A GLANCE",
-            "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 0
+            }
         },
         {
             "id": 11,
             "type": "stat",
             "title": "Sectors Up",
-            "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+            "gridPos": {
+                "h": 4,
+                "w": 4,
+                "x": 0,
+                "y": 1
+            },
             "datasource": "Prometheus",
-            "targets": [ { "expr": "count(sector_up == 1)", "instant": true, "refId": "A" } ],
-            "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "green" }, "noValue": "0" } }
+            "targets": [
+                {
+                    "expr": "count(sector_up == 1)",
+                    "instant": true,
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "fixed",
+                        "fixedColor": "green"
+                    },
+                    "noValue": "0"
+                }
+            }
         },
         {
             "id": 12,
             "type": "stat",
             "title": "Sectors Down",
-            "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+            "gridPos": {
+                "h": 4,
+                "w": 4,
+                "x": 4,
+                "y": 1
+            },
             "datasource": "Prometheus",
-            "targets": [ { "expr": "count(sector_up == 0) or vector(0)", "instant": true, "refId": "A" } ],
-            "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "red" }, "noValue": "0" } }
+            "targets": [
+                {
+                    "expr": "count(sector_up == 0) or vector(0)",
+                    "instant": true,
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "fixed",
+                        "fixedColor": "red"
+                    },
+                    "noValue": "0"
+                }
+            }
         },
         {
             "id": 13,
             "type": "stat",
             "title": "Sectors Over Capacity",
             "description": "Sectors at/over their warn threshold for client count OR throughput (thresholds from sector-thresholds.yml). These feed the 08:00 capacity digest.",
-            "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
+            "gridPos": {
+                "h": 4,
+                "w": 4,
+                "x": 8,
+                "y": 1
+            },
             "datasource": "Prometheus",
-            "targets": [ { "expr": "count( (sector:clients >= on(sector) group_left() sector:cap_clients_warn) or (sector:throughput_mbps > on(sector) group_left() sector:cap_mbps_warn) ) or vector(0)", "instant": true, "refId": "A" } ],
-            "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "yellow" }, "noValue": "0" } }
+            "targets": [
+                {
+                    "expr": "count( (sector:clients >= on(sector) group_left() sector:cap_clients_warn) or (sector:throughput_mbps > on(sector) group_left() sector:cap_mbps_warn) ) or vector(0)",
+                    "instant": true,
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "fixed",
+                        "fixedColor": "yellow"
+                    },
+                    "noValue": "0"
+                }
+            }
         },
         {
             "id": 14,
             "type": "stat",
             "title": "CPEs Degrading",
             "description": "CPEs whose signal is 6 dB or more below their own 7-day average right now.",
-            "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
+            "gridPos": {
+                "h": 4,
+                "w": 4,
+                "x": 12,
+                "y": 1
+            },
             "datasource": "Prometheus",
-            "targets": [ { "expr": "count(sector:cpe:signal_drift_db <= -6) or vector(0)", "instant": true, "refId": "A" } ],
-            "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "orange" }, "noValue": "0" } }
+            "targets": [
+                {
+                    "expr": "count(sector:cpe:signal_drift_db <= -6) or vector(0)",
+                    "instant": true,
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "fixed",
+                        "fixedColor": "orange"
+                    },
+                    "noValue": "0"
+                }
+            }
         },
         {
             "id": 15,
             "type": "stat",
             "title": "CPEs Flapping",
             "description": "CPEs that have re-registered 3+ times in the last hour.",
-            "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
+            "gridPos": {
+                "h": 4,
+                "w": 4,
+                "x": 16,
+                "y": 1
+            },
             "datasource": "Prometheus",
-            "targets": [ { "expr": "count(resets(sector_cpe_session_uptime_seconds[1h]) >= 3) or vector(0)", "instant": true, "refId": "A" } ],
-            "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "orange" }, "noValue": "0" } }
+            "targets": [
+                {
+                    "expr": "count(resets(sector_cpe_session_uptime_seconds[1h]) >= 3) or vector(0)",
+                    "instant": true,
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "fixed",
+                        "fixedColor": "orange"
+                    },
+                    "noValue": "0"
+                }
+            }
         },
         {
             "id": 16,
             "type": "stat",
             "title": "Misaligned CPEs",
             "description": "CPEs with an alignment score below 60 (weak limiting chain, chain imbalance, low SNR, or downward chain drift).",
-            "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
+            "gridPos": {
+                "h": 4,
+                "w": 4,
+                "x": 20,
+                "y": 1
+            },
             "datasource": "Prometheus",
-            "targets": [ { "expr": "count(sector:cpe:alignment_score < 60) or vector(0)", "instant": true, "refId": "A" } ],
-            "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "orange" }, "noValue": "0" } }
+            "targets": [
+                {
+                    "expr": "count(sector:cpe:alignment_score < 60) or vector(0)",
+                    "instant": true,
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "fixed",
+                        "fixedColor": "orange"
+                    },
+                    "noValue": "0"
+                }
+            }
         },
         {
             "id": 1,
             "type": "table",
             "title": "All Sectors",
             "description": "One row per sector. Clients / Mbps are colored against the default 15/20 and 20/25 thresholds - per-sector overrides in sector-thresholds.yml aren't reflected in the cell color, only in the alerts. Click a row to open Sector Detail.",
-            "gridPos": { "h": 16, "w": 24, "x": 0, "y": 5 },
+            "gridPos": {
+                "h": 16,
+                "w": 24,
+                "x": 0,
+                "y": 5
+            },
             "datasource": "Prometheus",
-            "options": { "sortBy": [ { "displayName": "Clients", "desc": true } ] },
+            "options": {
+                "sortBy": [
+                    {
+                        "displayName": "Clients",
+                        "desc": true
+                    }
+                ]
+            },
             "targets": [
-                { "expr": "max by (sector) (sector_up)", "refId": "Status", "instant": true, "format": "table" },
-                { "expr": "max by (sector) (sector:clients)", "refId": "Clients", "instant": true, "format": "table" },
-                { "expr": "max by (sector) (sector:throughput_mbps)", "refId": "Mbps", "instant": true, "format": "table" },
-                { "expr": "max by (sector) (sector_noise_floor_dbm)", "refId": "Noise", "instant": true, "format": "table" },
-                { "expr": "min by (sector) (sector_cpe_signal_dbm)", "refId": "WorstCPE", "instant": true, "format": "table" },
-                { "expr": "count by (sector) (sector:cpe:alignment_score < 60) or (max by (sector) (sector_up) * 0)", "refId": "Misaligned", "instant": true, "format": "table" },
-                { "expr": "count by (sector) (resets(sector_cpe_session_uptime_seconds[1h]) >= 3) or (max by (sector) (sector_up) * 0)", "refId": "Flapping", "instant": true, "format": "table" },
-                { "expr": "max by (sector) (sector_cpu_load_percent)", "refId": "CPU", "instant": true, "format": "table" }
+                {
+                    "expr": "max by (sector) (sector_up)",
+                    "refId": "Status",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "max by (sector) (sector:clients)",
+                    "refId": "Clients",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "max by (sector) (sector:throughput_mbps)",
+                    "refId": "Mbps",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "max by (sector) (sector_noise_floor_dbm)",
+                    "refId": "Noise",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "min by (sector) (sector_cpe_signal_dbm)",
+                    "refId": "WorstCPE",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "count by (sector) (sector:cpe:alignment_score < 60) or (max by (sector) (sector_up) * 0)",
+                    "refId": "Misaligned",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "count by (sector) (resets(sector_cpe_session_uptime_seconds[1h]) >= 3) or (max by (sector) (sector_up) * 0)",
+                    "refId": "Flapping",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "max by (sector) (sector_cpu_load_percent)",
+                    "refId": "CPU",
+                    "instant": true,
+                    "format": "table"
+                }
             ],
             "transformations": [
-                { "id": "organize", "options": { "excludeByName": { "Time": true, "__name__": true, "job": true, "instance": true } } },
-                { "id": "merge", "options": {} },
                 {
                     "id": "organize",
                     "options": {
-                        "excludeByName": { "Time": true, "__name__": true, "job": true, "instance": true },
+                        "excludeByName": {
+                            "Time": true,
+                            "__name__": true,
+                            "job": true,
+                            "instance": true
+                        }
+                    }
+                },
+                {
+                    "id": "merge",
+                    "options": {}
+                },
+                {
+                    "id": "organize",
+                    "options": {
+                        "excludeByName": {
+                            "Time": true,
+                            "__name__": true,
+                            "job": true,
+                            "instance": true
+                        },
                         "indexByName": {
-                            "sector": 0, "Value #Status": 1, "Value #Clients": 2, "Value #Mbps": 3,
-                            "Value #Noise": 4, "Value #WorstCPE": 5, "Value #Misaligned": 6,
-                            "Value #Flapping": 7, "Value #CPU": 8
+                            "sector": 0,
+                            "Value #Status": 1,
+                            "Value #Clients": 2,
+                            "Value #Mbps": 3,
+                            "Value #Noise": 4,
+                            "Value #WorstCPE": 5,
+                            "Value #Misaligned": 6,
+                            "Value #Flapping": 7,
+                            "Value #CPU": 8
                         },
                         "renameByName": {
                             "sector": "Sector",
@@ -121,63 +316,374 @@
                 }
             ],
             "fieldConfig": {
-                "defaults": { "color": { "mode": "thresholds" } },
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    }
+                },
                 "overrides": [
                     {
-                        "matcher": { "id": "byName", "options": "Sector" },
-                        "properties": [ { "id": "links", "value": [ { "title": "Open Sector Detail", "url": "/d/sector-detail/sector-detail?var-sector=${__data.fields.Sector}", "targetBlank": false } ] } ]
-                    },
-                    {
-                        "matcher": { "id": "byName", "options": "Status" },
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Sector"
+                        },
                         "properties": [
-                            { "id": "mappings", "value": [
-                                { "type": "value", "options": { "1": { "text": "UP", "color": "green", "index": 0 }, "0": { "text": "DOWN", "color": "red", "index": 1 } } },
-                                { "type": "special", "options": { "match": "null+nan", "result": { "text": "NO DATA", "color": "white", "index": 2 } } }
-                            ] },
-                            { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } }
+                            {
+                                "id": "links",
+                                "value": [
+                                    {
+                                        "title": "Open Sector Detail",
+                                        "url": "/d/sector-detail/sector-detail?var-sector=${__data.fields.Sector}",
+                                        "targetBlank": false
+                                    }
+                                ]
+                            }
                         ]
                     },
                     {
-                        "matcher": { "id": "byName", "options": "Clients" },
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Status"
+                        },
                         "properties": [
-                            { "id": "thresholds", "value": { "mode": "absolute", "steps": [ { "value": null, "color": "green" }, { "value": 15, "color": "yellow" }, { "value": 20, "color": "red" } ] } },
-                            { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } }
+                            {
+                                "id": "mappings",
+                                "value": [
+                                    {
+                                        "type": "value",
+                                        "options": {
+                                            "1": {
+                                                "text": "UP",
+                                                "color": "green",
+                                                "index": 0
+                                            },
+                                            "0": {
+                                                "text": "DOWN",
+                                                "color": "red",
+                                                "index": 1
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "type": "special",
+                                        "options": {
+                                            "match": "null+nan",
+                                            "result": {
+                                                "text": "NO DATA",
+                                                "color": "white",
+                                                "index": 2
+                                            }
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "type": "color-background",
+                                    "mode": "gradient"
+                                }
+                            }
                         ]
                     },
                     {
-                        "matcher": { "id": "byName", "options": "Throughput (Mbps)" },
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Clients"
+                        },
                         "properties": [
-                            { "id": "decimals", "value": 1 },
-                            { "id": "thresholds", "value": { "mode": "absolute", "steps": [ { "value": null, "color": "green" }, { "value": 20, "color": "yellow" }, { "value": 25, "color": "red" } ] } },
-                            { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } }
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        {
+                                            "value": null,
+                                            "color": "green"
+                                        },
+                                        {
+                                            "value": 15,
+                                            "color": "yellow"
+                                        },
+                                        {
+                                            "value": 20,
+                                            "color": "red"
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "type": "color-background",
+                                    "mode": "gradient"
+                                }
+                            }
                         ]
                     },
                     {
-                        "matcher": { "id": "byName", "options": "Worst CPE (dBm)" },
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Throughput (Mbps)"
+                        },
                         "properties": [
-                            { "id": "thresholds", "value": { "mode": "absolute", "steps": [ { "value": null, "color": "red" }, { "value": -78, "color": "yellow" }, { "value": -68, "color": "green" } ] } },
-                            { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } }
+                            {
+                                "id": "decimals",
+                                "value": 1
+                            },
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        {
+                                            "value": null,
+                                            "color": "green"
+                                        },
+                                        {
+                                            "value": 20,
+                                            "color": "yellow"
+                                        },
+                                        {
+                                            "value": 25,
+                                            "color": "red"
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "type": "color-background",
+                                    "mode": "gradient"
+                                }
+                            }
                         ]
                     },
                     {
-                        "matcher": { "id": "byName", "options": "Misaligned CPEs" },
-                        "properties": [ { "id": "thresholds", "value": { "mode": "absolute", "steps": [ { "value": null, "color": "green" }, { "value": 1, "color": "yellow" }, { "value": 3, "color": "red" } ] } }, { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } } ]
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Worst CPE (dBm)"
+                        },
+                        "properties": [
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        {
+                                            "value": null,
+                                            "color": "red"
+                                        },
+                                        {
+                                            "value": -78,
+                                            "color": "yellow"
+                                        },
+                                        {
+                                            "value": -68,
+                                            "color": "green"
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "type": "color-background",
+                                    "mode": "gradient"
+                                }
+                            }
+                        ]
                     },
                     {
-                        "matcher": { "id": "byName", "options": "Flapping CPEs" },
-                        "properties": [ { "id": "thresholds", "value": { "mode": "absolute", "steps": [ { "value": null, "color": "green" }, { "value": 1, "color": "yellow" }, { "value": 3, "color": "red" } ] } }, { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } } ]
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Misaligned CPEs"
+                        },
+                        "properties": [
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        {
+                                            "value": null,
+                                            "color": "green"
+                                        },
+                                        {
+                                            "value": 1,
+                                            "color": "yellow"
+                                        },
+                                        {
+                                            "value": 3,
+                                            "color": "red"
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "type": "color-background",
+                                    "mode": "gradient"
+                                }
+                            }
+                        ]
                     },
                     {
-                        "matcher": { "id": "byName", "options": "CPU %" },
-                        "properties": [ { "id": "thresholds", "value": { "mode": "absolute", "steps": [ { "value": null, "color": "green" }, { "value": 70, "color": "yellow" }, { "value": 85, "color": "red" } ] } }, { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } } ]
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Flapping CPEs"
+                        },
+                        "properties": [
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        {
+                                            "value": null,
+                                            "color": "green"
+                                        },
+                                        {
+                                            "value": 1,
+                                            "color": "yellow"
+                                        },
+                                        {
+                                            "value": 3,
+                                            "color": "red"
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "type": "color-background",
+                                    "mode": "gradient"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "CPU %"
+                        },
+                        "properties": [
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        {
+                                            "value": null,
+                                            "color": "green"
+                                        },
+                                        {
+                                            "value": 70,
+                                            "color": "yellow"
+                                        },
+                                        {
+                                            "value": 85,
+                                            "color": "red"
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "type": "color-background",
+                                    "mode": "gradient"
+                                }
+                            }
+                        ]
                     }
                 ]
             }
         }
     ],
-    "annotations": { "list": [] },
+    "annotations": {
+        "list": []
+    },
     "links": [
-        { "title": "Sector Detail", "url": "/d/sector-detail/sector-detail", "type": "link" },
-        { "title": "Capacity Planning", "url": "/d/capacity-planning/capacity-planning", "type": "link" }
+        {
+            "title": "NOC Overview",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/noc-overview",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "MikroTik Fleet Overview",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/mikrotik-fleet-overview",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "Capacity Planning",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/capacity-planning",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "PTP Link Monitoring",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/ptp-link-monitoring",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "Sector Detail",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/sector-detail",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "MikroTik Router Detail",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/mikrotik-router-overview",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        },
+        {
+            "title": "WAN/LAN Interfaces",
+            "type": "link",
+            "icon": "external link",
+            "url": "/d/wan-lan-interfaces",
+            "targetBlank": false,
+            "keepTime": true,
+            "includeVars": false,
+            "asDropdown": false,
+            "tags": []
+        }
     ]
 }
