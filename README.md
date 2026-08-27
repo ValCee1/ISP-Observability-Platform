@@ -53,8 +53,10 @@ Links          --ICMP--> blackbox-exporter -> Prometheus -> Grafana
 
 ## Dashboards (`grafana/dashboards/`, auto-provisioned)
 
-- **NOC Overview** — the front door: link counts by state + a color-coded table of
-  every link's health score, linking through to...
+- **NOC Overview** — the front door: an **Active Incidents** table (every firing
+  alert, one row per object, longest-running first), link/router/sector state
+  counts, then color-coded per-object health tables for links and sectors, each
+  linking through to its detail view.
 - **PTP Link Monitoring** — drill-down for one link: status, latency, packet loss,
   RF signal/noise/quality, capacity/utilization, vendor-specific diagnostics.
 - **MikroTik Router Overview** — reachability, CPU, memory, storage, interface traffic
@@ -83,3 +85,13 @@ Links          --ICMP--> blackbox-exporter -> Prometheus -> Grafana
   daily in the 08:00–08:15 Africa/Lagos window (`time_intervals` +
   `active_time_intervals` in `alertmanager/alertmanager.yml`). Real-time sector
   alerting is limited to RF/state/device problems.
+- Every alert carries `severity` (critical/warning/info), `category`
+  (state/health/capacity/degrading — drives routing + inhibition), `scope`
+  (link/router/sector/cpe) and `alert_type` (kebab-case specific symptom). The NOC
+  "Active Incidents" panel and the `incident:*` recording rules
+  (`prometheus/rules/incidents.yml`) key off these.
+- `SectorWideCPEDegradation` fires when 4+ CPEs on one sector drop below alignment
+  score 60, and inhibits the individual per-CPE RF alerts for that sector — a
+  shared cause is one incident, not N. `CPESignalDegradedVsBaseline` / `...Rising`
+  gate on `sector:cpe:baseline_ready` (≈17h+ of history) so they don't fire off a
+  half-formed baseline in a sector's first day.

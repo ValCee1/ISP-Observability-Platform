@@ -7,6 +7,8 @@ groups:
         labels:
           severity: critical
           category: state
+          scope: router
+          alert_type: router-down
         annotations:
           summary: "🔴 Core Router DOWN"
           description: "Router {{ $labels.instance }} has been unreachable for 30 seconds."
@@ -28,6 +30,8 @@ groups:
         labels:
           severity: critical
           category: state
+          scope: router
+          alert_type: wan-down
         annotations:
           summary: "🔴 WAN Interface DOWN"
           description: "{{ $labels.ifName }} on {{ $labels.instance }} has gone down."
@@ -46,6 +50,8 @@ groups:
         labels:
           severity: warning
           category: health
+          scope: router
+          alert_type: high-cpu
         annotations:
           summary: "🟠 High CPU"
           description: 'CPU on {{ $labels.instance }} has been above 80% for 5 minutes (currently {{ $value | printf "%.1f" }}%).'
@@ -56,6 +62,8 @@ groups:
         labels:
           severity: warning
           category: health
+          scope: router
+          alert_type: high-memory
         annotations:
           summary: "🟠 High Memory"
           description: 'Memory on {{ $labels.instance }} has been above 75% for 3 minutes (currently {{ $value | printf "%.1f" }}%).'
@@ -74,6 +82,8 @@ groups:
         labels:
           severity: warning
           category: health
+          scope: link
+          alert_type: weak-signal
         annotations:
           summary: "🟠 Weak Signal"
           description: 'Signal on {{ $labels.instance }} has been below -75 dBm for 5 minutes (currently {{ $value | printf "%.1f" }} dBm).'

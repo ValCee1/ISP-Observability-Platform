@@ -21,6 +21,13 @@
 - targets: ["10.10.13.1"]
   labels:
     auth: public_v2
-    sector: OFFICE-ISP-5B
-    site: OFFICE
+    sector: 4B
+    site: BASE 5
+    role: sector-ap
+
+- targets: ["10.10.13.129"]
+  labels:
+    auth: public_v2
+    sector: 4E
+    site: BASE 4
     role: sector-ap

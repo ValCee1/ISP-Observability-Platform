@@ -198,6 +198,26 @@ inhibit_rules:
       category: "health|capacity"
     equal: ["sector"]
 
+  # A sector's backhaul being down is a state incident that explains the
+  # RF/CPE/capacity symptoms that follow.
+  - source_match:
+      alertname: SectorEther1Down
+    target_match_re:
+      category: "health|capacity"
+    equal: ["sector"]
+
+  # STEP 7: when SectorWideCPEDegradation is firing, the individual
+  # per-CPE RF alerts on that same sector (weak signal, signal drift,
+  # signal rising, chain imbalance, low SNR) are the evidence beneath it,
+  # not separate incidents - suppress them. CPEFlapping and CPERateCollapse
+  # are deliberately NOT suppressed: they're a different failure mode that
+  # can coincide with, but isn't explained by, a sector-wide RF problem.
+  - source_match:
+      alertname: SectorWideCPEDegradation
+    target_match_re:
+      alert_type: "cpe-(weak-signal|signal-drift|signal-rising|chain-imbalance|low-snr)"
+    equal: ["sector"]
+
   # A router that's fully unreachable will also trip its own CPU/memory/
   # WAN alerts as soon as SNMP starts timing out on stale data - those add
   # nothing once you already know the whole router is down.

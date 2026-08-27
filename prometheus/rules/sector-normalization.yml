@@ -55,6 +55,18 @@ groups:
       - record: sector:worst_cpe_signal_dbm
         expr: min by (sector, site) (sector_cpe_signal_dbm)
 
+      # Backhaul port capacity + utilisation. ifHighSpeed is in Mbit/s;
+      # topk-1 the non-wireless interface to match sector:backhaul_*_bps.
+      - record: sector:backhaul_capacity_bps
+        expr: >
+          topk by (sector, site) (1,
+            sector_interface_speed_mbps{ifName!~"wlan.*|lo|bridge.*|"} * 1e6)
+
+      - record: sector:backhaul_utilization_percent
+        expr: >
+          (sector:backhaul_tx_bps > sector:backhaul_rx_bps or sector:backhaul_rx_bps)
+          / on (sector, site) sector:backhaul_capacity_bps * 100
+
   - name: sector-cpe
     rules:
       - record: sector:cpe:tx_bps
@@ -76,20 +88,29 @@ groups:
           (sector_cpe_rx_strength_ch0_dbm <= bool sector_cpe_rx_strength_ch1_dbm) * sector_cpe_rx_strength_ch0_dbm
           + (sector_cpe_rx_strength_ch0_dbm > bool sector_cpe_rx_strength_ch1_dbm) * sector_cpe_rx_strength_ch1_dbm
 
-      # 7-day rolling baseline and the CPE's current deviation from it.
-      # avg_over_time (not a quantile) to keep the 7d window cheap on the
-      # TSDB; it still returns a value with only partial history.
+  # Baseline-relative CPE metrics. Split into their own 5m group: the 7d
+  # windows (via 10m subqueries to stay cheap) and 24h counts are far too
+  # heavy to run at the 15s default.
+  - name: sector-cpe-derived
+    interval: 5m
+    rules:
       - record: sector:cpe:signal_avg7d
-        expr: avg_over_time(sector_cpe_signal_dbm[7d])
+        expr: avg_over_time(sector_cpe_signal_dbm[7d:10m])
 
       - record: sector:cpe:signal_drift_db
         expr: sector_cpe_signal_dbm - sector:cpe:signal_avg7d
 
       - record: sector:cpe:worst_chain_avg7d
-        expr: avg_over_time(sector:cpe:worst_chain_dbm[7d])
+        expr: avg_over_time(sector:cpe:worst_chain_dbm[7d:10m])
 
       - record: sector:cpe:chain_drift_db
         expr: sector:cpe:worst_chain_dbm - sector:cpe:worst_chain_avg7d
+
+      # 1 once a CPE has ~17h+ of signal history in the last 24h - the
+      # drift / rising alerts gate on this so they don't fire off a
+      # baseline that's really just "the last few hours".
+      - record: sector:cpe:baseline_ready
+        expr: (count_over_time(sector_cpe_signal_dbm[24h:5m]) > bool 200)
 
       # 0-100 physical-alignment / link-quality score per CPE.
       # Penalty budget: weak limiting chain up to 45, chain imbalance up to
@@ -104,6 +125,18 @@ groups:
             - clamp_max(clamp_min((- sector:cpe:chain_drift_db) - 3, 0) * 3, 30),
             0
           )
+
+      # Per-sector counts of CPEs in trouble - the numbers behind the
+      # "widespread degradation" rollup alert and the NOC sector row.
+      - record: sector:degraded_cpe_count
+        expr: >
+          count by (sector, site) (sector:cpe:alignment_score < 60)
+          or (0 * max by (sector, site) (sector_up))
+
+      - record: sector:critical_cpe_count
+        expr: >
+          count by (sector, site) (sector:cpe:alignment_score < 40)
+          or (0 * max by (sector, site) (sector_up))
 
   # 24h rollups for the capacity digest and the peak-hour panels. Evaluated
   # every 5m (not every 15s) - the [24h:1m] subqueries are expensive.

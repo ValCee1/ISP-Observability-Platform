@@ -1,402 +1,208 @@
 {
     "title": "NOC Overview",
-    "description": "At-a-glance board for the NOC: link counts by state, then a color-coded table of every link's health score - click a row to drill into that link on PTP Link Monitoring.",
+    "description": "The front door. Active Incidents first (what's wrong, for how long), then link/router/sector counts, then per-object health tables. Every row links through to the detail view.",
     "uid": "noc-overview",
     "schemaVersion": 39,
-    "version": 10,
+    "version": 11,
     "editable": true,
     "timezone": "browser",
-    "time": {
-        "from": "now-1h",
-        "to": "now"
-    },
+    "time": { "from": "now-1h", "to": "now" },
     "refresh": "30s",
     "panels": [
+        { "id": 30, "type": "row", "title": "ACTIVE INCIDENTS", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 } },
         {
-            "id": 10,
-            "type": "row",
-            "title": "AT A GLANCE",
-            "gridPos": {
-                "h": 1,
-                "w": 24,
-                "x": 0,
-                "y": 0
-            }
-        },
-        {
-            "id": 11,
-            "type": "stat",
-            "title": "Links Up",
-            "description": "Count of PTP links currently reachable (link_up == 1), one series per link_id.",
-            "gridPos": {
-                "h": 4,
-                "w": 6,
-                "x": 0,
-                "y": 1
-            },
-            "datasource": "Prometheus",
-            "targets": [
-                {
-                    "expr": "count(min by (link_id) (link_up) == 1)",
-                    "instant": true,
-                    "refId": "A"
-                }
-            ],
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "fixed",
-                        "fixedColor": "green"
-                    },
-                    "noValue": "0"
-                }
-            }
-        },
-        {
-            "id": 12,
-            "type": "stat",
-            "title": "Links Down",
-            "description": "Count of PTP links where either endpoint is unreachable right now - matches the LinkDown alert condition.",
-            "gridPos": {
-                "h": 4,
-                "w": 6,
-                "x": 6,
-                "y": 1
-            },
-            "datasource": "Prometheus",
-            "targets": [
-                {
-                    "expr": "count(min by (link_id) (link_up) == 0) or vector(0)",
-                    "instant": true,
-                    "refId": "A"
-                }
-            ],
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "fixed",
-                        "fixedColor": "red"
-                    },
-                    "noValue": "0"
-                }
-            }
-        },
-        {
-            "id": 13,
-            "type": "stat",
-            "title": "Degraded",
-            "description": "Links that are reachable (link_up == 1) but whose health score has dropped below the WARN threshold used in the table below (85) - the case a plain up/down view misses. Mirrors the intent of the LinkUpButDegrading alert.",
-            "gridPos": {
-                "h": 4,
-                "w": 6,
-                "x": 12,
-                "y": 1
-            },
-            "datasource": "Prometheus",
-            "targets": [
-                {
-                    "expr": "count((min by (link_id) (link_up) == 1) and (link_health_score < 85)) or vector(0)",
-                    "instant": true,
-                    "refId": "A"
-                }
-            ],
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "fixed",
-                        "fixedColor": "yellow"
-                    },
-                    "noValue": "0"
-                }
-            }
-        },
-        {
-            "id": 14,
-            "type": "stat",
-            "title": "Core Routers Down",
-            "gridPos": {
-                "h": 4,
-                "w": 6,
-                "x": 18,
-                "y": 1
-            },
-            "datasource": "Prometheus",
-            "targets": [
-                {
-                    "expr": "count(up{job=\"snmp-mikrotik\"} == 0) or vector(0)",
-                    "instant": true,
-                    "refId": "A"
-                }
-            ],
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "fixed",
-                        "fixedColor": "red"
-                    },
-                    "noValue": "0"
-                }
-            }
-        },
-        {
-            "id": 1,
+            "id": 31,
             "type": "table",
-            "title": "All Links",
-            "description": "One row per link_id. Status reflects link_up (green = UP, red = DOWN, white/gray = no data reported). Health Score blends packet loss, SNR, interface errors, and reachability into 0-100 (see link_endpoint_health_score in prometheus/rules/link-normalization.yml) and is colored green (healthy, >=85), yellow (shaky, 60-84), or red (critical, <60). Click a row to open that link's detail graphs and radio diagnostics on PTP Link Monitoring.",
-            "gridPos": {
-                "h": 10,
-                "w": 24,
-                "x": 0,
-                "y": 5
-            },
+            "title": "Active incidents",
+            "description": "Every alert currently firing, one row per object + alert, longest-running first. Object is the link / sector / router it concerns. Two-tier duplicates (a warning + critical of the same alert) are collapsed to the critical. Symptom rows under a bigger incident (a link's packet loss while it is DOWN) are still shown here as context - Alertmanager is what suppresses those from Telegram.",
+            "gridPos": { "h": 9, "w": 24, "x": 0, "y": 1 },
             "datasource": "Prometheus",
-            "options": {
-                "sortBy": [
-                    {
-                        "displayName": "Health Score",
-                        "desc": false
-                    }
-                ]
-            },
+            "options": { "sortBy": [ { "displayName": "Duration", "desc": true } ] },
             "targets": [
                 {
-                    "expr": "min by (link_id) (link_up)",
-                    "refId": "Status",
-                    "instant": true,
-                    "format": "table"
-                },
-                {
-                    "expr": "link_health_score",
-                    "refId": "Health",
-                    "instant": true,
-                    "format": "table"
+                    "expr": "incident:active_seconds",
+                    "refId": "A", "instant": true, "format": "table"
                 }
             ],
             "transformations": [
-                {
-                    "id": "merge",
-                    "options": {}
-                },
+                { "id": "filterFieldsByName", "options": { "include": { "pattern": "^(severity|object|alertname|alert_type|scope|cpe_name|Value)$" } } },
                 {
                     "id": "organize",
                     "options": {
-                        "excludeByName": {
-                            "Time": true,
-                            "Time 1": true,
-                            "Time 2": true,
-                            "__name__": true,
-                            "job": true,
-                            "instance": true
+                        "indexByName": {
+                            "severity": 0, "object": 1, "alertname": 2, "alert_type": 3,
+                            "scope": 4, "cpe_name": 5, "Value": 6
                         },
                         "renameByName": {
-                            "Value #Status": "Status",
-                            "Value #Health": "Health Score"
+                            "severity": "Severity", "object": "Object", "alertname": "Alert",
+                            "alert_type": "Type", "scope": "Scope", "cpe_name": "CPE", "Value": "Duration"
                         }
                     }
                 }
             ],
             "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "thresholds"
-                    }
-                },
+                "defaults": { "color": { "mode": "thresholds" } },
                 "overrides": [
                     {
-                        "matcher": {
-                            "id": "byName",
-                            "options": "link_id"
-                        },
-                        "properties": [
-                            {
-                                "id": "links",
-                                "value": [
-                                    {
-                                        "title": "View link details",
-                                        "url": "/d/ptp-link-monitoring/ptp-link-monitoring?var-link_id=${__data.fields.link_id}",
-                                        "targetBlank": false
-                                    }
-                                ]
-                            }
-                        ]
+                        "matcher": { "id": "byName", "options": "Duration" },
+                        "properties": [ { "id": "unit", "value": "s" }, { "id": "decimals", "value": 0 } ]
                     },
                     {
-                        "matcher": {
-                            "id": "byName",
-                            "options": "Status"
-                        },
+                        "matcher": { "id": "byName", "options": "Severity" },
                         "properties": [
-                            {
-                                "id": "mappings",
-                                "value": [
-                                    {
-                                        "type": "value",
-                                        "options": {
-                                            "1": {
-                                                "text": "UP",
-                                                "color": "green",
-                                                "index": 0
-                                            },
-                                            "0": {
-                                                "text": "DOWN",
-                                                "color": "red",
-                                                "index": 1
-                                            }
-                                        }
-                                    },
-                                    {
-                                        "type": "special",
-                                        "options": {
-                                            "match": "null+nan",
-                                            "result": {
-                                                "text": "NO DATA",
-                                                "color": "white",
-                                                "index": 2
-                                            }
-                                        }
-                                    }
-                                ]
-                            },
-                            {
-                                "id": "custom.cellOptions",
-                                "value": {
-                                    "type": "color-background",
-                                    "mode": "gradient"
-                                }
-                            },
-                            {
-                                "id": "noValue",
-                                "value": "NO DATA"
-                            }
-                        ]
-                    },
-                    {
-                        "matcher": {
-                            "id": "byName",
-                            "options": "Health Score"
-                        },
-                        "properties": [
-                            {
-                                "id": "thresholds",
-                                "value": {
-                                    "mode": "absolute",
-                                    "steps": [
-                                        {
-                                            "value": null,
-                                            "color": "white"
-                                        },
-                                        {
-                                            "value": 0,
-                                            "color": "red"
-                                        },
-                                        {
-                                            "value": 60,
-                                            "color": "yellow"
-                                        },
-                                        {
-                                            "value": 85,
-                                            "color": "green"
-                                        }
-                                    ]
-                                }
-                            },
-                            {
-                                "id": "custom.cellOptions",
-                                "value": {
-                                    "type": "color-background",
-                                    "mode": "gradient"
-                                }
-                            },
-                            {
-                                "id": "noValue",
-                                "value": "NO DATA"
-                            }
+                            { "id": "mappings", "value": [ { "type": "value", "options": {
+                                "critical": { "text": "CRITICAL", "color": "red", "index": 0 },
+                                "warning":  { "text": "WARNING",  "color": "orange", "index": 1 },
+                                "info":     { "text": "INFO",     "color": "blue", "index": 2 }
+                            } } ] },
+                            { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } }
                         ]
                     }
                 ]
             }
+        },
+
+        { "id": 10, "type": "row", "title": "AT A GLANCE", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 10 } },
+        {
+            "id": 12, "type": "stat", "title": "Links Down",
+            "description": "PTP links with either endpoint unreachable (matches LinkDown).",
+            "gridPos": { "h": 4, "w": 4, "x": 0, "y": 11 }, "datasource": "Prometheus",
+            "targets": [ { "expr": "count(min by (link_id) (link_up) == 0) or vector(0)", "instant": true } ],
+            "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "red" }, "noValue": "0" } }
+        },
+        {
+            "id": 13, "type": "stat", "title": "Links Degraded",
+            "description": "Links reachable but health score below 85 (LinkUpButDegrading territory).",
+            "gridPos": { "h": 4, "w": 4, "x": 4, "y": 11 }, "datasource": "Prometheus",
+            "targets": [ { "expr": "count((min by (link_id) (link_up) == 1) and (link_health_score < 85)) or vector(0)", "instant": true } ],
+            "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "yellow" }, "noValue": "0" } }
+        },
+        {
+            "id": 14, "type": "stat", "title": "Routers Down",
+            "gridPos": { "h": 4, "w": 4, "x": 8, "y": 11 }, "datasource": "Prometheus",
+            "targets": [ { "expr": "count(up{job=\"snmp-mikrotik\"} == 0) or vector(0)", "instant": true } ],
+            "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "red" }, "noValue": "0" } }
+        },
+        {
+            "id": 15, "type": "stat", "title": "Sectors Down",
+            "description": "Sector APs unreachable over SNMP (matches SectorDown).",
+            "gridPos": { "h": 4, "w": 4, "x": 12, "y": 11 }, "datasource": "Prometheus",
+            "targets": [ { "expr": "count(sector_up == 0) or vector(0)", "instant": true } ],
+            "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "red" }, "noValue": "0" } }
+        },
+        {
+            "id": 16, "type": "stat", "title": "Sectors Over Capacity",
+            "description": "Sectors at/over their warn threshold for clients OR throughput. These feed the 08:00 digest.",
+            "gridPos": { "h": 4, "w": 4, "x": 16, "y": 11 }, "datasource": "Prometheus",
+            "targets": [ { "expr": "count( (sector:clients >= on(sector) group_left() sector:cap_clients_warn) or (sector:throughput_mbps > on(sector) group_left() sector:cap_mbps_warn) ) or vector(0)", "instant": true } ],
+            "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "yellow" }, "noValue": "0" } }
+        },
+        {
+            "id": 17, "type": "stat", "title": "Sectors Degrading",
+            "description": "Sectors where 4+ CPEs are below alignment score 60 - a shared RF problem (SectorWideCPEDegradation).",
+            "gridPos": { "h": 4, "w": 4, "x": 20, "y": 11 }, "datasource": "Prometheus",
+            "targets": [ { "expr": "count(sector:degraded_cpe_count >= 4) or vector(0)", "instant": true } ],
+            "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "orange" }, "noValue": "0" } }
+        },
+
+        { "id": 20, "type": "row", "title": "LINKS", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 } },
+        {
+            "id": 1,
+            "type": "table",
+            "title": "All Links",
+            "description": "One row per link_id. Status = link_up; Health Score blends packet loss, SNR, interface errors, reachability (green >=85, yellow 60-84, red <60). Click a row for PTP Link Monitoring.",
+            "gridPos": { "h": 9, "w": 24, "x": 0, "y": 16 },
+            "datasource": "Prometheus",
+            "options": { "sortBy": [ { "displayName": "Health Score", "desc": false } ] },
+            "targets": [
+                { "expr": "min by (link_id) (link_up)", "refId": "Status", "instant": true, "format": "table" },
+                { "expr": "link_health_score", "refId": "Health", "instant": true, "format": "table" }
+            ],
+            "transformations": [
+                { "id": "organize", "options": { "excludeByName": { "Time": true, "__name__": true, "job": true, "instance": true } } },
+                { "id": "merge", "options": {} },
+                { "id": "organize", "options": {
+                    "excludeByName": { "Time": true, "__name__": true, "job": true, "instance": true },
+                    "renameByName": { "Value #Status": "Status", "Value #Health": "Health Score" }
+                } }
+            ],
+            "fieldConfig": {
+                "defaults": { "color": { "mode": "thresholds" } },
+                "overrides": [
+                    { "matcher": { "id": "byName", "options": "link_id" }, "properties": [ { "id": "links", "value": [ { "title": "View link details", "url": "/d/ptp-link-monitoring/ptp-link-monitoring?var-link_id=${__data.fields.link_id}", "targetBlank": false } ] } ] },
+                    { "matcher": { "id": "byName", "options": "Status" }, "properties": [
+                        { "id": "mappings", "value": [
+                            { "type": "value", "options": { "1": { "text": "UP", "color": "green", "index": 0 }, "0": { "text": "DOWN", "color": "red", "index": 1 } } },
+                            { "type": "special", "options": { "match": "null+nan", "result": { "text": "NO DATA", "color": "white", "index": 2 } } }
+                        ] },
+                        { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } },
+                        { "id": "noValue", "value": "NO DATA" }
+                    ] },
+                    { "matcher": { "id": "byName", "options": "Health Score" }, "properties": [
+                        { "id": "thresholds", "value": { "mode": "absolute", "steps": [ { "value": null, "color": "white" }, { "value": 0, "color": "red" }, { "value": 60, "color": "yellow" }, { "value": 85, "color": "green" } ] } },
+                        { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } },
+                        { "id": "noValue", "value": "NO DATA" }
+                    ] }
+                ]
+            }
+        },
+
+        { "id": 21, "type": "row", "title": "SECTORS", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 } },
+        {
+            "id": 2,
+            "type": "table",
+            "title": "All Sectors",
+            "description": "One row per sector. Degraded CPEs = count below alignment score 60. Backhaul % is ether1 against its negotiated port speed. Click a row for Sector Detail.",
+            "gridPos": { "h": 9, "w": 24, "x": 0, "y": 26 },
+            "datasource": "Prometheus",
+            "options": { "sortBy": [ { "displayName": "Degraded CPEs", "desc": true } ] },
+            "targets": [
+                { "expr": "max by (sector) (sector_up)", "refId": "Status", "instant": true, "format": "table" },
+                { "expr": "max by (sector) (sector:clients)", "refId": "Clients", "instant": true, "format": "table" },
+                { "expr": "max by (sector) (sector:throughput_mbps)", "refId": "Mbps", "instant": true, "format": "table" },
+                { "expr": "max by (sector) (sector:degraded_cpe_count)", "refId": "Degraded", "instant": true, "format": "table" },
+                { "expr": "max by (sector) (sector_noise_floor_dbm)", "refId": "Noise", "instant": true, "format": "table" },
+                { "expr": "max by (sector) (sector:backhaul_utilization_percent)", "refId": "Backhaul", "instant": true, "format": "table" }
+            ],
+            "transformations": [
+                { "id": "organize", "options": { "excludeByName": { "Time": true, "__name__": true, "job": true, "instance": true } } },
+                { "id": "merge", "options": {} },
+                { "id": "organize", "options": {
+                    "excludeByName": { "Time": true, "__name__": true, "job": true, "instance": true },
+                    "indexByName": { "sector": 0, "Value #Status": 1, "Value #Clients": 2, "Value #Mbps": 3, "Value #Degraded": 4, "Value #Noise": 5, "Value #Backhaul": 6 },
+                    "renameByName": {
+                        "sector": "Sector", "Value #Status": "Status", "Value #Clients": "Clients",
+                        "Value #Mbps": "Throughput (Mbps)", "Value #Degraded": "Degraded CPEs",
+                        "Value #Noise": "Noise (dBm)", "Value #Backhaul": "Backhaul %"
+                    }
+                } }
+            ],
+            "fieldConfig": {
+                "defaults": { "color": { "mode": "thresholds" }, "decimals": 1 },
+                "overrides": [
+                    { "matcher": { "id": "byName", "options": "Sector" }, "properties": [ { "id": "links", "value": [ { "title": "Open Sector Detail", "url": "/d/sector-detail/sector-detail?var-sector=${__data.fields.Sector}", "targetBlank": false } ] } ] },
+                    { "matcher": { "id": "byName", "options": "Status" }, "properties": [
+                        { "id": "mappings", "value": [
+                            { "type": "value", "options": { "1": { "text": "UP", "color": "green", "index": 0 }, "0": { "text": "DOWN", "color": "red", "index": 1 } } },
+                            { "type": "special", "options": { "match": "null+nan", "result": { "text": "NO DATA", "color": "white", "index": 2 } } }
+                        ] },
+                        { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } }
+                    ] },
+                    { "matcher": { "id": "byName", "options": "Clients" }, "properties": [ { "id": "decimals", "value": 0 }, { "id": "thresholds", "value": { "mode": "absolute", "steps": [ { "value": null, "color": "green" }, { "value": 15, "color": "yellow" }, { "value": 20, "color": "red" } ] } }, { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } } ] },
+                    { "matcher": { "id": "byName", "options": "Degraded CPEs" }, "properties": [ { "id": "decimals", "value": 0 }, { "id": "thresholds", "value": { "mode": "absolute", "steps": [ { "value": null, "color": "green" }, { "value": 1, "color": "yellow" }, { "value": 4, "color": "red" } ] } }, { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } } ] },
+                    { "matcher": { "id": "byName", "options": "Backhaul %" }, "properties": [ { "id": "unit", "value": "percent" }, { "id": "thresholds", "value": { "mode": "absolute", "steps": [ { "value": null, "color": "green" }, { "value": 60, "color": "yellow" }, { "value": 80, "color": "red" } ] } }, { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } } ] }
+                ]
+            }
         }
     ],
-    "annotations": {
-        "list": []
-    },
+    "annotations": { "list": [] },
     "links": [
-        {
-            "title": "MikroTik Fleet Overview",
-            "type": "link",
-            "icon": "external link",
-            "url": "/d/mikrotik-fleet-overview",
-            "targetBlank": false,
-            "keepTime": true,
-            "includeVars": false,
-            "asDropdown": false,
-            "tags": []
-        },
-        {
-            "title": "Sector Fleet Overview",
-            "type": "link",
-            "icon": "external link",
-            "url": "/d/sector-fleet-overview",
-            "targetBlank": false,
-            "keepTime": true,
-            "includeVars": false,
-            "asDropdown": false,
-            "tags": []
-        },
-        {
-            "title": "Capacity Planning",
-            "type": "link",
-            "icon": "external link",
-            "url": "/d/capacity-planning",
-            "targetBlank": false,
-            "keepTime": true,
-            "includeVars": false,
-            "asDropdown": false,
-            "tags": []
-        },
-        {
-            "title": "PTP Link Monitoring",
-            "type": "link",
-            "icon": "external link",
-            "url": "/d/ptp-link-monitoring",
-            "targetBlank": false,
-            "keepTime": true,
-            "includeVars": false,
-            "asDropdown": false,
-            "tags": []
-        },
-        {
-            "title": "Sector Detail",
-            "type": "link",
-            "icon": "external link",
-            "url": "/d/sector-detail",
-            "targetBlank": false,
-            "keepTime": true,
-            "includeVars": false,
-            "asDropdown": false,
-            "tags": []
-        },
-        {
-            "title": "MikroTik Router Detail",
-            "type": "link",
-            "icon": "external link",
-            "url": "/d/mikrotik-router-overview",
-            "targetBlank": false,
-            "keepTime": true,
-            "includeVars": false,
-            "asDropdown": false,
-            "tags": []
-        },
-        {
-            "title": "WAN/LAN Interfaces",
-            "type": "link",
-            "icon": "external link",
-            "url": "/d/wan-lan-interfaces",
-            "targetBlank": false,
-            "keepTime": true,
-            "includeVars": false,
-            "asDropdown": false,
-            "tags": []
-        }
+        { "title": "MikroTik Fleet Overview", "type": "link", "icon": "external link", "url": "/d/mikrotik-fleet-overview", "targetBlank": false, "keepTime": true, "includeVars": false, "asDropdown": false, "tags": [] },
+        { "title": "Sector Fleet Overview", "type": "link", "icon": "external link", "url": "/d/sector-fleet-overview", "targetBlank": false, "keepTime": true, "includeVars": false, "asDropdown": false, "tags": [] },
+        { "title": "Capacity Planning", "type": "link", "icon": "external link", "url": "/d/capacity-planning", "targetBlank": false, "keepTime": true, "includeVars": false, "asDropdown": false, "tags": [] },
+        { "title": "PTP Link Monitoring", "type": "link", "icon": "external link", "url": "/d/ptp-link-monitoring", "targetBlank": false, "keepTime": true, "includeVars": false, "asDropdown": false, "tags": [] },
+        { "title": "Sector Detail", "type": "link", "icon": "external link", "url": "/d/sector-detail", "targetBlank": false, "keepTime": true, "includeVars": false, "asDropdown": false, "tags": [] },
+        { "title": "MikroTik Router Detail", "type": "link", "icon": "external link", "url": "/d/mikrotik-router-overview", "targetBlank": false, "keepTime": true, "includeVars": false, "asDropdown": false, "tags": [] },
+        { "title": "WAN/LAN Interfaces", "type": "link", "icon": "external link", "url": "/d/wan-lan-interfaces", "targetBlank": false, "keepTime": true, "includeVars": false, "asDropdown": false, "tags": [] }
     ]
 }

@@ -1,0 +1,32 @@
+# Turns the raw ALERTS stream into an "incidents" view for the NOC
+# Overview "Active Incidents" panel: one row per (object, alert), with a
+# unified `object` label (link_id / sector / router instance) and the
+# firing duration as the value.
+#
+# This does NOT re-implement every alertmanager.yml inhibit rule - the
+# board deliberately still shows a link's packet-loss / error rows while
+# the link is DOWN, as context. It only collapses the pure duplicates:
+# the two-tier warning+critical alerts (PacketLoss 5%/20%, HighLatency
+# 100/500ms) where showing both is noise, not information.
+
+groups:
+  - name: incidents
+    interval: 30s
+    rules:
+      - record: incident:raw_seconds
+        expr: |
+          max by (severity, object, alertname, alert_type, scope, cpe_name) (
+            label_replace(label_replace(label_replace(
+              (time() - ALERTS_FOR_STATE) and ignoring(alertstate) ALERTS{alertstate="firing"},
+              "object", "$1", "instance", "(.+)"),
+              "object", "$1", "sector", "(.+)"),
+              "object", "$1", "link_id", "(.+)")
+          )
+
+      - record: incident:active_seconds
+        expr: |
+          (
+            incident:raw_seconds{severity="warning"}
+            unless on (object, alertname) incident:raw_seconds{severity="critical"}
+          )
+          or incident:raw_seconds{severity!="warning"}

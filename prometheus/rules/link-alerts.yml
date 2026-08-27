@@ -8,6 +8,8 @@ groups:
         labels:
           severity: critical
           category: state
+          scope: link
+          alert_type: link-down
         annotations:
           summary: "🔴 Link DOWN"
           description: "{{ $labels.link_name }} has been unreachable for 5 minutes."
@@ -22,6 +24,8 @@ groups:
         labels:
           severity: warning
           category: health
+          scope: link
+          alert_type: weak-signal
         annotations:
           summary: "🟠 Weak Signal"
           description: "{{ $labels.link_name }} signal has been below -80 dBm for 10 minutes (currently {{ $value }} dBm)."
@@ -32,6 +36,8 @@ groups:
         labels:
           severity: warning
           category: health
+          scope: link
+          alert_type: low-quality
         annotations:
           summary: "🟠 Low Link Quality"
           description: '{{ $labels.link_name }} quality has been below 70% for 10 minutes (currently {{ $value | printf "%.1f" }}%).'
@@ -42,6 +48,8 @@ groups:
         labels:
           severity: warning
           category: health
+          scope: link
+          alert_type: latency-variability
         annotations:
           summary: "🟠 Unstable Latency"
           description: "{{ $labels.link_name }} latency variability has exceeded 50ms for 10 minutes - link is up but inconsistent."
@@ -52,6 +60,8 @@ groups:
         labels:
           severity: warning
           category: health
+          scope: link
+          alert_type: interface-errors
         annotations:
           summary: "🟠 Interface Errors"
           description: "{{ $labels.link_name }} ({{ $labels.ifName }}) is logging interface errors - possible cabling, duplex, or hardware issue."
@@ -62,6 +72,8 @@ groups:
         labels:
           severity: warning
           category: health
+          scope: link
+          alert_type: packet-loss
         annotations:
           summary: "🟠 Packet Loss"
           description: '{{ $labels.link_name }} packet loss has been above 5% for 10 minutes (currently {{ $value | printf "%.1f" }}%).'
@@ -72,6 +84,8 @@ groups:
         labels:
           severity: critical
           category: health
+          scope: link
+          alert_type: packet-loss
         annotations:
           summary: "🔴 Severe Packet Loss"
           description: '{{ $labels.link_name }} packet loss has been above 20% for 10 minutes (currently {{ $value | printf "%.1f" }}%) - link is up but effectively unusable.'
@@ -88,6 +102,8 @@ groups:
         labels:
           severity: warning
           category: health
+          scope: link
+          alert_type: high-latency
         annotations:
           summary: "🟠 High Latency"
           description: '{{ $labels.link_name }} latency has been above 100ms for 10 minutes (currently {{ $value | printf "%.1f" }}ms).'
@@ -98,6 +114,8 @@ groups:
         labels:
           severity: critical
           category: health
+          scope: link
+          alert_type: high-latency
         annotations:
           summary: "🔴 Severe Latency"
           description: '{{ $labels.link_name }} latency has been above 500ms for 10 minutes (currently {{ $value | printf "%.1f" }}ms) - link is up but barely usable.'
@@ -119,6 +137,8 @@ groups:
         labels:
           severity: warning
           category: degrading
+          scope: link
+          alert_type: link-degrading
         annotations:
           summary: "🟡 Link degrading (still up)"
           description: "{{ $labels.link_name }} is reachable but showing sustained signal/quality/reliability degradation - investigate before it goes down."

@@ -1,22 +1,27 @@
 # Alerting rules for MikroTik PtMP sectors.
 #
-# Routing (see alertmanager/alertmanager.yml):
-#  - category: state / health  -> real-time Telegram, grouped per `sector`
-#  - category: capacity        -> batched into ONE 08:00 Africa/Lagos digest
-#                                 message per day (active_time_intervals)
+# Every alert carries a consistent label set so Alertmanager can reason
+# about it (see alertmanager/alertmanager.yml):
+#   severity   : critical | warning | info
+#   category   : state | health | capacity | degrading   (drives routing + inhibition)
+#   scope      : sector | cpe                             (the kind of object)
+#   alert_type : kebab-case specific type                 (one operational symptom)
+# plus the identity labels the metric already carries (sector, cpe_name, instance).
 #
-# The capacity-tier thresholds come from sector-thresholds.yml (per-sector
-# series joined on `sector`), so they are tuned there, not here.
+# Routing: category state/health -> real-time per-sector Telegram;
+# category capacity -> batched 08:00 Africa/Lagos digest.
+# Capacity-tier thresholds come from sector-thresholds.yml.
 
 groups:
-  - name: sector-state
+  # ---------------------------------------------------------------------
+  # A. AVAILABILITY - the sector or its backhaul is down. Highest priority.
+  # ---------------------------------------------------------------------
+  - name: sector-availability
     rules:
       - alert: SectorDown
         expr: sector_up == 0
         for: 3m
-        labels:
-          severity: critical
-          category: state
+        labels: { severity: critical, category: state, scope: sector, alert_type: sector-down }
         annotations:
           summary: "🔴 Sector AP DOWN"
           description: "Sector {{ $labels.sector }} ({{ $labels.instance }}) has been SNMP-unreachable for 3 minutes."
@@ -24,53 +29,121 @@ groups:
       - alert: SectorNoClients
         expr: (sector:clients == 0) and on(sector) (sector_up == 1)
         for: 10m
-        labels:
-          severity: critical
-          category: state
+        labels: { severity: critical, category: state, scope: sector, alert_type: sector-no-clients }
         annotations:
           summary: "🔴 Sector has zero registered clients"
           description: "Sector {{ $labels.sector }} is reachable but no CPEs are registered - RF outage, antenna, or wireless-config problem."
 
-  - name: sector-rf
+      - alert: SectorEther1Down
+        expr: sector_interface_state{ifName="ether1"} == 2 and on(sector) (sector_up == 1)
+        for: 3m
+        labels: { severity: critical, category: state, scope: sector, alert_type: ether1-down }
+        annotations:
+          summary: "🔴 Sector backhaul (ether1) DOWN"
+          description: "ether1 on sector {{ $labels.sector }} is operationally down while the AP is still reachable - the sector is likely islanded."
+
+  # ---------------------------------------------------------------------
+  # B. PERFORMANCE DEGRADATION - sector is up but the RF environment or
+  #    backhaul is deteriorating.
+  # ---------------------------------------------------------------------
+  - name: sector-performance
     rules:
       - alert: SectorNoiseFloorRising
         expr: |
           sector_noise_floor_dbm > -85
-          and (sector_noise_floor_dbm - avg_over_time(sector_noise_floor_dbm[7d] offset 15m)) > 8
+          and (sector_noise_floor_dbm - avg_over_time(sector_noise_floor_dbm[7d:10m] offset 15m)) > 8
         for: 15m
-        labels:
-          severity: warning
-          category: health
+        labels: { severity: warning, category: health, scope: sector, alert_type: noise-rising }
         annotations:
           summary: "🟠 Sector noise floor rising"
           description: 'Sector {{ $labels.sector }} noise floor is {{ $value | printf "%.0f" }} dBm, more than 8 dB above its 7-day norm - external interference on this channel.'
 
+      - alert: SectorLikelyCongested
+        expr: |
+          (sector:throughput_mbps > on(sector) group_left() sector:cap_mbps_crit)
+          and on(sector) (count by (sector) (sector_cpe_tx_rate_bps < 65e6) >= 3)
+        for: 20m
+        labels: { severity: warning, category: health, scope: sector, alert_type: sector-congested }
+        annotations:
+          summary: "🟠 Sector likely congested"
+          description: 'Sector {{ $labels.sector }} is carrying {{ $value | printf "%.1f" }} Mbps with 3+ CPEs dropped to low PHY rates - airtime saturation likely. (Airtime % itself is not observable on Nv2.)'
+
+      - alert: SectorBackhaulSaturated
+        expr: sector:backhaul_utilization_percent > 80
+        for: 15m
+        labels: { severity: warning, category: health, scope: sector, alert_type: backhaul-saturated }
+        annotations:
+          summary: "🟠 Sector backhaul saturated"
+          description: 'ether1 on sector {{ $labels.sector }} is at {{ $value | printf "%.0f" }}% of port capacity for 15 minutes - the backhaul, not the RF, is now the bottleneck.'
+
+      # STEP 7 rollup: when many CPEs on one sector degrade together, that
+      # is a single sector-level incident, not N CPE incidents. This fires
+      # and (via alertmanager inhibition) silences the individual
+      # cpe-weak-signal / cpe-signal-drift / cpe-chain-imbalance /
+      # cpe-low-snr alerts for the same sector - they become evidence
+      # under this one, visible on Sector Detail.
+      - alert: SectorWideCPEDegradation
+        expr: sector:degraded_cpe_count >= 4
+        for: 15m
+        labels: { severity: warning, category: degrading, scope: sector, alert_type: sector-cpe-degradation }
+        annotations:
+          summary: "🟠 Sector-wide CPE degradation"
+          description: >-
+            {{ $value | printf "%.0f" }} CPEs on sector {{ $labels.sector }} are below alignment score 60
+            ({{ with query (printf "sector:critical_cpe_count{sector='%s'}" $labels.sector) }}{{ . | first | value | printf "%.0f" }}{{ end }} below 40).
+            A shared cause is likely - interference, AP hardware, or weather - check the sector before the individual CPEs.
+
+  # ---------------------------------------------------------------------
+  # C. DEVICE / INTERFACE HEALTH
+  # ---------------------------------------------------------------------
+  - name: sector-device
+    rules:
+      - alert: SectorEther1Errors
+        expr: |
+          rate(sector_interface_in_errors{ifName="ether1"}[5m]) > 0
+          or rate(sector_interface_out_errors{ifName="ether1"}[5m]) > 0
+        for: 10m
+        labels: { severity: warning, category: health, scope: sector, alert_type: ether1-errors }
+        annotations:
+          summary: "🟠 Sector ether1 errors"
+          description: "Sector {{ $labels.sector }} ether1 is logging interface errors - cabling, duplex mismatch, or a failing port on the backhaul."
+
+      - alert: SectorHighCPU
+        expr: max by (sector, instance) (sector_cpu_load_percent) > 85
+        for: 5m
+        labels: { severity: warning, category: health, scope: sector, alert_type: high-cpu }
+        annotations:
+          summary: "🟠 Sector CPU high"
+          description: 'CPU on sector {{ $labels.sector }} has been above 85% for 5 minutes (currently {{ $value | printf "%.0f" }}%) - Nv2 + high packet rates.'
+
+  # ---------------------------------------------------------------------
+  # D. DERIVED CPE INTELLIGENCE - conclusions drawn from the registration
+  #    table, one CPE at a time. Grouped per sector in Alertmanager, and
+  #    inhibited by SectorWideCPEDegradation / SectorDown when a shared
+  #    cause is already firing.
+  # ---------------------------------------------------------------------
+  - name: sector-cpe
+    rules:
       - alert: CPEWeakSignal
         expr: sector_cpe_signal_dbm < -78
         for: 15m
-        labels:
-          severity: warning
-          category: health
+        labels: { severity: warning, category: health, scope: cpe, alert_type: cpe-weak-signal }
         annotations:
           summary: "🟠 CPE weak signal"
           description: '{{ $labels.cpe_name }} on sector {{ $labels.sector }} has been at {{ $value | printf "%.0f" }} dBm for 15 minutes.'
 
       - alert: CPESignalDegradedVsBaseline
-        expr: sector:cpe:signal_drift_db <= -6
+        expr: (sector:cpe:signal_drift_db <= -6) and on(sector, cpe_mac) (sector:cpe:baseline_ready == 1)
         for: 30m
-        labels:
-          severity: warning
-          category: health
+        labels: { severity: warning, category: health, scope: cpe, alert_type: cpe-signal-drift }
         annotations:
           summary: "🟠 CPE signal degraded vs baseline"
           description: '{{ $labels.cpe_name }} on sector {{ $labels.sector }} is {{ $value | printf "%.1f" }} dB below its 7-day average - vegetation growth, mount shift, or water ingress.'
 
       - alert: CPESignalRising
-        expr: sector:cpe:signal_drift_db >= 6
+        expr: (sector:cpe:signal_drift_db >= 6) and on(sector, cpe_mac) (sector:cpe:baseline_ready == 1)
         for: 30m
-        labels:
-          severity: warning
-          category: health
+        labels: { severity: warning, category: health, scope: cpe, alert_type: cpe-signal-rising }
         annotations:
           summary: "🟡 CPE signal jumped up"
           description: '{{ $labels.cpe_name }} on sector {{ $labels.sector }} is {{ $value | printf "%.1f" }} dB above baseline - re-aim onto a reflection, or a near-far problem now desensing the sector for other CPEs.'
@@ -78,9 +151,7 @@ groups:
       - alert: CPEChainImbalance
         expr: sector:cpe:chain_imbalance_db >= 10
         for: 20m
-        labels:
-          severity: warning
-          category: health
+        labels: { severity: warning, category: health, scope: cpe, alert_type: cpe-chain-imbalance }
         annotations:
           summary: "🟠 CPE chain imbalance"
           description: '{{ $labels.cpe_name }} on sector {{ $labels.sector }}: {{ $value | printf "%.0f" }} dB between receive chains - connector, pigtail, or polarisation/alignment fault on one chain.'
@@ -88,9 +159,7 @@ groups:
       - alert: CPELowSNR
         expr: sector_cpe_snr_db < 18
         for: 15m
-        labels:
-          severity: warning
-          category: health
+        labels: { severity: warning, category: health, scope: cpe, alert_type: cpe-low-snr }
         annotations:
           summary: "🟠 CPE low SNR"
           description: '{{ $labels.cpe_name }} on sector {{ $labels.sector }} SNR has been {{ $value | printf "%.0f" }} dB for 15 minutes - close to the modulation floor.'
@@ -98,9 +167,7 @@ groups:
       - alert: CPEFlapping
         expr: resets(sector_cpe_session_uptime_seconds[1h]) >= 3
         for: 0m
-        labels:
-          severity: warning
-          category: health
+        labels: { severity: warning, category: health, scope: cpe, alert_type: cpe-flapping }
         annotations:
           summary: "🟠 CPE flapping"
           description: '{{ $labels.cpe_name }} on sector {{ $labels.sector }} has re-registered {{ $value | printf "%.0f" }} times in the last hour.'
@@ -110,60 +177,20 @@ groups:
           sector_cpe_tx_rate_bps < 0.4 * avg_over_time(sector_cpe_tx_rate_bps[6h] offset 15m)
           and sector_cpe_tx_rate_bps < 60e6
         for: 20m
-        labels:
-          severity: warning
-          category: health
+        labels: { severity: warning, category: health, scope: cpe, alert_type: cpe-rate-collapse }
         annotations:
           summary: "🟠 CPE PHY rate collapse"
           description: '{{ $labels.cpe_name }} on sector {{ $labels.sector }} TX rate dropped to {{ $value | printf "%.0f" }} bps, well below its 6-hour norm - RF degradation or interference.'
 
-  - name: sector-transport
-    rules:
-      - alert: SectorLikelyCongested
-        expr: |
-          (sector:throughput_mbps > on(sector) group_left() sector:cap_mbps_crit)
-          and on(sector) (count by (sector) (sector_cpe_tx_rate_bps < 65e6) >= 3)
-        for: 20m
-        labels:
-          severity: warning
-          category: health
-        annotations:
-          summary: "🟠 Sector likely congested"
-          description: 'Sector {{ $labels.sector }} is carrying {{ $value | printf "%.1f" }} Mbps with 3+ CPEs dropped to low PHY rates - airtime saturation likely. (Airtime % itself is not observable on Nv2.)'
-
-      - alert: SectorEther1Errors
-        expr: |
-          rate(sector_interface_in_errors{ifName="ether1"}[5m]) > 0
-          or rate(sector_interface_out_errors{ifName="ether1"}[5m]) > 0
-        for: 10m
-        labels:
-          severity: warning
-          category: health
-        annotations:
-          summary: "🟠 Sector ether1 errors"
-          description: "Sector {{ $labels.sector }} ether1 is logging interface errors - cabling, duplex mismatch, or a failing port on the backhaul."
-
-  - name: sector-device
-    rules:
-      - alert: SectorHighCPU
-        expr: max by (sector, instance) (sector_cpu_load_percent) > 85
-        for: 5m
-        labels:
-          severity: warning
-          category: health
-        annotations:
-          summary: "🟠 Sector CPU high"
-          description: 'CPU on sector {{ $labels.sector }} has been above 85% for 5 minutes (currently {{ $value | printf "%.0f" }}%) - Nv2 + high packet rates.'
-
-  # --- capacity tier: batched into the 08:00 Africa/Lagos digest ---------
+  # ---------------------------------------------------------------------
+  # Capacity tier - batched into the 08:00 Africa/Lagos digest.
+  # ---------------------------------------------------------------------
   - name: sector-capacity
     rules:
       - alert: SectorOverClientCapacity
         expr: sector:clients >= on(sector) group_left() sector:cap_clients_warn
         for: 30m
-        labels:
-          severity: warning
-          category: capacity
+        labels: { severity: warning, category: capacity, scope: sector, alert_type: over-client-capacity }
         annotations:
           summary: "🟡 Sector over client capacity"
           description: >-
@@ -176,9 +203,7 @@ groups:
       - alert: SectorOverThroughputBudget
         expr: sector:minutes_over_cap_mbps:24h > 30
         for: 0m
-        labels:
-          severity: warning
-          category: capacity
+        labels: { severity: warning, category: capacity, scope: sector, alert_type: over-throughput-budget }
         annotations:
           summary: "🟡 Sector exceeded its throughput budget"
           description: >-
