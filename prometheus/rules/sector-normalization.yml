@@ -184,3 +184,228 @@ groups:
 
       - record: sector:backhaul_bps:hourly
         expr: avg_over_time((sector:backhaul_tx_bps + sector:backhaul_rx_bps)[1h:1m])
+
+  # Throughput / client count / backhaul %, averaged by LOCAL HOUR OF DAY
+  # (Africa/Lagos = UTC+1, hence time()+3600) over the last 7 days - 24
+  # series per sector, hod label 00..23, so a bar chart answers 'which
+  # hours is this sector busiest'. One rule per hour because PromQL
+  # cannot derive an hour-of-day label from a timestamp.
+  - name: sector-hour-of-day
+    interval: 15m
+    rules:
+      - record: sector:throughput_mbps:hod
+        expr: avg_over_time((sector:throughput_mbps and on() (hour(vector(time() + 3600)) == 0))[7d:15m])
+        labels: { hod: "00" }
+      - record: sector:throughput_mbps:hod
+        expr: avg_over_time((sector:throughput_mbps and on() (hour(vector(time() + 3600)) == 1))[7d:15m])
+        labels: { hod: "01" }
+      - record: sector:throughput_mbps:hod
+        expr: avg_over_time((sector:throughput_mbps and on() (hour(vector(time() + 3600)) == 2))[7d:15m])
+        labels: { hod: "02" }
+      - record: sector:throughput_mbps:hod
+        expr: avg_over_time((sector:throughput_mbps and on() (hour(vector(time() + 3600)) == 3))[7d:15m])
+        labels: { hod: "03" }
+      - record: sector:throughput_mbps:hod
+        expr: avg_over_time((sector:throughput_mbps and on() (hour(vector(time() + 3600)) == 4))[7d:15m])
+        labels: { hod: "04" }
+      - record: sector:throughput_mbps:hod
+        expr: avg_over_time((sector:throughput_mbps and on() (hour(vector(time() + 3600)) == 5))[7d:15m])
+        labels: { hod: "05" }
+      - record: sector:throughput_mbps:hod
+        expr: avg_over_time((sector:throughput_mbps and on() (hour(vector(time() + 3600)) == 6))[7d:15m])
+        labels: { hod: "06" }
+      - record: sector:throughput_mbps:hod
+        expr: avg_over_time((sector:throughput_mbps and on() (hour(vector(time() + 3600)) == 7))[7d:15m])
+        labels: { hod: "07" }
+      - record: sector:throughput_mbps:hod
+        expr: avg_over_time((sector:throughput_mbps and on() (hour(vector(time() + 3600)) == 8))[7d:15m])
+        labels: { hod: "08" }
+      - record: sector:throughput_mbps:hod
+        expr: avg_over_time((sector:throughput_mbps and on() (hour(vector(time() + 3600)) == 9))[7d:15m])
+        labels: { hod: "09" }
+      - record: sector:throughput_mbps:hod
+        expr: avg_over_time((sector:throughput_mbps and on() (hour(vector(time() + 3600)) == 10))[7d:15m])
+        labels: { hod: "10" }
+      - record: sector:throughput_mbps:hod
+        expr: avg_over_time((sector:throughput_mbps and on() (hour(vector(time() + 3600)) == 11))[7d:15m])
+        labels: { hod: "11" }
+      - record: sector:throughput_mbps:hod
+        expr: avg_over_time((sector:throughput_mbps and on() (hour(vector(time() + 3600)) == 12))[7d:15m])
+        labels: { hod: "12" }
+      - record: sector:throughput_mbps:hod
+        expr: avg_over_time((sector:throughput_mbps and on() (hour(vector(time() + 3600)) == 13))[7d:15m])
+        labels: { hod: "13" }
+      - record: sector:throughput_mbps:hod
+        expr: avg_over_time((sector:throughput_mbps and on() (hour(vector(time() + 3600)) == 14))[7d:15m])
+        labels: { hod: "14" }
+      - record: sector:throughput_mbps:hod
+        expr: avg_over_time((sector:throughput_mbps and on() (hour(vector(time() + 3600)) == 15))[7d:15m])
+        labels: { hod: "15" }
+      - record: sector:throughput_mbps:hod
+        expr: avg_over_time((sector:throughput_mbps and on() (hour(vector(time() + 3600)) == 16))[7d:15m])
+        labels: { hod: "16" }
+      - record: sector:throughput_mbps:hod
+        expr: avg_over_time((sector:throughput_mbps and on() (hour(vector(time() + 3600)) == 17))[7d:15m])
+        labels: { hod: "17" }
+      - record: sector:throughput_mbps:hod
+        expr: avg_over_time((sector:throughput_mbps and on() (hour(vector(time() + 3600)) == 18))[7d:15m])
+        labels: { hod: "18" }
+      - record: sector:throughput_mbps:hod
+        expr: avg_over_time((sector:throughput_mbps and on() (hour(vector(time() + 3600)) == 19))[7d:15m])
+        labels: { hod: "19" }
+      - record: sector:throughput_mbps:hod
+        expr: avg_over_time((sector:throughput_mbps and on() (hour(vector(time() + 3600)) == 20))[7d:15m])
+        labels: { hod: "20" }
+      - record: sector:throughput_mbps:hod
+        expr: avg_over_time((sector:throughput_mbps and on() (hour(vector(time() + 3600)) == 21))[7d:15m])
+        labels: { hod: "21" }
+      - record: sector:throughput_mbps:hod
+        expr: avg_over_time((sector:throughput_mbps and on() (hour(vector(time() + 3600)) == 22))[7d:15m])
+        labels: { hod: "22" }
+      - record: sector:throughput_mbps:hod
+        expr: avg_over_time((sector:throughput_mbps and on() (hour(vector(time() + 3600)) == 23))[7d:15m])
+        labels: { hod: "23" }
+      - record: sector:clients:hod
+        expr: avg_over_time((sector:clients and on() (hour(vector(time() + 3600)) == 0))[7d:15m])
+        labels: { hod: "00" }
+      - record: sector:clients:hod
+        expr: avg_over_time((sector:clients and on() (hour(vector(time() + 3600)) == 1))[7d:15m])
+        labels: { hod: "01" }
+      - record: sector:clients:hod
+        expr: avg_over_time((sector:clients and on() (hour(vector(time() + 3600)) == 2))[7d:15m])
+        labels: { hod: "02" }
+      - record: sector:clients:hod
+        expr: avg_over_time((sector:clients and on() (hour(vector(time() + 3600)) == 3))[7d:15m])
+        labels: { hod: "03" }
+      - record: sector:clients:hod
+        expr: avg_over_time((sector:clients and on() (hour(vector(time() + 3600)) == 4))[7d:15m])
+        labels: { hod: "04" }
+      - record: sector:clients:hod
+        expr: avg_over_time((sector:clients and on() (hour(vector(time() + 3600)) == 5))[7d:15m])
+        labels: { hod: "05" }
+      - record: sector:clients:hod
+        expr: avg_over_time((sector:clients and on() (hour(vector(time() + 3600)) == 6))[7d:15m])
+        labels: { hod: "06" }
+      - record: sector:clients:hod
+        expr: avg_over_time((sector:clients and on() (hour(vector(time() + 3600)) == 7))[7d:15m])
+        labels: { hod: "07" }
+      - record: sector:clients:hod
+        expr: avg_over_time((sector:clients and on() (hour(vector(time() + 3600)) == 8))[7d:15m])
+        labels: { hod: "08" }
+      - record: sector:clients:hod
+        expr: avg_over_time((sector:clients and on() (hour(vector(time() + 3600)) == 9))[7d:15m])
+        labels: { hod: "09" }
+      - record: sector:clients:hod
+        expr: avg_over_time((sector:clients and on() (hour(vector(time() + 3600)) == 10))[7d:15m])
+        labels: { hod: "10" }
+      - record: sector:clients:hod
+        expr: avg_over_time((sector:clients and on() (hour(vector(time() + 3600)) == 11))[7d:15m])
+        labels: { hod: "11" }
+      - record: sector:clients:hod
+        expr: avg_over_time((sector:clients and on() (hour(vector(time() + 3600)) == 12))[7d:15m])
+        labels: { hod: "12" }
+      - record: sector:clients:hod
+        expr: avg_over_time((sector:clients and on() (hour(vector(time() + 3600)) == 13))[7d:15m])
+        labels: { hod: "13" }
+      - record: sector:clients:hod
+        expr: avg_over_time((sector:clients and on() (hour(vector(time() + 3600)) == 14))[7d:15m])
+        labels: { hod: "14" }
+      - record: sector:clients:hod
+        expr: avg_over_time((sector:clients and on() (hour(vector(time() + 3600)) == 15))[7d:15m])
+        labels: { hod: "15" }
+      - record: sector:clients:hod
+        expr: avg_over_time((sector:clients and on() (hour(vector(time() + 3600)) == 16))[7d:15m])
+        labels: { hod: "16" }
+      - record: sector:clients:hod
+        expr: avg_over_time((sector:clients and on() (hour(vector(time() + 3600)) == 17))[7d:15m])
+        labels: { hod: "17" }
+      - record: sector:clients:hod
+        expr: avg_over_time((sector:clients and on() (hour(vector(time() + 3600)) == 18))[7d:15m])
+        labels: { hod: "18" }
+      - record: sector:clients:hod
+        expr: avg_over_time((sector:clients and on() (hour(vector(time() + 3600)) == 19))[7d:15m])
+        labels: { hod: "19" }
+      - record: sector:clients:hod
+        expr: avg_over_time((sector:clients and on() (hour(vector(time() + 3600)) == 20))[7d:15m])
+        labels: { hod: "20" }
+      - record: sector:clients:hod
+        expr: avg_over_time((sector:clients and on() (hour(vector(time() + 3600)) == 21))[7d:15m])
+        labels: { hod: "21" }
+      - record: sector:clients:hod
+        expr: avg_over_time((sector:clients and on() (hour(vector(time() + 3600)) == 22))[7d:15m])
+        labels: { hod: "22" }
+      - record: sector:clients:hod
+        expr: avg_over_time((sector:clients and on() (hour(vector(time() + 3600)) == 23))[7d:15m])
+        labels: { hod: "23" }
+      - record: sector:backhaul_utilization_percent:hod
+        expr: avg_over_time((sector:backhaul_utilization_percent and on() (hour(vector(time() + 3600)) == 0))[7d:15m])
+        labels: { hod: "00" }
+      - record: sector:backhaul_utilization_percent:hod
+        expr: avg_over_time((sector:backhaul_utilization_percent and on() (hour(vector(time() + 3600)) == 1))[7d:15m])
+        labels: { hod: "01" }
+      - record: sector:backhaul_utilization_percent:hod
+        expr: avg_over_time((sector:backhaul_utilization_percent and on() (hour(vector(time() + 3600)) == 2))[7d:15m])
+        labels: { hod: "02" }
+      - record: sector:backhaul_utilization_percent:hod
+        expr: avg_over_time((sector:backhaul_utilization_percent and on() (hour(vector(time() + 3600)) == 3))[7d:15m])
+        labels: { hod: "03" }
+      - record: sector:backhaul_utilization_percent:hod
+        expr: avg_over_time((sector:backhaul_utilization_percent and on() (hour(vector(time() + 3600)) == 4))[7d:15m])
+        labels: { hod: "04" }
+      - record: sector:backhaul_utilization_percent:hod
+        expr: avg_over_time((sector:backhaul_utilization_percent and on() (hour(vector(time() + 3600)) == 5))[7d:15m])
+        labels: { hod: "05" }
+      - record: sector:backhaul_utilization_percent:hod
+        expr: avg_over_time((sector:backhaul_utilization_percent and on() (hour(vector(time() + 3600)) == 6))[7d:15m])
+        labels: { hod: "06" }
+      - record: sector:backhaul_utilization_percent:hod
+        expr: avg_over_time((sector:backhaul_utilization_percent and on() (hour(vector(time() + 3600)) == 7))[7d:15m])
+        labels: { hod: "07" }
+      - record: sector:backhaul_utilization_percent:hod
+        expr: avg_over_time((sector:backhaul_utilization_percent and on() (hour(vector(time() + 3600)) == 8))[7d:15m])
+        labels: { hod: "08" }
+      - record: sector:backhaul_utilization_percent:hod
+        expr: avg_over_time((sector:backhaul_utilization_percent and on() (hour(vector(time() + 3600)) == 9))[7d:15m])
+        labels: { hod: "09" }
+      - record: sector:backhaul_utilization_percent:hod
+        expr: avg_over_time((sector:backhaul_utilization_percent and on() (hour(vector(time() + 3600)) == 10))[7d:15m])
+        labels: { hod: "10" }
+      - record: sector:backhaul_utilization_percent:hod
+        expr: avg_over_time((sector:backhaul_utilization_percent and on() (hour(vector(time() + 3600)) == 11))[7d:15m])
+        labels: { hod: "11" }
+      - record: sector:backhaul_utilization_percent:hod
+        expr: avg_over_time((sector:backhaul_utilization_percent and on() (hour(vector(time() + 3600)) == 12))[7d:15m])
+        labels: { hod: "12" }
+      - record: sector:backhaul_utilization_percent:hod
+        expr: avg_over_time((sector:backhaul_utilization_percent and on() (hour(vector(time() + 3600)) == 13))[7d:15m])
+        labels: { hod: "13" }
+      - record: sector:backhaul_utilization_percent:hod
+        expr: avg_over_time((sector:backhaul_utilization_percent and on() (hour(vector(time() + 3600)) == 14))[7d:15m])
+        labels: { hod: "14" }
+      - record: sector:backhaul_utilization_percent:hod
+        expr: avg_over_time((sector:backhaul_utilization_percent and on() (hour(vector(time() + 3600)) == 15))[7d:15m])
+        labels: { hod: "15" }
+      - record: sector:backhaul_utilization_percent:hod
+        expr: avg_over_time((sector:backhaul_utilization_percent and on() (hour(vector(time() + 3600)) == 16))[7d:15m])
+        labels: { hod: "16" }
+      - record: sector:backhaul_utilization_percent:hod
+        expr: avg_over_time((sector:backhaul_utilization_percent and on() (hour(vector(time() + 3600)) == 17))[7d:15m])
+        labels: { hod: "17" }
+      - record: sector:backhaul_utilization_percent:hod
+        expr: avg_over_time((sector:backhaul_utilization_percent and on() (hour(vector(time() + 3600)) == 18))[7d:15m])
+        labels: { hod: "18" }
+      - record: sector:backhaul_utilization_percent:hod
+        expr: avg_over_time((sector:backhaul_utilization_percent and on() (hour(vector(time() + 3600)) == 19))[7d:15m])
+        labels: { hod: "19" }
+      - record: sector:backhaul_utilization_percent:hod
+        expr: avg_over_time((sector:backhaul_utilization_percent and on() (hour(vector(time() + 3600)) == 20))[7d:15m])
+        labels: { hod: "20" }
+      - record: sector:backhaul_utilization_percent:hod
+        expr: avg_over_time((sector:backhaul_utilization_percent and on() (hour(vector(time() + 3600)) == 21))[7d:15m])
+        labels: { hod: "21" }
+      - record: sector:backhaul_utilization_percent:hod
+        expr: avg_over_time((sector:backhaul_utilization_percent and on() (hour(vector(time() + 3600)) == 22))[7d:15m])
+        labels: { hod: "22" }
+      - record: sector:backhaul_utilization_percent:hod
+        expr: avg_over_time((sector:backhaul_utilization_percent and on() (hour(vector(time() + 3600)) == 23))[7d:15m])
+        labels: { hod: "23" }

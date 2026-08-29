@@ -44,6 +44,13 @@
                 "defaults": { "color": { "mode": "thresholds" } },
                 "overrides": [
                     {
+                        "matcher": { "id": "byName", "options": "Object" },
+                        "properties": [ { "id": "links", "value": [
+                            { "title": "Sector Detail", "url": "/d/sector-detail/sector-detail?var-sector=${__data.fields.Object}", "targetBlank": false },
+                            { "title": "PTP Link Monitoring", "url": "/d/ptp-link-monitoring/ptp-link-monitoring?var-link_id=${__data.fields.Object}", "targetBlank": false }
+                        ] } ]
+                    },
+                    {
                         "matcher": { "id": "byName", "options": "Duration" },
                         "properties": [ { "id": "unit", "value": "s" }, { "id": "decimals", "value": 0 } ]
                     },
