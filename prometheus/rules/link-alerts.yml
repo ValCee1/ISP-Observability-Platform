@@ -5,6 +5,7 @@ groups:
       - alert: LinkDown
         expr: link_up == 0
         for: 5m
+        keep_firing_for: 10m
         labels:
           severity: critical
           category: state
@@ -45,6 +46,7 @@ groups:
       - alert: HighLatencyVariability
         expr: link_latency_variability_seconds > 0.05
         for: 10m
+        keep_firing_for: 10m
         labels:
           severity: warning
           category: health
@@ -54,9 +56,15 @@ groups:
           summary: "🟠 Unstable Latency"
           description: "{{ $labels.link_name }} latency variability has exceeded 50ms for 10 minutes - link is up but inconsistent."
 
+      # Aggregated per link endpoint, NOT per interface - a radio logging
+      # errors on three interfaces is one problem, one alert.
       - alert: RisingInterfaceErrors
-        expr: rate(link_interface_in_errors[5m]) > 0 or rate(link_interface_out_errors[5m]) > 0
+        expr: |
+          sum by (link_id, endpoint, site, role, vendor, link_name) (
+            rate(link_interface_in_errors[5m]) + rate(link_interface_out_errors[5m])
+          ) > 0
         for: 10m
+        keep_firing_for: 10m
         labels:
           severity: warning
           category: health
@@ -64,11 +72,12 @@ groups:
           alert_type: interface-errors
         annotations:
           summary: "🟠 Interface Errors"
-          description: "{{ $labels.link_name }} ({{ $labels.ifName }}) is logging interface errors - possible cabling, duplex, or hardware issue."
+          description: '{{ $labels.link_name }} is logging interface errors ({{ $value | printf "%.2f" }}/s) - possible cabling, duplex, or hardware issue.'
 
       - alert: PacketLoss
         expr: link_packet_loss_percent > 5
         for: 10m
+        keep_firing_for: 10m
         labels:
           severity: warning
           category: health
@@ -81,6 +90,7 @@ groups:
       - alert: PacketLoss
         expr: link_packet_loss_percent > 20
         for: 10m
+        keep_firing_for: 10m
         labels:
           severity: critical
           category: health
@@ -99,6 +109,7 @@ groups:
       - alert: HighLatency
         expr: link_latency_ms > 100
         for: 10m
+        keep_firing_for: 10m
         labels:
           severity: warning
           category: health
@@ -111,6 +122,7 @@ groups:
       - alert: HighLatency
         expr: link_latency_ms > 500
         for: 10m
+        keep_firing_for: 10m
         labels:
           severity: critical
           category: health

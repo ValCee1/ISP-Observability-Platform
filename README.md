@@ -95,3 +95,10 @@ Links          --ICMP--> blackbox-exporter -> Prometheus -> Grafana
   shared cause is one incident, not N. `CPESignalDegradedVsBaseline` / `...Rising`
   gate on `sector:cpe:baseline_ready` (≈17h+ of history) so they don't fire off a
   half-formed baseline in a sector's first day.
+- Anti-storm machinery: `for:` swallows transients, `keep_firing_for:` stops
+  resolve/refire flap pairs on state + flappy health alerts,
+  `group_by`+`group_interval: 10m` batches per object, `inhibit_rules` suppress
+  symptoms under a parent (incl. `prometheus/topology.yml` `pop:` dependency —
+  a POP's backhaul/router down silences its downstream sectors). `repeat_interval`
+  2 h critical / 12 h warning. `prometheus/rules/tests/alerts_test.yml`
+  (`promtool test rules`) and `docs/failure-drills.md` prove it.

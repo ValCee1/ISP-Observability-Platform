@@ -191,7 +191,7 @@ groups:
   # hours is this sector busiest'. One rule per hour because PromQL
   # cannot derive an hour-of-day label from a timestamp.
   - name: sector-hour-of-day
-    interval: 15m
+    interval: 5m
     rules:
       - record: sector:throughput_mbps:hod
         expr: avg_over_time((sector:throughput_mbps and on() (hour(vector(time() + 3600)) == 0))[7d:15m])

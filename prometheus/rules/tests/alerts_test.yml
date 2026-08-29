@@ -1,0 +1,125 @@
+# promtool unit tests for the alert logic. Run:
+#   docker run --rm --entrypoint promtool -v "$PWD/prometheus":/p \
+#     prom/prometheus:v3.13.2 test rules /p/rules/tests/alerts_test.yml
+#
+# These prove, reproducibly, the behaviours the failure-drills runbook
+# (docs/failure-drills.md) exercises by hand: an alert fires when it
+# should, keeps firing through a short recovery blip (no resolve/refire
+# storm), the two-tier alerts both evaluate at rule level, and the
+# baseline-gated CPE alerts stay quiet until there is enough history.
+
+rule_files:
+  - ../link-alerts.yml
+  - ../sector-alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  # ------------------------------------------------------------------
+  # LinkDown fires after 5m down, and keep_firing_for: 10m rides out a
+  # 3-minute recovery blip instead of resolving + re-firing.
+  # ------------------------------------------------------------------
+  - interval: 1m
+    input_series:
+      - series: 'link_up{link_id="LINK-T", link_name="t-a", endpoint="a", site="S", role="P2P", vendor="t"}'
+        #        0m--2m   3m----------------10m  11m-13m  14m--------20m
+        values: '1 1 1    0 0 0 0 0 0 0 0        1 1 1    0 0 0 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 7m           # 4m into the outage - not yet
+        alertname: LinkDown
+        exp_alerts: []
+      - eval_time: 9m           # 6m in - firing
+        alertname: LinkDown
+        exp_alerts:
+          - exp_labels: { severity: critical, category: state, scope: link, alert_type: link-down,
+                          link_id: LINK-T, link_name: t-a, endpoint: a, site: S, role: P2P, vendor: t }
+            exp_annotations: { summary: "🔴 Link DOWN", description: "t-a has been unreachable for 5 minutes." }
+      - eval_time: 12m          # link_up==1 for 1m - keep_firing_for keeps it firing
+        alertname: LinkDown
+        exp_alerts:
+          - exp_labels: { severity: critical, category: state, scope: link, alert_type: link-down,
+                          link_id: LINK-T, link_name: t-a, endpoint: a, site: S, role: P2P, vendor: t }
+            exp_annotations: { summary: "🔴 Link DOWN", description: "t-a has been unreachable for 5 minutes." }
+      - eval_time: 16m          # blip over, down again - still one continuous firing alert
+        alertname: LinkDown
+        exp_alerts:
+          - exp_labels: { severity: critical, category: state, scope: link, alert_type: link-down,
+                          link_id: LINK-T, link_name: t-a, endpoint: a, site: S, role: P2P, vendor: t }
+            exp_annotations: { summary: "🔴 Link DOWN", description: "t-a has been unreachable for 5 minutes." }
+
+  # ------------------------------------------------------------------
+  # At 25% loss both PacketLoss tiers evaluate (warning + critical). The
+  # duplicate is collapsed to one Telegram message by an alertmanager
+  # inhibit rule, not here.
+  # ------------------------------------------------------------------
+  - interval: 1m
+    input_series:
+      - series: 'link_packet_loss_percent{link_id="LINK-T", link_name="t-a"}'
+        values: '25x20'
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: PacketLoss
+        exp_alerts:
+          - exp_labels: { severity: warning, category: health, scope: link, alert_type: packet-loss,
+                          link_id: LINK-T, link_name: t-a }
+            exp_annotations: { summary: "🟠 Packet Loss",
+                               description: "t-a packet loss has been above 5% for 10 minutes (currently 25.0%)." }
+          - exp_labels: { severity: critical, category: health, scope: link, alert_type: packet-loss,
+                          link_id: LINK-T, link_name: t-a }
+            exp_annotations: { summary: "🔴 Severe Packet Loss",
+                               description: "t-a packet loss has been above 20% for 10 minutes (currently 25.0%) - link is up but effectively unusable." }
+
+  # ------------------------------------------------------------------
+  # SectorWideCPEDegradation fires when >=4 CPEs on a sector are degraded.
+  # ------------------------------------------------------------------
+  - interval: 1m
+    input_series:
+      - series: 'sector:degraded_cpe_count{sector="T", site="S"}'
+        values: '5x20'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: SectorWideCPEDegradation
+        exp_alerts: []                     # for: 15m not met yet
+      - eval_time: 17m
+        alertname: SectorWideCPEDegradation
+        exp_alerts:
+          - exp_labels: { severity: warning, category: degrading, scope: sector,
+                          alert_type: sector-cpe-degradation, sector: T, site: S }
+            exp_annotations:
+              summary: "🟠 Sector-wide CPE degradation"
+              description: "5 CPEs on sector T are below alignment score 60 ( below 40). A shared cause is likely - interference, AP hardware, or weather - check the sector before the individual CPEs."
+
+  # ------------------------------------------------------------------
+  # CPESignalDegradedVsBaseline stays quiet while baseline_ready == 0
+  # even though the drift has been past threshold the whole time.
+  # ------------------------------------------------------------------
+  - interval: 1m
+    input_series:
+      - series: 'sector:cpe:signal_drift_db{sector="T", cpe_mac="AA", cpe_name="cpe-x"}'
+        values: '-8x45'
+      - series: 'sector:cpe:baseline_ready{sector="T", cpe_mac="AA", cpe_name="cpe-x"}'
+        values: '0x45'
+    alert_rule_test:
+      - eval_time: 44m
+        alertname: CPESignalDegradedVsBaseline
+        exp_alerts: []
+
+  # ...and fires once baseline_ready == 1 and the drift has held for 30m.
+  - interval: 1m
+    input_series:
+      - series: 'sector:cpe:signal_drift_db{sector="T", cpe_mac="AA", cpe_name="cpe-x"}'
+        values: '-8x45'
+      - series: 'sector:cpe:baseline_ready{sector="T", cpe_mac="AA", cpe_name="cpe-x"}'
+        values: '1x45'
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: CPESignalDegradedVsBaseline
+        exp_alerts: []
+      - eval_time: 35m
+        alertname: CPESignalDegradedVsBaseline
+        exp_alerts:
+          - exp_labels: { severity: warning, category: health, scope: cpe, alert_type: cpe-signal-drift,
+                          sector: T, cpe_mac: AA, cpe_name: cpe-x }
+            exp_annotations:
+              summary: "🟠 CPE signal degraded vs baseline"
+              description: "cpe-x on sector T is -8.0 dB below its 7-day average - vegetation growth, mount shift, or water ingress."

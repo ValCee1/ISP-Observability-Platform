@@ -1,0 +1,39 @@
+# Network dependency map - lab scale, hand-maintained.
+#
+# This file is DOCUMENTATION + the source of truth for the `pop` label you
+# add to targets. It is not loaded by Prometheus directly. The point is
+# dependency-aware alerting: if a POP's upstream backhaul or its router is
+# down, every sector behind it is unreachable too - so those downstream
+# alerts should be suppressed, not sent as separate incidents.
+#
+# How it wires up:
+#   1. Give every link endpoint / router / sector that belongs to a POP the
+#      same `pop: <name>` label in its targets file
+#      (prometheus/targets/*.yml).
+#   2. Mark the POP's upstream backhaul link endpoints with
+#      `link_role: backhaul` (already a convention in links.yml via `role`).
+#   3. The inhibit_rules in alertmanager/alertmanager.yml keyed on
+#      `equal: [pop]` then do the rest - a LinkDown or CoreRouterDown that
+#      carries a `pop` label silences the state/health/capacity alerts of
+#      everything else sharing that `pop`.
+#
+# Until `pop` labels exist on targets the inhibit rules are inert (they
+# only match when the source alert actually has a non-empty `pop`).
+
+pops:
+  HOME:
+    router: 192.168.10.1          # site HOME, role core-router
+    upstream_link: HOME-GSIA      # LINK-001 (airMAX LiteBeam)
+    sectors: []                   # none behind HOME yet
+
+  BASE:
+    router: null                  # no MikroTik router polled at BASE yet
+    upstream_links:               # dual backhaul into the BASE site
+      - LINK-002                  # AirFiber  (10.10.6.82 / .83)
+      - LINK003                   # SAF Integra (10.10.6.90 / .91)
+    sectors:
+      - 4B                        # 10.10.13.1   (site BASE 5)
+      - 4E                        # 10.10.13.129 (site BASE 4)
+
+# Peripheral (not a POP, no downstream):
+#   192.168.10.19  room-office  Repeater

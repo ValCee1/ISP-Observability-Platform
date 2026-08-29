@@ -37,9 +37,9 @@ time_intervals:
 route:
   receiver: telegram
   group_by: ["alertname"]   # only used if nothing below matches (shouldn't happen - every alert carries `instance`)
-  group_wait: 30s
-  group_interval: 5m
-  repeat_interval: 3h
+  group_wait: 45s
+  group_interval: 10m
+  repeat_interval: 6h
 
   routes:
     # Sector capacity alerts (category: capacity, from sector-alerts.yml):
@@ -63,15 +63,15 @@ route:
     - match_re:
         sector: ".+"
       group_by: ["sector"]
-      group_wait: 30s
-      group_interval: 5m
+      group_wait: 45s
+      group_interval: 10m
       routes:
         - match:
             severity: critical
-          repeat_interval: 1h
+          repeat_interval: 2h
         - match:
             severity: warning
-          repeat_interval: 6h
+          repeat_interval: 12h
 
     # PTP link alerts (link-alerts.yml) all carry a link_id label shared by
     # both endpoints of the same physical link. Grouping by link_id (NOT
@@ -81,15 +81,15 @@ route:
     - match_re:
         link_id: ".+"
       group_by: ["link_id"]
-      group_wait: 30s
-      group_interval: 5m
+      group_wait: 45s
+      group_interval: 10m
       routes:
         - match:
             severity: critical
-          repeat_interval: 1h    # a link actually down - keep reminding hourly until it's fixed
+          repeat_interval: 2h    # a link actually down - keep reminding until it's fixed
         - match:
             severity: warning
-          repeat_interval: 6h    # degraded-but-up - don't need hourly nagging
+          repeat_interval: 12h   # degraded-but-up - don't need frequent nagging
 
     # Everything else (router-level alerts from mikrotik-alerts.yml - no
     # link_id) groups by instance instead, so CoreRouterDown + HighCPU +
@@ -97,15 +97,15 @@ route:
     - match_re:
         instance: ".+"
       group_by: ["instance"]
-      group_wait: 30s
-      group_interval: 5m
+      group_wait: 45s
+      group_interval: 10m
       routes:
         - match:
             severity: critical
-          repeat_interval: 1h
+          repeat_interval: 2h
         - match:
             severity: warning
-          repeat_interval: 6h
+          repeat_interval: 12h
 
 receivers:
   - name: telegram
@@ -126,16 +126,23 @@ receivers:
         # (single argument, one return value), so Alertmanager's stock Go
         # text/template can call it directly with no extra template
         # functions or relay service needed for this.
+        # One message per object per batch. Header line = a single verdict
+        # for the whole object (worst severity + count), then each alert
+        # under it. Symptoms of a bigger incident are already gone by the
+        # time they'd get here (inhibit_rules below), so the list is the
+        # real picture, not a storm.
         message: |
-          {{ if .CommonLabels.link_id }}<b>Link: {{ .CommonLabels.link_id }}</b>
-          {{ else if .CommonLabels.sector }}<b>Sector: {{ .CommonLabels.sector }}</b>
-          {{ else if .CommonLabels.instance }}<b>Router: {{ .CommonLabels.instance }}</b>
-          {{ end }}
-          {{ range .Alerts }}{{ if eq .Status "firing" }}<b>{{ .Annotations.summary }}</b> (since {{ .StartsAt.Format "15:04:05 MST" }})
-          {{ else }}✅ <b>RESOLVED:</b> {{ .Annotations.summary }} (firing for {{ .EndsAt.Sub .StartsAt }})
-          {{ end }}{{ if .Labels.link_name }}Endpoint: {{ .Labels.link_name }}
-          {{ end }}{{ if .Labels.cpe_name }}CPE: {{ .Labels.cpe_name }}
-          {{ end }}{{ .Annotations.description }}
+          {{- $obj := "" }}{{ if .CommonLabels.link_id }}{{ $obj = printf "Link %s" .CommonLabels.link_id }}
+          {{- else if .CommonLabels.sector }}{{ $obj = printf "Sector %s" .CommonLabels.sector }}
+          {{- else if .CommonLabels.instance }}{{ $obj = printf "Router %s" .CommonLabels.instance }}
+          {{- else }}{{ $obj = .CommonLabels.alertname }}{{ end }}
+          {{- if eq .Status "resolved" }}✅ <b>{{ $obj }} — RESOLVED</b>
+          {{- else if eq .CommonLabels.severity "critical" }}🔴 <b>{{ $obj }} — CRITICAL</b> ({{ .Alerts.Firing | len }} alert{{ if gt (len .Alerts.Firing) 1 }}s{{ end }})
+          {{- else }}🟠 <b>{{ $obj }} — degraded</b> ({{ .Alerts.Firing | len }} alert{{ if gt (len .Alerts.Firing) 1 }}s{{ end }}){{ end }}
+
+          {{ range .Alerts }}{{ if eq .Status "firing" }}• <b>{{ .Annotations.summary }}</b> (since {{ .StartsAt.Format "15:04 MST" }})
+          {{ else }}• ✅ {{ .Annotations.summary }} (was firing {{ .EndsAt.Sub .StartsAt }})
+          {{ end }}{{ if .Labels.link_name }}  {{ .Labels.link_name }}: {{ end }}{{ if .Labels.cpe_name }}  {{ .Labels.cpe_name }}: {{ end }}{{ .Annotations.description }}
           {{ end }}
 
 # Suppress lower-priority alerts about an entity that's already covered by
@@ -205,6 +212,30 @@ inhibit_rules:
     target_match_re:
       category: "health|capacity"
     equal: ["sector"]
+
+  # DEPENDENCY AWARENESS (see prometheus/topology.yml). A backhaul link into
+  # a POP going down makes every sector/router behind that POP unreachable -
+  # their own alerts are downstream noise, not separate incidents. Guarded
+  # by `pop=~".+"` so it only fires when the LinkDown actually carries a
+  # `pop` label (i.e. you've tagged that link as a POP backhaul in
+  # links.yml); otherwise inert.
+  - source_match:
+      alertname: LinkDown
+    source_match_re:
+      pop: ".+"
+    target_match_re:
+      scope: "sector|router"
+    equal: ["pop"]
+
+  # Same for a POP's router being down (targets sectors only - a router
+  # can't be "downstream" of itself).
+  - source_match:
+      alertname: CoreRouterDown
+    source_match_re:
+      pop: ".+"
+    target_match:
+      scope: "sector"
+    equal: ["pop"]
 
   # STEP 7: when SectorWideCPEDegradation is firing, the individual
   # per-CPE RF alerts on that same sector (weak signal, signal drift,

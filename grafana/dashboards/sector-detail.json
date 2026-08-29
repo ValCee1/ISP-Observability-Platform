@@ -3,7 +3,7 @@
   "description": "Per-sector drill-down for one MikroTik PtMP sector. Pick a sector above or arrive from the Sector Fleet Overview. The Clients table lists every CPE with its raw RF figures alongside the computed alignment score, worst-first.",
   "uid": "sector-detail",
   "schemaVersion": 39,
-  "version": 4,
+  "version": 6,
   "editable": true,
   "timezone": "browser",
   "time": {
@@ -424,7 +424,7 @@
       "id": 21,
       "type": "table",
       "title": "Clients (worst alignment first)",
-      "description": "Every registered CPE, worst alignment first. Signal/Noise/SNR and the two receive chains (Rx Ch0/Ch1) plus their gap (Chain Delta) are the RF + physical-alignment picture; Tx Signal is the reverse path. Drift 7d is signal vs the CPE's own 7-day average. IP/ROS come from the AP's ARP + registration tables (IP may be blank on a pure L2 sector).",
+      "description": "Every registered CPE, worst alignment first. Signal / SNR / the two receive chains (Rx Ch0-Ch1) and their gap (Chain \u0394) are the alignment + quality picture; Drift 7d is signal vs the CPE's own 7-day average (a degrading link); Tx PHY shows rate downshift; Session is hours since it last (re)registered.",
       "gridPos": {
         "h": 16,
         "w": 24,
@@ -435,25 +435,13 @@
       "options": {
         "sortBy": [
           {
-            "displayName": "Align Score",
+            "displayName": "Align",
             "desc": false
           }
         ],
         "cellHeight": "sm"
       },
       "targets": [
-        {
-          "expr": "sector_cpe_ip{sector=\"$sector\"}",
-          "refId": "IP",
-          "instant": true,
-          "format": "table"
-        },
-        {
-          "expr": "sector_cpe_ros_version{sector=\"$sector\"}",
-          "refId": "ROS",
-          "instant": true,
-          "format": "table"
-        },
         {
           "expr": "sector:cpe:alignment_score{sector=\"$sector\"}",
           "refId": "Align",
@@ -463,12 +451,6 @@
         {
           "expr": "sector_cpe_signal_dbm{sector=\"$sector\"}",
           "refId": "Signal",
-          "instant": true,
-          "format": "table"
-        },
-        {
-          "expr": "(sector_cpe_signal_dbm{sector=\"$sector\"} - sector_cpe_snr_db{sector=\"$sector\"})",
-          "refId": "Noise",
           "instant": true,
           "format": "table"
         },
@@ -497,12 +479,6 @@
           "format": "table"
         },
         {
-          "expr": "sector_cpe_tx_signal_dbm{sector=\"$sector\"}",
-          "refId": "TxSig",
-          "instant": true,
-          "format": "table"
-        },
-        {
           "expr": "sector:cpe:signal_drift_db{sector=\"$sector\"}",
           "refId": "Drift",
           "instant": true,
@@ -511,18 +487,6 @@
         {
           "expr": "sector_cpe_tx_rate_bps{sector=\"$sector\"} / 1e6",
           "refId": "TxPhy",
-          "instant": true,
-          "format": "table"
-        },
-        {
-          "expr": "sector_cpe_rx_rate_bps{sector=\"$sector\"} / 1e6",
-          "refId": "RxPhy",
-          "instant": true,
-          "format": "table"
-        },
-        {
-          "expr": "(sector:cpe:tx_bps{sector=\"$sector\"} + sector:cpe:rx_bps{sector=\"$sector\"}) / 1e6",
-          "refId": "Traffic",
           "instant": true,
           "format": "table"
         },
@@ -546,10 +510,12 @@
               "role": true,
               "site": true,
               "sector": true,
+              "cpe_mac": true,
               "wlan_ifindex": true,
               "ssid": true,
               "channel": true,
-              "hrStorageDescr": true
+              "hrStorageDescr": true,
+              "sector_cpe_ros_version": true
             }
           }
         },
@@ -560,45 +526,28 @@
         {
           "id": "organize",
           "options": {
-            "excludeByName": {
-              "cpe_mac": true,
-              "Value #IP": true,
-              "Value #ROS": true
-            },
             "indexByName": {
               "cpe_name": 0,
-              "cpe_ip": 1,
-              "sector_cpe_ros_version": 2,
-              "Value #Align": 3,
-              "Value #Signal": 4,
-              "Value #Noise": 5,
-              "Value #SNR": 6,
-              "Value #Ch0": 7,
-              "Value #Ch1": 8,
-              "Value #ChainDelta": 9,
-              "Value #TxSig": 10,
-              "Value #Drift": 11,
-              "Value #TxPhy": 12,
-              "Value #RxPhy": 13,
-              "Value #Traffic": 14,
-              "Value #Session": 15
+              "Value #Align": 1,
+              "Value #Signal": 2,
+              "Value #SNR": 3,
+              "Value #Ch0": 4,
+              "Value #Ch1": 5,
+              "Value #ChainDelta": 6,
+              "Value #Drift": 7,
+              "Value #TxPhy": 8,
+              "Value #Session": 9
             },
             "renameByName": {
               "cpe_name": "CPE",
-              "cpe_ip": "IP",
-              "sector_cpe_ros_version": "ROS",
               "Value #Align": "Align",
               "Value #Signal": "Signal (dBm)",
-              "Value #Noise": "Noise (dBm)",
               "Value #SNR": "SNR (dB)",
               "Value #Ch0": "Rx Ch0",
               "Value #Ch1": "Rx Ch1",
               "Value #ChainDelta": "Chain \u0394",
-              "Value #TxSig": "Tx Signal",
               "Value #Drift": "Drift 7d",
-              "Value #TxPhy": "Tx PHY",
-              "Value #RxPhy": "Rx PHY",
-              "Value #Traffic": "Traffic (Mbps)",
+              "Value #TxPhy": "Tx PHY (Mbps)",
               "Value #Session": "Session (h)"
             }
           }
@@ -659,7 +608,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": "Signal \\(dBm\\)|Rx Ch0|Rx Ch1|Tx Signal"
+              "options": "Signal \\(dBm\\)|Rx Ch0|Rx Ch1"
             },
             "properties": [
               {
@@ -774,18 +723,6 @@
                   "type": "color-background",
                   "mode": "gradient"
                 }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Noise (dBm)"
-            },
-            "properties": [
-              {
-                "id": "decimals",
-                "value": 0
               }
             ]
           },
@@ -953,34 +890,20 @@
     },
     {
       "id": 38,
-      "type": "table",
-      "title": "Busiest hours (7-day avg, Lagos)",
-      "description": "The local hours this sector carries the most traffic - size capacity and schedule maintenance around these.",
+      "type": "stat",
+      "title": "Peak throughput window (7-day avg, local)",
+      "description": "The local hour this sector carries the most traffic - size capacity and schedule work around it.",
       "gridPos": {
-        "h": 8,
-        "w": 10,
-        "x": 14,
+        "h": 5,
+        "w": 12,
+        "x": 0,
         "y": 46
       },
       "datasource": "Prometheus",
-      "options": {
-        "sortBy": [
-          {
-            "displayName": "Throughput (Mbps)",
-            "desc": true
-          }
-        ]
-      },
       "targets": [
         {
-          "expr": "sector:throughput_mbps:hod{sector=\"$sector\"}",
-          "refId": "T",
-          "instant": true,
-          "format": "table"
-        },
-        {
-          "expr": "sector:clients:hod{sector=\"$sector\"}",
-          "refId": "C",
+          "expr": "topk(1, sector:throughput_mbps:hod{sector=\"$sector\"})",
+          "refId": "A",
           "instant": true,
           "format": "table"
         }
@@ -995,63 +918,296 @@
               "job": true,
               "instance": true,
               "site": true,
-              "sector": true
-            }
-          }
-        },
-        {
-          "id": "merge",
-          "options": {}
-        },
-        {
-          "id": "organize",
-          "options": {
-            "indexByName": {
-              "hod": 0,
-              "Value #T": 1,
-              "Value #C": 2
-            },
-            "renameByName": {
-              "hod": "Hour",
-              "Value #T": "Throughput (Mbps)",
-              "Value #C": "Clients"
+              "sector": true,
+              "Value": true
             }
           }
         }
       ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^hod$/"
+        },
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "none"
+      },
       "fieldConfig": {
         "defaults": {
-          "decimals": 1,
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "00": {
+                  "text": "12 AM \u2013 1 AM",
+                  "index": 0
+                },
+                "01": {
+                  "text": "1 AM \u2013 2 AM",
+                  "index": 1
+                },
+                "02": {
+                  "text": "2 AM \u2013 3 AM",
+                  "index": 2
+                },
+                "03": {
+                  "text": "3 AM \u2013 4 AM",
+                  "index": 3
+                },
+                "04": {
+                  "text": "4 AM \u2013 5 AM",
+                  "index": 4
+                },
+                "05": {
+                  "text": "5 AM \u2013 6 AM",
+                  "index": 5
+                },
+                "06": {
+                  "text": "6 AM \u2013 7 AM",
+                  "index": 6
+                },
+                "07": {
+                  "text": "7 AM \u2013 8 AM",
+                  "index": 7
+                },
+                "08": {
+                  "text": "8 AM \u2013 9 AM",
+                  "index": 8
+                },
+                "09": {
+                  "text": "9 AM \u2013 10 AM",
+                  "index": 9
+                },
+                "10": {
+                  "text": "10 AM \u2013 11 AM",
+                  "index": 10
+                },
+                "11": {
+                  "text": "11 AM \u2013 12 PM",
+                  "index": 11
+                },
+                "12": {
+                  "text": "12 PM \u2013 1 PM",
+                  "index": 12
+                },
+                "13": {
+                  "text": "1 PM \u2013 2 PM",
+                  "index": 13
+                },
+                "14": {
+                  "text": "2 PM \u2013 3 PM",
+                  "index": 14
+                },
+                "15": {
+                  "text": "3 PM \u2013 4 PM",
+                  "index": 15
+                },
+                "16": {
+                  "text": "4 PM \u2013 5 PM",
+                  "index": 16
+                },
+                "17": {
+                  "text": "5 PM \u2013 6 PM",
+                  "index": 17
+                },
+                "18": {
+                  "text": "6 PM \u2013 7 PM",
+                  "index": 18
+                },
+                "19": {
+                  "text": "7 PM \u2013 8 PM",
+                  "index": 19
+                },
+                "20": {
+                  "text": "8 PM \u2013 9 PM",
+                  "index": 20
+                },
+                "21": {
+                  "text": "9 PM \u2013 10 PM",
+                  "index": 21
+                },
+                "22": {
+                  "text": "10 PM \u2013 11 PM",
+                  "index": 22
+                },
+                "23": {
+                  "text": "11 PM \u2013 12 AM",
+                  "index": 23
+                }
+              }
+            }
+          ],
           "color": {
-            "mode": "thresholds"
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Hour"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 70
-              }
-            ]
+            "mode": "fixed",
+            "fixedColor": "blue"
           },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Clients"
-            },
-            "properties": [
-              {
-                "id": "decimals",
-                "value": 0
-              }
-            ]
+          "noValue": "\u2014"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 39,
+      "type": "stat",
+      "title": "Peak client-count window (7-day avg, local)",
+      "description": "The local hour this sector has the most CPEs online.",
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 12,
+        "y": 46
+      },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "topk(1, sector:clients:hod{sector=\"$sector\"})",
+          "refId": "A",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "job": true,
+              "instance": true,
+              "site": true,
+              "sector": true,
+              "Value": true
+            }
           }
-        ]
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^hod$/"
+        },
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "00": {
+                  "text": "12 AM \u2013 1 AM",
+                  "index": 0
+                },
+                "01": {
+                  "text": "1 AM \u2013 2 AM",
+                  "index": 1
+                },
+                "02": {
+                  "text": "2 AM \u2013 3 AM",
+                  "index": 2
+                },
+                "03": {
+                  "text": "3 AM \u2013 4 AM",
+                  "index": 3
+                },
+                "04": {
+                  "text": "4 AM \u2013 5 AM",
+                  "index": 4
+                },
+                "05": {
+                  "text": "5 AM \u2013 6 AM",
+                  "index": 5
+                },
+                "06": {
+                  "text": "6 AM \u2013 7 AM",
+                  "index": 6
+                },
+                "07": {
+                  "text": "7 AM \u2013 8 AM",
+                  "index": 7
+                },
+                "08": {
+                  "text": "8 AM \u2013 9 AM",
+                  "index": 8
+                },
+                "09": {
+                  "text": "9 AM \u2013 10 AM",
+                  "index": 9
+                },
+                "10": {
+                  "text": "10 AM \u2013 11 AM",
+                  "index": 10
+                },
+                "11": {
+                  "text": "11 AM \u2013 12 PM",
+                  "index": 11
+                },
+                "12": {
+                  "text": "12 PM \u2013 1 PM",
+                  "index": 12
+                },
+                "13": {
+                  "text": "1 PM \u2013 2 PM",
+                  "index": 13
+                },
+                "14": {
+                  "text": "2 PM \u2013 3 PM",
+                  "index": 14
+                },
+                "15": {
+                  "text": "3 PM \u2013 4 PM",
+                  "index": 15
+                },
+                "16": {
+                  "text": "4 PM \u2013 5 PM",
+                  "index": 16
+                },
+                "17": {
+                  "text": "5 PM \u2013 6 PM",
+                  "index": 17
+                },
+                "18": {
+                  "text": "6 PM \u2013 7 PM",
+                  "index": 18
+                },
+                "19": {
+                  "text": "7 PM \u2013 8 PM",
+                  "index": 19
+                },
+                "20": {
+                  "text": "8 PM \u2013 9 PM",
+                  "index": 20
+                },
+                "21": {
+                  "text": "9 PM \u2013 10 PM",
+                  "index": 21
+                },
+                "22": {
+                  "text": "10 PM \u2013 11 PM",
+                  "index": 22
+                },
+                "23": {
+                  "text": "11 PM \u2013 12 AM",
+                  "index": 23
+                }
+              }
+            }
+          ],
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "purple"
+          },
+          "noValue": "\u2014"
+        },
+        "overrides": []
       }
     },
     {
@@ -1063,7 +1219,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 54
+        "y": 51
       },
       "datasource": "Prometheus",
       "targets": [
@@ -1163,7 +1319,7 @@
         "h": 4,
         "w": 5,
         "x": 0,
-        "y": 63
+        "y": 60
       },
       "datasource": "Prometheus",
       "targets": [
@@ -1208,7 +1364,7 @@
         "h": 4,
         "w": 5,
         "x": 5,
-        "y": 63
+        "y": 60
       },
       "datasource": "Prometheus",
       "targets": [
@@ -1232,7 +1388,7 @@
         "h": 4,
         "w": 5,
         "x": 10,
-        "y": 63
+        "y": 60
       },
       "datasource": "Prometheus",
       "targets": [
@@ -1256,7 +1412,7 @@
         "h": 4,
         "w": 5,
         "x": 15,
-        "y": 63
+        "y": 60
       },
       "datasource": "Prometheus",
       "targets": [
@@ -1300,7 +1456,7 @@
         "h": 4,
         "w": 4,
         "x": 20,
-        "y": 63
+        "y": 60
       },
       "datasource": "Prometheus",
       "targets": [
@@ -1343,7 +1499,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 68
+        "y": 65
       }
     },
     {
@@ -1354,7 +1510,7 @@
         "h": 7,
         "w": 12,
         "x": 0,
-        "y": 69
+        "y": 66
       },
       "datasource": "Prometheus",
       "fieldConfig": {
@@ -1377,7 +1533,7 @@
         "h": 7,
         "w": 12,
         "x": 12,
-        "y": 69
+        "y": 66
       },
       "datasource": "Prometheus",
       "fieldConfig": {

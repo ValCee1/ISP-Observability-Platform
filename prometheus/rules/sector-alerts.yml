@@ -21,6 +21,7 @@ groups:
       - alert: SectorDown
         expr: sector_up == 0
         for: 3m
+        keep_firing_for: 10m
         labels: { severity: critical, category: state, scope: sector, alert_type: sector-down }
         annotations:
           summary: "🔴 Sector AP DOWN"
@@ -29,6 +30,7 @@ groups:
       - alert: SectorNoClients
         expr: (sector:clients == 0) and on(sector) (sector_up == 1)
         for: 10m
+        keep_firing_for: 10m
         labels: { severity: critical, category: state, scope: sector, alert_type: sector-no-clients }
         annotations:
           summary: "🔴 Sector has zero registered clients"
@@ -37,6 +39,7 @@ groups:
       - alert: SectorEther1Down
         expr: sector_interface_state{ifName="ether1"} == 2 and on(sector) (sector_up == 1)
         for: 3m
+        keep_firing_for: 10m
         labels: { severity: critical, category: state, scope: sector, alert_type: ether1-down }
         annotations:
           summary: "🔴 Sector backhaul (ether1) DOWN"

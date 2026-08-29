@@ -215,7 +215,6 @@ modules:
       - 1.3.6.1.2.1.2.2.1.20     # ifOutErrors
       - 1.3.6.1.2.1.25.3.3.1.2   # hrProcessorLoad
       - 1.3.6.1.2.1.25.2.3.1     # hrStorageTable (memory/disk)
-      - 1.3.6.1.2.1.4.22.1.2     # ipNetToMediaPhysAddress (ARP: IP -> MAC), best-effort CPE IP
       - 1.3.6.1.4.1.14988.1.1.1  # MikroTik wireless: rtab + AP table + scalars
     metrics:
       - name: sector_uptime_seconds
@@ -545,20 +544,6 @@ modules:
             oid: 1.3.6.1.4.1.14988.1.1.1.2.1.20
             labelname: cpe_name
             type: DisplayString
-
-      # Best-effort CPE IP from the sector AP's ARP table (IP-MIB
-      # ipNetToMediaPhysAddress). Index is arp_ifindex + cpe_ip; the value
-      # is the MAC, emitted into the label `sector_cpe_ip` - prometheus.yml
-      # copies that into `cpe_mac` so it joins the registration table.
-      # May be empty if the AP is a pure L2 bridge with no L3 neighbours.
-      - name: sector_cpe_ip
-        oid: 1.3.6.1.2.1.4.22.1.2
-        type: PhysAddress48
-        indexes:
-          - labelname: arp_ifindex
-            type: gauge
-          - labelname: cpe_ip
-            type: InetAddressIPv4
 
       # --- AP / sector table (index = wlan ifIndex) ---------------------
       - name: sector_registered_clients

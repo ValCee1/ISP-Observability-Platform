@@ -4,6 +4,7 @@ groups:
       - alert: CoreRouterDown
         expr: up{job="snmp-mikrotik"} == 0
         for: 30s
+        keep_firing_for: 5m
         labels:
           severity: critical
           category: state
@@ -27,6 +28,7 @@ groups:
       - alert: WANInterfaceDown
         expr: ifOperStatus{ifName="chiemerie-ppp"} == 2
         for: 2m
+        keep_firing_for: 10m
         labels:
           severity: critical
           category: state

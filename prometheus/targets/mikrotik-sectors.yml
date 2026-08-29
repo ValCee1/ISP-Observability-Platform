@@ -12,6 +12,9 @@
 #            short and free of spaces.
 #   site   - tower / location grouping label
 #   role   - free-form; "sector-ap" for all of these
+#   pop    - dependency group (see prometheus/topology.yml). If this POP's
+#            upstream link or router goes down, these sectors' alerts are
+#            inhibited as unreachable-downstream rather than sent separately.
 #
 # Capacity thresholds (clients / Mbps before warn + critical) are NOT set
 # here - they live in prometheus/rules/sector-thresholds.yml, which
@@ -24,6 +27,7 @@
     sector: 4B
     site: BASE 5
     role: sector-ap
+    pop: BASE
 
 - targets: ["10.10.13.129"]
   labels:
@@ -31,3 +35,4 @@
     sector: 4E
     site: BASE 4
     role: sector-ap
+    pop: BASE
