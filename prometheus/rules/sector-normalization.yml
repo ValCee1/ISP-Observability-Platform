@@ -88,11 +88,13 @@ groups:
           (sector_cpe_rx_strength_ch0_dbm <= bool sector_cpe_rx_strength_ch1_dbm) * sector_cpe_rx_strength_ch0_dbm
           + (sector_cpe_rx_strength_ch0_dbm > bool sector_cpe_rx_strength_ch1_dbm) * sector_cpe_rx_strength_ch1_dbm
 
-  # Baseline-relative CPE metrics. Split into their own 5m group: the 7d
-  # windows (via 10m subqueries to stay cheap) and 24h counts are far too
-  # heavy to run at the 15s default.
+  # Baseline-relative CPE metrics. Own group at 2m: the 7d windows (via
+  # 10m subqueries) are too heavy for the 15s default. NOTE: interval must
+  # stay <= 2m - at interval: 5m this Prometheus (v3.13) silently produces
+  # no samples for rules that reference another group's recording rule
+  # over a range/subquery. 2m works, 5m does not.
   - name: sector-cpe-derived
-    interval: 5m
+    interval: 2m
     rules:
       - record: sector:cpe:signal_avg7d
         expr: avg_over_time(sector_cpe_signal_dbm[7d:10m])
@@ -138,8 +140,9 @@ groups:
           count by (sector, site) (sector:cpe:alignment_score < 40)
           or (0 * max by (sector, site) (sector_up))
 
-  # 24h rollups for the capacity digest and the peak-hour panels. Evaluated
-  # every 5m (not every 15s) - the [24h:1m] subqueries are expensive.
+  # 24h rollups for the capacity digest and the peak-hour panels. 2m
+  # interval (see the sector-cpe-derived note - 5m breaks cross-group
+  # range refs on this build).
   - name: sector-24h
     interval: 2m
     rules:
@@ -167,11 +170,10 @@ groups:
       - record: sector:minutes_over_cap_clients:24h
         expr: sum_over_time((sector:clients >= bool on(sector) sector:cap_clients_warn)[24h:1m])
 
-  # Hourly averages, kept as a low-resolution series so the dashboard can
-  # show the daily traffic/load rhythm ("busy hours") over the last week
-  # without a heavy subquery at render time. Evaluated every 30m.
+  # Hourly averages for the 7-day busy-hours view. 2m interval (5m
+  # breaks cross-group range refs on this build - see sector-cpe-derived).
   - name: sector-hourly
-    interval: 5m
+    interval: 2m
     rules:
       - record: sector:throughput_mbps:hourly
         expr: avg_over_time(sector:throughput_mbps[1h])
@@ -191,7 +193,7 @@ groups:
   # hours is this sector busiest'. One rule per hour because PromQL
   # cannot derive an hour-of-day label from a timestamp.
   - name: sector-hour-of-day
-    interval: 5m
+    interval: 2m
     rules:
       - record: sector:throughput_mbps:hod
         expr: avg_over_time((sector:throughput_mbps and on() (hour(vector(time() + 3600)) == 0))[7d:15m])

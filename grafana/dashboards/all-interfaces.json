@@ -3,7 +3,7 @@
     "description": "Deep-dive diagnostics for a single MikroTik router: health, storage, and per-interface traffic/status. Arrive here via the Fleet Overview table's row link, or pick a router from the dropdown above. Purpose: \"I'm investigating this router\" - for \"what needs my attention\", see MikroTik Fleet Overview.",
     "uid": "mikrotik-router-overview",
     "schemaVersion": 39,
-    "version": 5,
+    "version": 6,
     "editable": true,
     "timezone": "browser",
     "time": {
@@ -353,6 +353,268 @@
                         }
                     ]
                 }
+            }
+        },
+        {
+            "id": 9,
+            "type": "table",
+            "title": "PPP Subscriber Sessions",
+            "description": "One row per live PPP/PPPoE server session on this router (dynamic \"<pppoe-USER>\" interfaces from the IF-MIB). Session uptime / Last flap / averages are derived - RouterOS SNMP has no /ppp active table. \"Last flap\" is the most recent reconnect edge and is blank when the user hasn't dropped in 2d; a true disconnect timestamp + reason has to be pushed off the router. Avg down/up are mean throughput over the current session's life. Defined in prometheus/rules/ppp-sessions.yml.",
+            "gridPos": {
+                "h": 10,
+                "w": 24,
+                "x": 0,
+                "y": 25
+            },
+            "datasource": "Prometheus",
+            "options": {
+                "sortBy": [
+                    {
+                        "displayName": "Session uptime",
+                        "desc": false
+                    }
+                ],
+                "cellHeight": "sm",
+                "footer": {
+                    "show": true,
+                    "reducer": [
+                        "sum"
+                    ],
+                    "fields": [
+                        "Avg ⬇ (bps)",
+                        "Avg ⬆ (bps)"
+                    ]
+                }
+            },
+            "targets": [
+                {
+                    "expr": "ppp:session:up{instance=\"$instance\"}",
+                    "refId": "A",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "ppp:session:start_timestamp{instance=\"$instance\"} * 1000",
+                    "refId": "B",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "time() - ppp:session:start_timestamp{instance=\"$instance\"}",
+                    "refId": "C",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "ppp:session:last_connect_timestamp{instance=\"$instance\"} * 1000",
+                    "refId": "D",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "ppp:session:avg_rx_bps{instance=\"$instance\"}",
+                    "refId": "E",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "ppp:session:avg_tx_bps{instance=\"$instance\"}",
+                    "refId": "F",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "8 * max without (ifIndex, ifName) (label_replace(rate(ifHCInOctets{job=\"snmp-mikrotik\", instance=\"$instance\", ifName=~\"<(pppoe|l2tp|pptp|sstp|ovpn)-.+>\"}[5m]), \"user\", \"$1\", \"ifName\", \"<[a-z0-9]+-(.+)>\"))",
+                    "refId": "G",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "8 * max without (ifIndex, ifName) (label_replace(rate(ifHCOutOctets{job=\"snmp-mikrotik\", instance=\"$instance\", ifName=~\"<(pppoe|l2tp|pptp|sstp|ovpn)-.+>\"}[5m]), \"user\", \"$1\", \"ifName\", \"<[a-z0-9]+-(.+)>\"))",
+                    "refId": "H",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "ppp:session:reconnects_24h{instance=\"$instance\"}",
+                    "refId": "I",
+                    "instant": true,
+                    "format": "table"
+                }
+            ],
+            "transformations": [
+                {
+                    "id": "merge",
+                    "options": {}
+                },
+                {
+                    "id": "organize",
+                    "options": {
+                        "excludeByName": {
+                            "Time": true,
+                            "__name__": true,
+                            "instance": true,
+                            "job": true,
+                            "auth": true,
+                            "site": true,
+                            "role": true,
+                            "ifName": true,
+                            "ifIndex": true
+                        },
+                        "indexByName": {
+                            "user": 0,
+                            "Value #A": 1,
+                            "Value #C": 2,
+                            "Value #B": 3,
+                            "Value #D": 4,
+                            "Value #E": 5,
+                            "Value #F": 6,
+                            "Value #G": 7,
+                            "Value #H": 8,
+                            "Value #I": 9
+                        },
+                        "renameByName": {
+                            "user": "Client",
+                            "Value #A": "State",
+                            "Value #B": "Connected since",
+                            "Value #C": "Session uptime",
+                            "Value #D": "Last flap (≈ disconnect)",
+                            "Value #E": "Avg ⬇ (bps)",
+                            "Value #F": "Avg ⬆ (bps)",
+                            "Value #G": "Now ⬇ (bps)",
+                            "Value #H": "Now ⬆ (bps)",
+                            "Value #I": "Reconnects 24h"
+                        }
+                    }
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "custom": {
+                        "cellOptions": {
+                            "type": "auto"
+                        },
+                        "align": "auto"
+                    }
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "State"
+                        },
+                        "properties": [
+                            {
+                                "id": "mappings",
+                                "value": [
+                                    {
+                                        "type": "value",
+                                        "options": {
+                                            "1": {
+                                                "text": "UP",
+                                                "color": "green",
+                                                "index": 0
+                                            },
+                                            "0": {
+                                                "text": "DOWN",
+                                                "color": "red",
+                                                "index": 1
+                                            }
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "type": "color-background",
+                                    "mode": "basic"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byRegexp",
+                            "options": "Connected since|Last flap.*"
+                        },
+                        "properties": [
+                            {
+                                "id": "unit",
+                                "value": "dateTimeFromNow"
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Session uptime"
+                        },
+                        "properties": [
+                            {
+                                "id": "unit",
+                                "value": "dtdurations"
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byRegexp",
+                            "options": "(Avg|Now) .* \\(bps\\)"
+                        },
+                        "properties": [
+                            {
+                                "id": "unit",
+                                "value": "bps"
+                            },
+                            {
+                                "id": "decimals",
+                                "value": 1
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Reconnects 24h"
+                        },
+                        "properties": [
+                            {
+                                "id": "decimals",
+                                "value": 0
+                            },
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        {
+                                            "value": null,
+                                            "color": "green"
+                                        },
+                                        {
+                                            "value": 1,
+                                            "color": "yellow"
+                                        },
+                                        {
+                                            "value": 5,
+                                            "color": "red"
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "type": "color-text"
+                                }
+                            }
+                        ]
+                    }
+                ]
             }
         }
     ],

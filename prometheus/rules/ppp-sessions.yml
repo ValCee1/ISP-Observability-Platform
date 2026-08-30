@@ -1,0 +1,126 @@
+# Per-subscriber PPP/PPPoE session view for the core router(s).
+#
+# DATA SOURCE / WHY THESE LOOK THE WAY THEY DO
+# -------------------------------------------------------------------
+# RouterOS SNMP does NOT expose /ppp active (no caller-id, no
+# disconnect-reason, no session uptime OID). What it DOES expose: every
+# live PPP server session shows up in the IF-MIB ifTable as a dynamic
+# interface named "<pppoe-USER>" / "<l2tp-USER>" / "<pptp-USER>" /
+# "<sstp-USER>" / "<ovpn-USER>" (angle brackets included). The generic
+# `mikrotik` SNMP module already walks ifTable + ifXTable, so these
+# sessions are already scraped as ifOperStatus / ifHCInOctets /
+# ifHCOutOctets - no snmp.yml change needed.
+#
+# The router's own PPPoE *client* WAN uplink ("chiemerie-ppp", no angle
+# brackets - see prometheus/targets/mikrotik-routers.yml) is deliberately
+# NOT matched by the regex below: only bracketed dynamic *server*
+# sessions are.
+#
+# KEY DERIVATIONS
+#  - user           account name, parsed out of the ifName.
+#  - ifIndex        dropped: RouterOS assigns a fresh one on every
+#                   reconnect, so "ifIndex changed" == "session bounced".
+#  - start_timestamp    first time the current session (this ifIndex) was
+#                       seen, capped at the 2d subquery window.
+#  - last_connect_timestamp  most recent moment a session for this user
+#                       *appeared* after being absent - i.e. the reconnect
+#                       edge. The disconnect happened seconds before it.
+#                       Series is simply absent if the user has not
+#                       flapped in the last 2d (nothing to show = good).
+#  - avg_*_bps      total octets over the session, divided by real
+#                   session length -> mean throughput while connected.
+#
+# For a true last-disconnect timestamp + reason you have to push it off
+# the router (RouterOS scheduler / on-down script -> pushgateway, or the
+# API); SNMP cannot give it.
+
+groups:
+  - name: ppp-sessions
+    # slow tick - every rule here runs a 1-2d subquery; the table is not
+    # a per-second concern.
+    interval: 1m
+    rules:
+      # 1 = a server session for this user is currently up.
+      - record: ppp:session:up
+        expr: |
+          max without (ifIndex, ifName) (
+            label_replace(
+              (ifOperStatus{job="snmp-mikrotik", ifName=~"<(pppoe|l2tp|pptp|sstp|ovpn)-.+>"} == bool 1),
+              "user", "$1", "ifName", "<[a-z0-9]+-(.+)>"
+            )
+          )
+
+      # Epoch seconds when the current session (this ifIndex) first
+      # appeared. min_over_time keeps ifIndex so a reconnect starts a new
+      # clock; max without(ifIndex) then picks the newest session per user.
+      - record: ppp:session:start_timestamp
+        expr: |
+          max without (ifIndex, ifName) (
+            label_replace(
+              min_over_time(
+                timestamp(
+                  ifHCInOctets{job="snmp-mikrotik", ifName=~"<(pppoe|l2tp|pptp|sstp|ovpn)-.+>"}
+                )[2d:1m]
+              ),
+              "user", "$1", "ifName", "<[a-z0-9]+-(.+)>"
+            )
+          )
+
+      # Epoch seconds of the most recent reconnect edge (session present
+      # now, absent ~2m earlier). Absent series => no flap in 2d.
+      - record: ppp:session:last_connect_timestamp
+        expr: |
+          max without (ifIndex, ifName) (
+            label_replace(
+              max_over_time(
+                (
+                  timestamp(ifHCInOctets{job="snmp-mikrotik", ifName=~"<(pppoe|l2tp|pptp|sstp|ovpn)-.+>"})
+                  unless
+                  timestamp(ifHCInOctets{job="snmp-mikrotik", ifName=~"<(pppoe|l2tp|pptp|sstp|ovpn)-.+>"} offset 3m)
+                )[2d:1m]
+              ),
+              "user", "$1", "ifName", "<[a-z0-9]+-(.+)>"
+            )
+          )
+
+      # Mean download bps over the life of the current session.
+      - record: ppp:session:avg_rx_bps
+        expr: |
+          8 * max without (ifIndex, ifName) (
+            label_replace(
+              increase(ifHCInOctets{job="snmp-mikrotik", ifName=~"<(pppoe|l2tp|pptp|sstp|ovpn)-.+>"}[2d]),
+              "user", "$1", "ifName", "<[a-z0-9]+-(.+)>"
+            )
+          )
+          / clamp_min(time() - ppp:session:start_timestamp, 60)
+
+      # Mean upload bps over the life of the current session.
+      - record: ppp:session:avg_tx_bps
+        expr: |
+          8 * max without (ifIndex, ifName) (
+            label_replace(
+              increase(ifHCOutOctets{job="snmp-mikrotik", ifName=~"<(pppoe|l2tp|pptp|sstp|ovpn)-.+>"}[2d]),
+              "user", "$1", "ifName", "<[a-z0-9]+-(.+)>"
+            )
+          )
+          / clamp_min(time() - ppp:session:start_timestamp, 60)
+
+      # Count of reconnect edges in the last 24h - a session-stability
+      # signal for the table (0 = rock solid). Each edge can linger for a
+      # scrape or two, so read it as "roughly N", not exact.
+      - record: ppp:session:reconnects_24h
+        expr: |
+          sum without (ifIndex, ifName) (
+            label_replace(
+              sum_over_time(
+                (
+                  (
+                    timestamp(ifHCInOctets{job="snmp-mikrotik", ifName=~"<(pppoe|l2tp|pptp|sstp|ovpn)-.+>"})
+                    unless
+                    timestamp(ifHCInOctets{job="snmp-mikrotik", ifName=~"<(pppoe|l2tp|pptp|sstp|ovpn)-.+>"} offset 3m)
+                  ) >bool 0
+                )[24h:1m]
+              ),
+              "user", "$1", "ifName", "<[a-z0-9]+-(.+)>"
+            )
+          )

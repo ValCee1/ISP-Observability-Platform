@@ -3,7 +3,7 @@
   "description": "Per-sector drill-down for one MikroTik PtMP sector. Pick a sector above or arrive from the Sector Fleet Overview. The Clients table lists every CPE with its raw RF figures alongside the computed alignment score, worst-first.",
   "uid": "sector-detail",
   "schemaVersion": 39,
-  "version": 6,
+  "version": 7,
   "editable": true,
   "timezone": "browser",
   "time": {
@@ -410,6 +410,66 @@
       ]
     },
     {
+      "id": 22,
+      "type": "timeseries",
+      "title": "Sector signal trend (avg / worst / best)",
+      "description": "One line each across all CPEs, instead of a line per client. If 'average' trends down, the whole sector is degrading; if only 'worst' drops, it's one CPE (check the table).",
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 20
+      },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dBm"
+        }
+      },
+      "targets": [
+        {
+          "expr": "avg(sector_cpe_signal_dbm{sector=\"$sector\"})",
+          "legendFormat": "average"
+        },
+        {
+          "expr": "min(sector_cpe_signal_dbm{sector=\"$sector\"})",
+          "legendFormat": "worst"
+        },
+        {
+          "expr": "max(sector_cpe_signal_dbm{sector=\"$sector\"})",
+          "legendFormat": "best"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "type": "timeseries",
+      "title": "Sector SNR trend (avg / worst)",
+      "description": "Average and worst SNR across all CPEs. Below ~18 dB the worst client is near the modulation floor.",
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 20
+      },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "avg(sector_cpe_snr_db{sector=\"$sector\"})",
+          "legendFormat": "average"
+        },
+        {
+          "expr": "min(sector_cpe_snr_db{sector=\"$sector\"})",
+          "legendFormat": "worst"
+        }
+      ]
+    },
+    {
       "id": 20,
       "type": "row",
       "title": "PER-CLIENT RF",
@@ -417,7 +477,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 20
+        "y": 27
       }
     },
     {
@@ -426,10 +486,10 @@
       "title": "Clients (worst alignment first)",
       "description": "Every registered CPE, worst alignment first. Signal / SNR / the two receive chains (Rx Ch0-Ch1) and their gap (Chain \u0394) are the alignment + quality picture; Drift 7d is signal vs the CPE's own 7-day average (a degrading link); Tx PHY shows rate downshift; Session is hours since it last (re)registered.",
       "gridPos": {
-        "h": 16,
+        "h": 18,
         "w": 24,
         "x": 0,
-        "y": 21
+        "y": 28
       },
       "datasource": "Prometheus",
       "options": {
@@ -769,66 +829,6 @@
       }
     },
     {
-      "id": 22,
-      "type": "timeseries",
-      "title": "Sector signal (average / worst / best)",
-      "description": "One line each across all CPEs, instead of a line per client. If 'average' trends down, the whole sector is degrading; if only 'worst' drops, it's one CPE (check the table).",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 37
-      },
-      "datasource": "Prometheus",
-      "fieldConfig": {
-        "defaults": {
-          "unit": "dBm"
-        }
-      },
-      "targets": [
-        {
-          "expr": "avg(sector_cpe_signal_dbm{sector=\"$sector\"})",
-          "legendFormat": "average"
-        },
-        {
-          "expr": "min(sector_cpe_signal_dbm{sector=\"$sector\"})",
-          "legendFormat": "worst"
-        },
-        {
-          "expr": "max(sector_cpe_signal_dbm{sector=\"$sector\"})",
-          "legendFormat": "best"
-        }
-      ]
-    },
-    {
-      "id": 23,
-      "type": "timeseries",
-      "title": "Sector SNR (average / worst)",
-      "description": "Average and worst SNR across all CPEs. Below ~18 dB the worst client is near the modulation floor.",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 37
-      },
-      "datasource": "Prometheus",
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none"
-        }
-      },
-      "targets": [
-        {
-          "expr": "avg(sector_cpe_snr_db{sector=\"$sector\"})",
-          "legendFormat": "average"
-        },
-        {
-          "expr": "min(sector_cpe_snr_db{sector=\"$sector\"})",
-          "legendFormat": "worst"
-        }
-      ]
-    },
-    {
       "id": 30,
       "type": "row",
       "title": "TRAFFIC PATTERN & BUDGET",
@@ -836,7 +836,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 45
+        "y": 46
       }
     },
     {
@@ -897,7 +897,7 @@
         "h": 5,
         "w": 12,
         "x": 0,
-        "y": 46
+        "y": 47
       },
       "datasource": "Prometheus",
       "targets": [
@@ -1058,7 +1058,7 @@
         "h": 5,
         "w": 12,
         "x": 12,
-        "y": 46
+        "y": 47
       },
       "datasource": "Prometheus",
       "targets": [
@@ -1219,7 +1219,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 51
+        "y": 52
       },
       "datasource": "Prometheus",
       "targets": [
@@ -1319,7 +1319,7 @@
         "h": 4,
         "w": 5,
         "x": 0,
-        "y": 60
+        "y": 61
       },
       "datasource": "Prometheus",
       "targets": [
@@ -1364,7 +1364,7 @@
         "h": 4,
         "w": 5,
         "x": 5,
-        "y": 60
+        "y": 61
       },
       "datasource": "Prometheus",
       "targets": [
@@ -1388,7 +1388,7 @@
         "h": 4,
         "w": 5,
         "x": 10,
-        "y": 60
+        "y": 61
       },
       "datasource": "Prometheus",
       "targets": [
@@ -1412,7 +1412,7 @@
         "h": 4,
         "w": 5,
         "x": 15,
-        "y": 60
+        "y": 61
       },
       "datasource": "Prometheus",
       "targets": [
@@ -1456,7 +1456,7 @@
         "h": 4,
         "w": 4,
         "x": 20,
-        "y": 60
+        "y": 61
       },
       "datasource": "Prometheus",
       "targets": [
@@ -1499,7 +1499,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 65
+        "y": 66
       }
     },
     {
@@ -1510,7 +1510,7 @@
         "h": 7,
         "w": 12,
         "x": 0,
-        "y": 66
+        "y": 67
       },
       "datasource": "Prometheus",
       "fieldConfig": {
@@ -1533,7 +1533,7 @@
         "h": 7,
         "w": 12,
         "x": 12,
-        "y": 66
+        "y": 67
       },
       "datasource": "Prometheus",
       "fieldConfig": {
