@@ -1,0 +1,17 @@
+# Build context for the isp-observability (Prometheus) image.
+# Only prometheus/** is COPYed in — keep everything else out of the context.
+*
+
+!prometheus/prometheus.yml
+!prometheus/rules/
+!prometheus/topology.yml
+!prometheus/targets/
+
+# Never ship these even if a rule above would match
+**/.DS_Store
+**/.git
+secrets/
+*.env
+prometheus_data/
+grafana_data/
+alertmanager_data/

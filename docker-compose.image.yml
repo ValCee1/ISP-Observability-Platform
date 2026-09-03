@@ -1,0 +1,26 @@
+# Override that swaps the stock prom/prometheus container for the
+# version-pinned isp-observability image (config baked in, no repo mounts).
+#
+# Everything else in docker-compose.yml is unchanged.
+#
+# Run the stack from the image:
+#   docker compose -f docker-compose.yml -f docker-compose.image.yml up -d
+#
+# Build the image locally instead of pulling:
+#   docker compose -f docker-compose.yml -f docker-compose.image.yml build prometheus
+#
+# Point at a different tag / registry:
+#   ISP_OBS_IMAGE=youruser/isp-observability:v1.1 docker compose \
+#     -f docker-compose.yml -f docker-compose.image.yml up -d
+#
+# Requires Docker Compose >= 2.24 for the `!reset` list directive.
+services:
+  prometheus:
+    image: ${ISP_OBS_IMAGE:-valcee1/isp-observability:v1.0}
+    build:
+      context: .
+      args:
+        PROMETHEUS_VERSION: v3.13.2
+    volumes:
+      - !reset null            # drop the read-only config bind mounts
+      - prometheus_data:/prometheus

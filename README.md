@@ -10,6 +10,17 @@ Links          --ICMP--> blackbox-exporter -> Prometheus -> Grafana
                                              -> Alertmanager -> Telegram
 ```
 
+## Documentation
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — components, container/network
+  layout, monitored topology, metric-normalization and alert pipelines, with
+  diagrams.
+- [docs/DOCKER.md](docs/DOCKER.md) — building and publishing the
+  `isp-observability` Prometheus image (repo config baked in) to a private
+  registry.
+- [docs/failure-drills.md](docs/failure-drills.md) — end-to-end failure runbook
+  (detect → alert → explain → recover → no storm).
+
 ## Running the stack
 
 1. Fill in the two secret files (both gitignored, not committed):
@@ -26,6 +37,13 @@ Links          --ICMP--> blackbox-exporter -> Prometheus -> Grafana
 - Alertmanager: http://localhost:9093
 - SNMP exporter: http://localhost:9116/metrics
 - Blackbox exporter: http://localhost:9115/metrics
+
+To run Prometheus from the version-pinned image (config baked in) instead of the
+local bind mounts, add the override file — see [docs/DOCKER.md](docs/DOCKER.md):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.image.yml up -d
+```
 
 ## What's monitored
 
