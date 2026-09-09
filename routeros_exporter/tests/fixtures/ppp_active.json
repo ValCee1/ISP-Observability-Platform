@@ -1,0 +1,6 @@
+[
+  {"name": "adebayo-01", "service": "pppoe", "caller-id": "48:8F:5A:2B:1C:0D", "address": "100.64.12.7", "uptime": "6d4h11m2s", "encoding": "", "session-id": "0x81"},
+  {"name": "chinedu-house", "service": "pppoe", "caller-id": "e4-8d-8c-11-22-33", "address": "100.64.12.9", "uptime": "1h3m", "session-id": "0x82"},
+  {"name": "okoro-shop", "service": "pppoe", "caller-id": "AABBCCDDEEFF", "address": "100.64.12.14", "uptime": "22s", "session-id": "0x83"},
+  {"name": "site-vpn-base", "service": "l2tp", "caller-id": "41.58.10.2", "address": "10.10.6.2", "uptime": "9w2d"}
+]

@@ -1,0 +1,64 @@
+# RouterOS config backup + drift detection (routeros_exporter backup module).
+#
+# The exporter pulls /export from every router each cycle, commits it to a
+# git repo on its own volume when it changes, and exposes:
+#   routeros_config_changed{router}               1 for the cycle a diff landed
+#   routeros_config_last_backup_timestamp{router} unix seconds
+#   routeros_config_last_change_timestamp{router}
+#   routeros_config_export_lines{router}
+#   routeros_config_backup_success{router}        1/0
+#
+# PRTG has nothing like this: an unexpected 02:14 config change is often the
+# first (only) sign of a fat-finger outage or unauthorized access.
+
+groups:
+  - name: config-backup
+    rules:
+      - alert: RouterConfigChanged
+        # Fires the cycle a diff is committed; keep_firing_for holds it long
+        # enough to be seen / grouped, then it self-resolves.
+        expr: routeros_config_changed == 1
+        for: 0m
+        keep_firing_for: 20m
+        labels: { severity: warning, category: health, scope: router, alert_type: config-changed }
+        annotations:
+          summary: "🟠 Config changed on {{ $labels.router }}"
+          description: >-
+            {{ $labels.router }}'s /export changed (now
+            {{ with query (printf "routeros_config_export_lines{router='%s'}" $labels.router) }}{{ . | first | value | printf "%.0f" }}{{ end }}
+            lines). If this was not a planned change, review the diff:
+            `git -C <backup-repo> log -p -- {{ $labels.router }}.rsc`.
+
+      - alert: RouterBackupStale
+        expr: |
+          (time() - routeros_config_last_backup_timestamp) > 90000
+        for: 30m
+        labels: { severity: critical, category: state, scope: router, alert_type: backup-stale }
+        annotations:
+          summary: "🔴 Config backup stale for {{ $labels.router }}"
+          description: >-
+            No successful config export from {{ $labels.router }} in over
+            25h - the API user, /ip service access-list, or connectivity is
+            broken. Restores from this router are now out of date.
+
+      - alert: RouterBackupFailing
+        expr: routeros_config_backup_success == 0
+        for: 1h
+        labels: { severity: warning, category: health, scope: router, alert_type: backup-failing }
+        annotations:
+          summary: "🟠 Config backup failing for {{ $labels.router }}"
+          description: >-
+            The last {{ $labels.router }} backup cycle returned an error
+            (git commit or /export). Check routeros-exporter logs.
+
+      - alert: RouterOSVersionDrift
+        # More than one distinct RouterOS version across the polled fleet.
+        expr: count(count by (version) (routeros_system_info)) > 1
+        for: 1h
+        labels: { severity: info, category: health, scope: fleet, alert_type: version-drift }
+        annotations:
+          summary: "🟡 RouterOS versions differ across the fleet"
+          description: >-
+            {{ $value | printf "%.0f" }} distinct RouterOS versions are in
+            service. Version skew changes /export syntax and feature
+            behaviour - plan the fleet onto one release.

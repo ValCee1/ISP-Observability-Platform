@@ -1,0 +1,42 @@
+# routeros-exporter configuration (non-secret).
+#
+# Mounted read-only at /etc/routeros-exporter/config.yml (see
+# docker-compose.yml). Passwords are NOT here - they go in
+# secrets/routeros_api_credentials.json (gitignored), keyed by router name.
+#
+# Copy to config.yml and edit. `pop` / `site` / `role` mirror the labels the
+# SNMP jobs already attach in prometheus/targets/*.yml, so the API series
+# line up with them (and so `pop` finally activates the dependency inhibit
+# rules in alertmanager/alertmanager.yml).
+
+options:
+  listen_port: 9436
+  poll_interval_seconds: 30          # PPP + system metrics
+  api_timeout_seconds: 10
+  backup_interval_seconds: 3600       # config export + git commit
+  backup_repo_path: /var/lib/routeros-exporter/backups
+  topology_interval_seconds: 900      # route/neighbour discovery
+  topology_output_path: /var/lib/routeros-exporter/topology.generated.yml
+  log_lookback: 200                   # /log lines scanned for ppp events
+
+routers:
+  - name: pop1-home            # -> `router` label; keep stable
+    host: 192.168.10.1
+    port: 8728                  # 8729 + use_tls: true for api-ssl
+    site: HOME
+    pop: HOME
+    role: core-router
+
+  # Example downstream POP (no polled router yet in the lab):
+  # - name: pop2-base
+  #   host: 10.10.20.1
+  #   site: BASE
+  #   pop: BASE
+  #   role: core-router
+
+  - name: room-office-repeater
+    host: 192.168.10.19
+    site: room-office
+    role: Repeater
+    collect_ppp: false         # no PPPoE server here
+    collect_topology: false

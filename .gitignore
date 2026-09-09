@@ -3,3 +3,13 @@ secrets/
 prometheus_data/
 grafana_data/
 .DS_Store
+
+# routeros-exporter: local venv + the filled-in (non-example) config
+routeros_exporter/.venv/
+routeros_exporter/config.yml
+routeros_exporter_data/
+
+# python
+__pycache__/
+*.pyc
+.pytest_cache/

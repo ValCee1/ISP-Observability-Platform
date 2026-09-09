@@ -1,0 +1,146 @@
+# Subscriber-level alerting, from the RouterOS API pipeline
+# (routeros_exporter). Every alert carries the repo's standard routing
+# labels: severity / category (state|health|capacity) / scope=subscriber /
+# alert_type (kebab-case).
+#
+# Routing (alertmanager/alertmanager.yml):
+#   category state/health -> real-time, grouped by `router`
+#   category capacity     -> batched into the 08:00 Africa/Lagos digest
+# Inhibition: SectorDown / LinkDown / POPIsolated suppress these as
+# downstream noise (a shared cause is one incident, not N).
+
+groups:
+  # -------------------------------------------------------------------
+  # A. MASS OUTAGE - many sessions drop together in a few minutes. This
+  #    is the headline "one incident not 40 tickets" signal.
+  # -------------------------------------------------------------------
+  - name: subscriber-mass-outage
+    rules:
+      - alert: SubscriberMassOutagePOP
+        # >=30% of a POP's sessions gone vs 5 minutes ago, and at least 3
+        # in absolute terms (so a 2-of-4 dip on a tiny POP doesn't page).
+        expr: |
+          (
+            (subscriber:active:by_pop{pop!=""} offset 5m) - subscriber:active:by_pop{pop!=""} >= 3
+          )
+          and (
+            subscriber:active:by_pop{pop!=""}
+              <= 0.7 * (subscriber:active:by_pop{pop!=""} offset 5m)
+          )
+          and (
+            (subscriber:active:by_pop{pop!=""} offset 5m) > 0
+          )
+        for: 3m
+        keep_firing_for: 10m
+        # scope=pop so this routes + groups with POPIsolated (by `pop`), not
+        # with the per-router subscriber alerts.
+        labels: { severity: critical, category: state, scope: pop, alert_type: mass-outage-pop }
+        annotations:
+          summary: "🔴 Subscriber mass outage at POP {{ $labels.pop }}"
+          description: >-
+            POP {{ $labels.pop }} dropped from
+            {{ with query (printf "subscriber:active:by_pop{pop='%s'} offset 5m" $labels.pop) }}{{ . | first | value | printf "%.0f" }}{{ end }}
+            to {{ $value | printf "%.0f" }} active PPPoE sessions in ~5 min -
+            look for a backhaul, power, or sector RF event before working
+            individual subscribers.
+
+      - alert: SubscriberMassOutageRouter
+        # Same test at router granularity - catches a POP that has no `pop`
+        # label yet, and a single-router event inside a multi-router POP.
+        expr: |
+          (
+            (subscriber:active:by_router offset 5m) - subscriber:active:by_router >= 3
+          )
+          and (
+            subscriber:active:by_router
+              <= 0.7 * (subscriber:active:by_router offset 5m)
+          )
+          and (
+            (subscriber:active:by_router offset 5m) > 0
+          )
+        for: 3m
+        keep_firing_for: 10m
+        labels: { severity: critical, category: state, scope: subscriber, alert_type: mass-outage-router }
+        annotations:
+          summary: "🔴 Subscriber mass outage on {{ $labels.router }}"
+          description: >-
+            {{ $labels.router }} dropped from
+            {{ with query (printf "subscriber:active:by_router{router='%s'} offset 5m" $labels.router) }}{{ . | first | value | printf "%.0f" }}{{ end }}
+            to {{ $value | printf "%.0f" }} active sessions in ~5 min.
+
+  # -------------------------------------------------------------------
+  # B. AUTH / STABILITY
+  # -------------------------------------------------------------------
+  - name: subscriber-stability
+    rules:
+      - alert: PPPoEAuthFailureSpike
+        expr: subscriber:auth_failures:15m > 10
+        for: 5m
+        labels: { severity: warning, category: health, scope: subscriber, alert_type: auth-failure-spike }
+        annotations:
+          summary: "🟠 PPPoE auth-failure spike on {{ $labels.router }}"
+          description: >-
+            {{ $value | printf "%.0f" }} PPPoE authentication failures on
+            {{ $labels.router }} in 15 min - a wrong password after a plan
+            change / reset, an account being shared across two sites, or a
+            misprovisioned secret.
+
+      - alert: SubscriberChronicFlapping
+        # >=6 reconnects/24h, sustained for 2h of evaluation - a failing
+        # radio, marginal RF, or bad client-side cabling, not a one-off.
+        expr: subscriber:reconnects:24h >= 6
+        for: 2h
+        labels: { severity: warning, category: health, scope: subscriber, alert_type: chronic-flapping }
+        annotations:
+          summary: "🟠 Subscriber {{ $labels.user }} flapping"
+          description: >-
+            {{ $labels.user }} on {{ $labels.router }} has reconnected
+            {{ $value | printf "%.0f" }} times in 24h - schedule a check
+            before it becomes a no-service call.
+
+      - alert: RouterOSAPICollectorDown
+        # If the API pipeline itself breaks, every subscriber signal above
+        # goes blind - surface that explicitly rather than as silence.
+        expr: routeros_scrape_success == 0
+        for: 10m
+        keep_firing_for: 5m
+        labels: { severity: warning, category: state, scope: subscriber, alert_type: api-collector-down }
+        annotations:
+          summary: "🟠 RouterOS API collector cannot reach {{ $labels.router }}"
+          description: >-
+            routeros-exporter has failed to poll {{ $labels.router }} for
+            10 min - subscriber session / config-backup / topology data for
+            this router is stale. SNMP-derived signals are unaffected.
+
+  # -------------------------------------------------------------------
+  # C. CAPACITY / HOUSEKEEPING - batched into the 08:00 digest.
+  # -------------------------------------------------------------------
+  - name: subscriber-housekeeping
+    rules:
+      - alert: ProvisionedButOffline
+        expr: subscriber:provisioned_offline:by_router >= 5
+        for: 1h
+        labels: { severity: warning, category: capacity, scope: subscriber, alert_type: provisioned-offline }
+        annotations:
+          summary: "🟡 {{ $labels.router }}: provisioned accounts offline"
+          description: >-
+            {{ $value | printf "%.0f" }} enabled PPPoE secrets on
+            {{ $labels.router }} have no active session (1h+). Expected some
+            churn; a large or growing number is dead CPE / silent
+            cancellations worth reconciling against billing.
+
+      - alert: SubscriberConnectedNoTraffic
+        # SNMP side (ppp:session:*): session is up but has moved almost no
+        # data over its life - dead hardware behind a live PPPoE session.
+        expr: |
+          ppp:session:up == 1
+          and ppp:session:avg_rx_bps < 2000
+          and (time() - ppp:session:start_timestamp) > 86400
+        for: 2h
+        labels: { severity: warning, category: capacity, scope: subscriber, alert_type: connected-no-traffic }
+        annotations:
+          summary: "🟡 Subscriber {{ $labels.user }} connected but idle"
+          description: >-
+            {{ $labels.user }} has held a PPPoE session for 24h+ while
+            averaging under 2 kbps down - likely dead CPE / router left
+            powered with nothing behind it.

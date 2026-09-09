@@ -1,0 +1,74 @@
+{
+    "title": "Config Audit",
+    "description": "RouterOS config backup + drift (routeros-exporter backup module). Last-backup age, recent changes, RouterOS versions across the fleet. The text exports are committed to a git repo on the routeros_exporter_data volume - `git -C <repo> log -p -- <router>.rsc` for the diff.",
+    "uid": "config-audit",
+    "schemaVersion": 39,
+    "version": 1,
+    "editable": true,
+    "timezone": "browser",
+    "time": { "from": "now-7d", "to": "now" },
+    "refresh": "1m",
+    "panels": [
+        { "id": 1, "type": "row", "title": "BACKUP HEALTH", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 } },
+        {
+            "id": 2, "type": "table", "title": "Backup status by router",
+            "description": "Age of the last successful /export. RouterBackupStale fires past 25h; RouterBackupFailing on a failing cycle.",
+            "gridPos": { "h": 8, "w": 24, "x": 0, "y": 1 },
+            "datasource": "Prometheus",
+            "options": { "sortBy": [ { "displayName": "last backup age", "desc": true } ] },
+            "targets": [
+                { "expr": "time() - routeros_config_last_backup_timestamp", "refId": "A", "instant": true, "format": "table" },
+                { "expr": "routeros_config_backup_success", "refId": "B", "instant": true, "format": "table" },
+                { "expr": "routeros_config_export_lines", "refId": "C", "instant": true, "format": "table" }
+            ],
+            "transformations": [
+                { "id": "merge", "options": {} },
+                { "id": "filterFieldsByName", "options": { "include": { "pattern": "^(router|Value #A|Value #B|Value #C)$" } } },
+                { "id": "organize", "options": { "renameByName": { "Value #A": "last backup age", "Value #B": "last cycle ok", "Value #C": "export lines" } } }
+            ],
+            "fieldConfig": { "defaults": {}, "overrides": [ { "matcher": { "id": "byName", "options": "last backup age" }, "properties": [ { "id": "unit", "value": "s" }, { "id": "custom.cellOptions", "value": { "type": "color-background" } }, { "id": "thresholds", "value": { "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 3600 }, { "color": "red", "value": 90000 } ] } } ] } ] }
+        },
+        {
+            "id": 3, "type": "timeseries", "title": "Config changes",
+            "description": "A spike is a committed /export diff. RouterConfigChanged fires on each. Investigate any change you didn't plan.",
+            "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
+            "datasource": "Prometheus",
+            "fieldConfig": { "defaults": { "custom": { "drawStyle": "bars", "fillOpacity": 60, "pointSize": 6 } } },
+            "targets": [ { "expr": "routeros_config_changed", "legendFormat": "{{router}}", "refId": "A" } ]
+        },
+        {
+            "id": 4, "type": "table", "title": "Most recent config change per router",
+            "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
+            "datasource": "Prometheus",
+            "targets": [ { "expr": "routeros_config_last_change_timestamp * 1000", "refId": "A", "instant": true, "format": "table" } ],
+            "transformations": [
+                { "id": "filterFieldsByName", "options": { "include": { "pattern": "^(router|Value)$" } } },
+                { "id": "organize", "options": { "renameByName": { "Value": "last change" } } }
+            ],
+            "fieldConfig": { "defaults": {}, "overrides": [ { "matcher": { "id": "byName", "options": "last change" }, "properties": [ { "id": "unit", "value": "dateTimeAsIso" } ] } ] }
+        },
+        { "id": 10, "type": "row", "title": "FLEET VERSIONS", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 } },
+        {
+            "id": 11, "type": "stat", "title": "Distinct RouterOS versions",
+            "description": "RouterOSVersionDrift (info) fires above 1.",
+            "gridPos": { "h": 4, "w": 6, "x": 0, "y": 18 },
+            "datasource": "Prometheus",
+            "fieldConfig": { "defaults": { "thresholds": { "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 2 } ] }, "color": { "mode": "thresholds" } } },
+            "targets": [ { "expr": "count(count by (version) (routeros_system_info))", "refId": "A" } ]
+        },
+        {
+            "id": 12, "type": "table", "title": "RouterOS version by router",
+            "gridPos": { "h": 6, "w": 18, "x": 6, "y": 18 },
+            "datasource": "Prometheus",
+            "targets": [
+                { "expr": "routeros_system_info", "refId": "A", "instant": true, "format": "table" },
+                { "expr": "routeros_system_uptime_seconds", "refId": "B", "instant": true, "format": "table" }
+            ],
+            "transformations": [
+                { "id": "merge", "options": {} },
+                { "id": "filterFieldsByName", "options": { "include": { "pattern": "^(router|version|board|architecture|Value #B)$" } } },
+                { "id": "organize", "options": { "renameByName": { "Value #B": "uptime (s)" } } }
+            ]
+        }
+    ]
+}

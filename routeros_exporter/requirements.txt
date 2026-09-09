@@ -1,0 +1,5 @@
+# Pinned so the image is reproducible (mirrors the version-pinning of every
+# other component in this repo). Bump deliberately, never float.
+librouteros==3.4.1        # pure-python RouterOS API client (MIT)
+prometheus-client==0.21.1 # metrics registry + WSGI exposition
+PyYAML==6.0.2             # config file + generated topology.yml

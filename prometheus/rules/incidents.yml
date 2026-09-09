@@ -1,7 +1,11 @@
 # Turns the raw ALERTS stream into an "incidents" view for the NOC
 # Overview "Active Incidents" panel: one row per (object, alert), with a
-# unified `object` label (link_id / sector / router instance) and the
-# firing duration as the value.
+# unified `object` label (link_id / sector / router instance / router name /
+# pop) and the firing duration as the value.
+#
+# `object` precedence (most specific wins, applied last): pop -> router
+# (RouterOS API alerts) -> instance -> sector -> link_id. So a subscriber
+# mass-outage row is keyed by its router, a POPIsolated row by its pop.
 #
 # This does NOT re-implement every alertmanager.yml inhibit rule - the
 # board deliberately still shows a link's packet-loss / error rows while
@@ -16,9 +20,11 @@ groups:
       - record: incident:raw_seconds
         expr: |
           max by (severity, object, alertname, alert_type, scope, cpe_name) (
-            label_replace(label_replace(label_replace(
+            label_replace(label_replace(label_replace(label_replace(label_replace(
               (time() - ALERTS_FOR_STATE) and ignoring(alertstate) ALERTS{alertstate="firing"},
+              "object", "$1", "pop", "(.+)"),
               "object", "$1", "instance", "(.+)"),
+              "object", "$1", "router", "(.+)"),
               "object", "$1", "sector", "(.+)"),
               "object", "$1", "link_id", "(.+)")
           )

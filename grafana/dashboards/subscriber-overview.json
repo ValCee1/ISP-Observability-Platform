@@ -1,0 +1,118 @@
+{
+    "title": "Subscriber Overview",
+    "description": "Per-subscriber PPP/PPPoE session intelligence from the RouterOS API (routeros-exporter). Active vs provisioned, mass-outage timeline, top flappers, auth failures, disconnect reasons. SNMP can't produce any of this - see prometheus/rules/subscriber-sessions.yml.",
+    "uid": "subscriber-overview",
+    "schemaVersion": 39,
+    "version": 1,
+    "editable": true,
+    "timezone": "browser",
+    "time": { "from": "now-6h", "to": "now" },
+    "refresh": "1m",
+    "templating": {
+        "list": [
+            {
+                "name": "pop",
+                "type": "query",
+                "datasource": "Prometheus",
+                "query": "label_values(routeros_router_info, pop)",
+                "includeAll": true,
+                "multi": true,
+                "current": { "text": "All", "value": "$__all" }
+            }
+        ]
+    },
+    "panels": [
+        { "id": 1, "type": "row", "title": "FLEET", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 } },
+        {
+            "id": 2, "type": "stat", "title": "Active sessions",
+            "description": "Sum of active PPP/PPPoE sessions across the polled routers.",
+            "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+            "datasource": "Prometheus",
+            "targets": [ { "expr": "sum(routeros_ppp_active_total)", "refId": "A" } ]
+        },
+        {
+            "id": 3, "type": "stat", "title": "Provisioned (enabled)",
+            "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+            "datasource": "Prometheus",
+            "targets": [ { "expr": "sum(routeros_ppp_secret_total)", "refId": "A" } ]
+        },
+        {
+            "id": 4, "type": "stat", "title": "Provisioned but offline",
+            "description": "Enabled secrets with no active session (1h+ is alertable, see ProvisionedButOffline).",
+            "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
+            "datasource": "Prometheus",
+            "fieldConfig": { "defaults": { "thresholds": { "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 5 }, { "color": "red", "value": 20 } ] }, "color": { "mode": "thresholds" } } },
+            "targets": [ { "expr": "sum(subscriber:provisioned_offline:by_router)", "refId": "A" } ]
+        },
+        {
+            "id": 5, "type": "stat", "title": "Auth failures (15m)",
+            "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
+            "datasource": "Prometheus",
+            "fieldConfig": { "defaults": { "thresholds": { "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 10 } ] }, "color": { "mode": "thresholds" } } },
+            "targets": [ { "expr": "sum(subscriber:auth_failures:15m)", "refId": "A" } ]
+        },
+        {
+            "id": 6, "type": "stat", "title": "POPs isolated",
+            "description": "POPs with every backhaul down (POPIsolated).",
+            "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
+            "datasource": "Prometheus",
+            "fieldConfig": { "defaults": { "thresholds": { "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] }, "color": { "mode": "thresholds" } } },
+            "targets": [ { "expr": "count(topology:pop:isolated) or vector(0)", "refId": "A" } ]
+        },
+        {
+            "id": 7, "type": "stat", "title": "API collector reachable",
+            "description": "routeros_scrape_success across routers.",
+            "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
+            "datasource": "Prometheus",
+            "targets": [ { "expr": "sum(routeros_scrape_success) / count(routeros_scrape_success)", "refId": "A" } ],
+            "fieldConfig": { "defaults": { "unit": "percentunit" } }
+        },
+        {
+            "id": 10, "type": "timeseries", "title": "Active sessions by POP  (mass-outage timeline)",
+            "description": "A sharp cliff here is a backhaul / power / sector event - SubscriberMassOutagePOP fires on a >=30% drop in 5 min.",
+            "gridPos": { "h": 9, "w": 24, "x": 0, "y": 5 },
+            "datasource": "Prometheus",
+            "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10, "showPoints": "never" } } },
+            "targets": [ { "expr": "subscriber:active:by_pop{pop=~\"$pop\"}", "legendFormat": "{{pop}}", "refId": "A" } ]
+        },
+        { "id": 19, "type": "row", "title": "SUBSCRIBERS", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 } },
+        {
+            "id": 20, "type": "table", "title": "Top flapping subscribers (24h reconnects)",
+            "description": "SubscriberChronicFlapping fires at >=6 sustained for 2h.",
+            "gridPos": { "h": 9, "w": 12, "x": 0, "y": 15 },
+            "datasource": "Prometheus",
+            "options": { "sortBy": [ { "displayName": "Value", "desc": true } ] },
+            "targets": [ { "expr": "topk(20, subscriber:reconnects:24h > 0)", "refId": "A", "instant": true, "format": "table" } ],
+            "transformations": [
+                { "id": "filterFieldsByName", "options": { "include": { "pattern": "^(router|user|Value)$" } } },
+                { "id": "organize", "options": { "renameByName": { "Value": "reconnects/24h" } } }
+            ]
+        },
+        {
+            "id": 21, "type": "table", "title": "Disconnect reasons (1h, by router)",
+            "gridPos": { "h": 9, "w": 12, "x": 12, "y": 15 },
+            "datasource": "Prometheus",
+            "options": { "sortBy": [ { "displayName": "Value", "desc": true } ] },
+            "targets": [ { "expr": "subscriber:disconnects_by_reason:1h > 0", "refId": "A", "instant": true, "format": "table" } ],
+            "transformations": [
+                { "id": "filterFieldsByName", "options": { "include": { "pattern": "^(router|reason|Value)$" } } },
+                { "id": "organize", "options": { "renameByName": { "Value": "count/1h" } } }
+            ]
+        },
+        {
+            "id": 22, "type": "table", "title": "Active sessions (detail)",
+            "description": "One row per live session. `sector` is best-effort (caller-id vs registration MAC) - blank where they don't match.",
+            "gridPos": { "h": 10, "w": 24, "x": 0, "y": 24 },
+            "datasource": "Prometheus",
+            "targets": [
+                { "expr": "routeros_ppp_active_uptime_seconds", "refId": "A", "instant": true, "format": "table" },
+                { "expr": "routeros_ppp_active_caller_id_info", "refId": "B", "instant": true, "format": "table" }
+            ],
+            "transformations": [
+                { "id": "merge", "options": {} },
+                { "id": "filterFieldsByName", "options": { "include": { "pattern": "^(router|user|service|caller_id|address|Value #A)$" } } },
+                { "id": "organize", "options": { "renameByName": { "Value #A": "uptime (s)" } } }
+            ]
+        }
+    ]
+}

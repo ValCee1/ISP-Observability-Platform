@@ -94,6 +94,50 @@ route:
     # Everything else (router-level alerts from mikrotik-alerts.yml - no
     # link_id) groups by instance instead, so CoreRouterDown + HighCPU +
     # HighMemory for the same router land in one message too.
+    # POP-level rollup (topology-rollup.yml): POPIsolated carries scope=pop.
+    # Group by pop so it's one message per isolated POP. MUST precede the
+    # subscriber/instance routes.
+    - match:
+        scope: pop
+      group_by: ["pop"]
+      group_wait: 45s
+      group_interval: 10m
+      repeat_interval: 2h
+
+    # Subscriber alerts from the RouterOS API pipeline (subscriber-alerts.yml)
+    # carry scope=subscriber + a `router` label (some also `pop`). Group by
+    # router so a mass-outage + auth-spike + flapping burst on one router is
+    # one message. Capacity-tier subscriber alerts (ProvisionedButOffline,
+    # SubscriberConnectedNoTraffic) are already caught by the `category:
+    # capacity` route at the top and digested at 08:00.
+    - match:
+        scope: subscriber
+      group_by: ["router"]
+      group_wait: 45s
+      group_interval: 10m
+      routes:
+        - match:
+            severity: critical
+          repeat_interval: 2h
+        - match:
+            severity: warning
+          repeat_interval: 12h
+
+    # Router-scope config-backup alerts (config-backup.yml) carry scope=router
+    # + a `router` label but no `instance`. Group by router.
+    - match:
+        scope: router
+      group_by: ["router"]
+      group_wait: 45s
+      group_interval: 10m
+      routes:
+        - match:
+            severity: critical
+          repeat_interval: 2h
+        - match:
+            severity: warning
+          repeat_interval: 12h
+
     - match_re:
         instance: ".+"
       group_by: ["instance"]
@@ -135,6 +179,8 @@ receivers:
           {{- $obj := "" }}{{ if .CommonLabels.link_id }}{{ $obj = printf "Link %s" .CommonLabels.link_id }}
           {{- else if .CommonLabels.sector }}{{ $obj = printf "Sector %s" .CommonLabels.sector }}
           {{- else if .CommonLabels.instance }}{{ $obj = printf "Router %s" .CommonLabels.instance }}
+          {{- else if .CommonLabels.router }}{{ $obj = printf "Router %s" .CommonLabels.router }}
+          {{- else if .CommonLabels.pop }}{{ $obj = printf "POP %s" .CommonLabels.pop }}
           {{- else }}{{ $obj = .CommonLabels.alertname }}{{ end }}
           {{- if eq .Status "resolved" }}✅ <b>{{ $obj }} — RESOLVED</b>
           {{- else if eq .CommonLabels.severity "critical" }}🔴 <b>{{ $obj }} — CRITICAL</b> ({{ .Alerts.Firing | len }} alert{{ if gt (len .Alerts.Firing) 1 }}s{{ end }})
@@ -224,17 +270,37 @@ inhibit_rules:
     source_match_re:
       pop: ".+"
     target_match_re:
-      scope: "sector|router"
+      scope: "sector|router|subscriber"
     equal: ["pop"]
 
-  # Same for a POP's router being down (targets sectors only - a router
-  # can't be "downstream" of itself).
+  # Same for a POP's router being down (targets sectors + subscribers - a
+  # router can't be "downstream" of itself).
   - source_match:
       alertname: CoreRouterDown
     source_match_re:
       pop: ".+"
+    target_match_re:
+      scope: "sector|subscriber"
+    equal: ["pop"]
+
+  # POPIsolated (topology-rollup.yml) is the single root-cause incident when
+  # every backhaul into a POP is down. Everything else about that POP - its
+  # sectors, its backhaul link health/degrading alerts, its subscriber
+  # mass-outage / flapping / auth alerts, its config-backup staleness - is
+  # downstream of it. `equal: [pop]` scopes the suppression to that POP.
+  - source_match:
+      alertname: POPIsolated
+    target_match_re:
+      scope: "sector|subscriber|link|router"
+    equal: ["pop"]
+
+  # A POP-wide subscriber mass outage explains the per-router mass-outage
+  # alert(s) beneath it (SubscriberMassOutageRouter carries the same `pop`
+  # via the recording rule's group_left).
+  - source_match:
+      alert_type: mass-outage-pop
     target_match:
-      scope: "sector"
+      alert_type: mass-outage-router
     equal: ["pop"]
 
   # STEP 7: when SectorWideCPEDegradation is firing, the individual

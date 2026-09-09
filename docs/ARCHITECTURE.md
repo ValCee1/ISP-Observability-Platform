@@ -23,23 +23,28 @@ flowchart LR
         S["MikroTik PtMP sectors<br/>(SNMP: mikrotik_sector)<br/>+ registration table = CPEs"]
     end
 
-    subgraph exporters["Exporters (multi-target)"]
-        SNMP["snmp-exporter :9116"]
+    subgraph exporters["Exporters"]
+        SNMP["snmp-exporter :9116<br/>(multi-target proxy)"]
         BB["blackbox-exporter :9115<br/>ICMP prober (NET_RAW)"]
+        RE["routeros-exporter :9436<br/>RouterOS API · not a proxy"]
     end
 
     P["Prometheus :9090<br/>scrape + rule engine + TSDB"]
     AM["Alertmanager :9093<br/>route / group / inhibit"]
     G["Grafana :3000<br/>provisioned dashboards"]
     TG["NOC Telegram group"]
+    GIT["config-backup git repo<br/>(routeros_exporter_data)"]
 
     R -- SNMP --> SNMP
     L -- SNMP --> SNMP
     S -- SNMP --> SNMP
     L -- ICMP --> BB
+    R -- "RouterOS API<br/>/ppp · /export · /ip route" --> RE
+    RE -- "commit on change" --> GIT
 
     SNMP -- "HTTP /snmp scrape" --> P
     BB   -- "HTTP /probe scrape" --> P
+    RE   -- "HTTP /metrics scrape" --> P
 
     P -- "firing / resolved" --> AM
     AM -- "HTML message (bot token secret)" --> TG
@@ -89,12 +94,21 @@ flowchart TB
 | prometheus | `prom/prometheus:v3.13.2` | 9090 | `prometheus/prometheus.yml`, `prometheus/rules/`, `prometheus/targets/` | `prometheus_data` (TSDB) |
 | snmp-exporter | `prom/snmp-exporter:v0.30.1` | 9116 | `snmp_exporter/snmp.yml` | — |
 | blackbox-exporter | `prom/blackbox-exporter:v0.28.0` | 9115 | `blackbox/blackbox.yml` | — |
+| routeros-exporter | built from `routeros_exporter/` (`v0.1`) | 9436 | `routeros_exporter/config.yml` | `routeros_exporter_data` (config-backup git repo) |
 | grafana | `grafana/grafana:13.2.0` | 3000 | `grafana/provisioning/`, `grafana/dashboards/` | `grafana_data` |
 | alertmanager | `prom/alertmanager:v0.33.1` | 9093 | `alertmanager/alertmanager.yml` | `alertmanager_data` |
 
 Secrets are mounted as files under `/run/secrets/<name>` (never env vars):
-`grafana_admin_password` and `telegram_bot_token`. Both source files live in
-`secrets/` and are gitignored.
+`grafana_admin_password`, `telegram_bot_token`, and `routeros_api_credentials`
+(a JSON map of router name → `{username, password}` for the read-only RouterOS
+API user). All source files live in `secrets/` and are gitignored.
+
+Unlike the SNMP/ICMP exporters, **routeros-exporter is not a proxy target** — it
+walks the routers itself over the RouterOS API and exposes `routeros_*` metrics
+directly (job `routeros-api`, a plain `static_configs` scrape). It covers what
+SNMP cannot: per-subscriber PPP/PPPoE sessions, config backup + drift, topology
+auto-discovery. See
+[tier1-subscriber-config-topology.md](tier1-subscriber-config-topology.md).
 
 ---
 
@@ -184,7 +198,11 @@ Rule groups, by file:
 | `link-normalization.yml` | `link-availability`, `link-interface-health`, `link-derived-metrics` | raw SNMP/ICMP → `link_*` |
 | `link-alerts.yml` | `link-state`, `link-health`, `link-degrading`, `link-composite-health` | LinkDown, WeakSignal, PacketLoss, LinkUpButDegrading, `link_health_score` |
 | `mikrotik-alerts.yml` | `mikrotik-core` | CoreRouterDown, HighCPU, HighMemory, WANInterfaceDown |
-| `ppp-sessions.yml` | `ppp-sessions` | PPPoE session tracking |
+| `ppp-sessions.yml` | `ppp-sessions` | SNMP-derived PPPoE session tracking (fallback path) |
+| `subscriber-sessions.yml` | `subscriber-sessions` | RouterOS-API `subscriber:*` series (active by pop/router/sector, provisioned-offline, reconnects) |
+| `subscriber-alerts.yml` | `subscriber-mass-outage`, `subscriber-stability`, `subscriber-housekeeping` | SubscriberMassOutagePOP/Router, PPPoEAuthFailureSpike, SubscriberChronicFlapping, ProvisionedButOffline |
+| `config-backup.yml` | `config-backup` | RouterConfigChanged, RouterBackupStale/Failing, RouterOSVersionDrift |
+| `topology-rollup.yml` | `topology-rollup`, `topology-alerts` | `topology:pop:isolated`, POPIsolated (root-cause rollup) |
 | `sector-normalization.yml` | `sector-availability`, `sector-aggregates`, `sector-cpe`, `sector-cpe-derived`, `sector-24h`, `sector-hourly`, `sector-hour-of-day` | `sector_*` / `sector:*` derived series |
 | `sector-thresholds.yml` | `sector-capacity-thresholds` | per-sector client/Mbps limits (default 15/20 clients, 20/25 Mbps) |
 | `sector-alerts.yml` | `sector-availability`, `sector-performance`, `sector-device`, `sector-cpe`, `sector-capacity` | SectorDown, SectorWideCPEDegradation, CPE\* alerts, capacity digest |
@@ -257,6 +275,8 @@ Datasource is a single proxied Prometheus (`grafana/provisioning/datasources/`).
 | Sector Detail | `sector-detail.json` | one sector: stats, timeseries, per-CPE table (alignment score, worst-first), per-client signal/SNR, 24 h peak/budget |
 | Capacity Planning | `capacity-planning.json` | 24 h peak / p95 busy-hour / avg for every link, router interface and sector |
 | WAN/LAN Interfaces | `lan-wan-interfaces.json`, `all-interfaces.json` | traffic + up/down grouped by interface role (WAN/LAN/PPP/wireless backhaul) |
+| Subscriber Overview | `subscriber-overview.json` | active vs provisioned sessions, active-by-POP timeline (mass-outage cliff), top flappers, disconnect reasons, auth failures |
+| Config Audit | `config-audit.json` | last-backup age per router, config-change spikes, RouterOS versions across the fleet |
 
 Alerting is **Prometheus + Alertmanager only** — Grafana's own alerting engine
 is unused (`grafana/provisioning/alerting/.gitkeep`).
@@ -271,6 +291,7 @@ is unused (`grafana/provisioning/alerting/.gitkeep`).
 | a PTP link | `prometheus/targets/links.yml` | two endpoints sharing one `link_id`; set `module`, `auth`, `vendor`; add `pop:` if it's a POP backhaul |
 | a PtMP sector | `prometheus/targets/mikrotik-sectors.yml` | one target per AP; CPEs ride the registration table; add `pop:`; override capacity in `sector-thresholds.yml` |
 | an SNMP module / OID | `snmp_exporter/snmp.yml` | verify against a live `snmpwalk` before wiring an alert to it (see schema notes) |
+| a router to the API collector | `routeros_exporter/config.yml` + `secrets/routeros_api_credentials.json` | set `pop`/`site` to match the SNMP targets; needs a read-only RouterOS API user; `docker compose restart routeros-exporter` |
 | a dashboard | `grafana/dashboards/*.json` | picked up within 30 s, no restart |
 
 Target files reload without a Prometheus restart (`refresh_interval: 1m`). Rule

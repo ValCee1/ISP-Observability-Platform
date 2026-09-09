@@ -36,7 +36,9 @@ COPY --chown=nobody:nobody prometheus/topology.yml   /etc/prometheus/topology.ym
 # Fail the build if the bundled config or any rule file does not parse,
 # and if the promtool alert unit tests do not pass.
 RUN ["promtool", "check", "config", "/etc/prometheus/prometheus.yml"]
-RUN ["promtool", "test", "rules", "/etc/prometheus/rules/tests/alerts_test.yml"]
+RUN ["promtool", "test", "rules", \
+     "/etc/prometheus/rules/tests/alerts_test.yml", \
+     "/etc/prometheus/rules/tests/subscriber_test.yml"]
 
 # Entrypoint is inherited from the base image (/bin/prometheus). CMD is
 # repeated verbatim from upstream so the config path isn't silently lost if

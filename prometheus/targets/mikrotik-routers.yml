@@ -19,6 +19,8 @@
   labels:
     site: "HOME"
     role: "core-router"
+    pop: "HOME"          # dependency group (prometheus/topology.yml); keep in
+                          # sync with routeros_exporter/config.yml
     wan_ifname: "chiemerie-ppp"
 
 - targets:

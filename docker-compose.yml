@@ -96,14 +96,40 @@ services:
     networks:
       - monitoring
 
+  # RouterOS API collector. Covers what SNMP can't: per-subscriber PPP/PPPoE
+  # session intelligence (/ppp active + secret + log), config backup + drift
+  # detection (/export committed to a git repo on its own volume), and
+  # topology auto-discovery (/ip route + neighbour walk). Prometheus scrapes
+  # it on :9436 (job "routeros-api"). Read-only RouterOS user only - see
+  # routeros_exporter/README.md. The router list + labels are a bind-mounted
+  # config file; the API passwords are a Docker secret keyed by router name,
+  # never in the config file or git.
+  routeros-exporter:
+    build:
+      context: ./routeros_exporter
+    image: ${ISP_ROUTEROS_EXPORTER_IMAGE:-valcee1/isp-routeros-exporter:v0.1}
+    container_name: routeros-exporter
+    restart: unless-stopped
+    volumes:
+      - ./routeros_exporter/config.yml:/etc/routeros-exporter/config.yml:ro
+      - routeros_exporter_data:/var/lib/routeros-exporter
+    secrets:
+      - routeros_api_credentials
+    ports:
+      - "9436:9436"
+    networks:
+      - monitoring
+
 # Docker secrets: mounted into containers as read-only files under
 # /run/secrets/<name>, never as environment variables. Fill these files in
-# locally before `docker compose up` - both are gitignored.
+# locally before `docker compose up` - all are gitignored.
 secrets:
   grafana_admin_password:
     file: ./secrets/grafana_admin_password.txt
   telegram_bot_token:
     file: ./secrets/telegram_bot_token.txt
+  routeros_api_credentials:
+    file: ./secrets/routeros_api_credentials.json
 
 # Named volumes persist container state across `docker compose down`/`up`.
 # Only removed by an explicit `docker compose down -v`.
@@ -111,6 +137,7 @@ volumes:
   prometheus_data:
   grafana_data:
   alertmanager_data:
+  routeros_exporter_data:   # config-backup git repo + generated topology file
 
 networks:
   monitoring:
