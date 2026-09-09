@@ -86,11 +86,17 @@ def _load_yaml(path: str) -> dict[str, Any]:
 
 
 def _load_credentials(path: str) -> dict[str, dict[str, str]]:
-    if not pathlib.Path(path).exists():
+    p = pathlib.Path(path)
+    if not p.exists():
         # Not fatal at import time - useful for `--check` / unit tests. The
         # client raises a clear error later if it actually needs a password.
         return {}
-    return json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
+    text = p.read_text(encoding="utf-8").strip()
+    if not text:
+        return {}
+    data = json.loads(text)
+    # Tolerate the "_comment" key in the committed example file.
+    return {k: v for k, v in data.items() if isinstance(v, dict)}
 
 
 def load(
