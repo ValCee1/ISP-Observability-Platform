@@ -332,3 +332,21 @@ inhibit_rules:
     target_match:
       severity: warning
     equal: ["instance"]
+
+  # A router unreachable over SNMP (CoreRouterDown, keyed by `instance`=IP)
+  # and unreachable over the RouterOS API (RouterOSAPICollectorDown, keyed
+  # by `router`=the routeros_exporter name) are almost always the SAME
+  # outage seen through two collectors - without a shared label
+  # Alertmanager can't tell they're the same box, so this is otherwise TWO
+  # Telegram messages for one router being down. `mikrotik-routers.yml` now
+  # carries a `router:` label matching routeros_exporter/config.yml's
+  # `name`, specifically so this can `equal: [router]`. First observed
+  # 2026-09-12: room-office-repeater became a PPPoE client of pop1-home, so
+  # it goes unreachable via both paths whenever that session drops.
+  - source_match:
+      alertname: CoreRouterDown
+    source_match_re:
+      router: ".+"
+    target_match:
+      alertname: RouterOSAPICollectorDown
+    equal: ["router"]

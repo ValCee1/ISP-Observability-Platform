@@ -12,7 +12,8 @@
 options:
   listen_port: 9436
   poll_interval_seconds: 30          # PPP + system metrics
-  api_timeout_seconds: 10
+  api_timeout_seconds: 30            # CONFIRMED 2026-09-12: /export on a
+                                      # real router needs more than 10s
   backup_interval_seconds: 3600       # config export + git commit
   backup_repo_path: /var/lib/routeros-exporter/backups
   topology_interval_seconds: 900      # route/neighbour discovery

@@ -4,6 +4,15 @@
 # `site`/`role` are free-form labels attached to every metric from this
 # router - used by dashboards to group/filter by location or function.
 #
+# `router` (added 2026-09-12) is the same stable id used as the `name` in
+# routeros_exporter/config.yml for this box. It exists purely so
+# Alertmanager can `equal: [router]` a SNMP-side alert (CoreRouterDown,
+# keyed by `instance`=IP) against the API-side alert for the same router
+# (RouterOSAPICollectorDown, keyed by `router`=this name) - see the
+# inhibit_rules note in alertmanager/alertmanager.yml. Not the file
+# unification discussed and declined earlier: this is one label, kept in
+# sync by hand, not a shared source of truth.
+#
 # `wan_ifname` documents which ifName is this router's real WAN uplink
 # (dashboards use it, e.g. "WAN Interface: {{wan_ifname}}"). It is NOT
 # currently consumed by the WANInterfaceDown alert in mikrotik-alerts.yml -
@@ -21,11 +30,25 @@
     role: "core-router"
     pop: "HOME"          # dependency group (prometheus/topology.yml); keep in
                           # sync with routeros_exporter/config.yml
+    router: "pop1-home"  # keep in sync with routeros_exporter/config.yml `name`
     wan_ifname: "chiemerie-ppp"
 
 - targets:
-    - 192.168.10.19
+    - 192.168.10.15    # was 192.168.10.19 - re-IP'd 2026-09-12 when this
+                        # router became a PPPoE CLIENT of pop1-home
+                        # (192.168.10.1). It is now reachable only while
+                        # that PPP session is up - if the session drops,
+                        # this router goes unreachable too (that's the PPP
+                        # server-side session; see subscriber-alerts.yml /
+                        # RouterOSAPICollectorDown for the exporter's view
+                        # of the same dependency). No `pop`/inhibit wiring
+                        # for this session-level dependency yet - see the
+                        # 2026-09-12 conversation in the PR/session history.
   labels:
     site: "room-office"
     role: "Repeater"
-    wan_ifname: "wlan1"
+    router: "room-office-repeater"  # keep in sync with routeros_exporter/config.yml `name`
+    wan_ifname: "wlan1"  # UNVERIFIED since the re-IP - confirm the real
+                          # uplink ifName once this router is reachable
+                          # again; it may now be a pppoe-client interface,
+                          # not wlan1
