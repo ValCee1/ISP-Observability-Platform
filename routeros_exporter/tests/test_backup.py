@@ -1,6 +1,9 @@
 import subprocess
 
+import pytest
+
 from routeros_exporter import backup
+from routeros_exporter.client import RouterOSError
 
 from .conftest import FIXTURES
 
@@ -47,3 +50,32 @@ def test_export_via_api_row_shapes():
     assert backup.export_via_api(C([{"ret": "/ip address\nadd address=1.2.3.4/24"}])).startswith("/ip address")
     joined = backup.export_via_api(C([{"line": "/ppp profile"}, {"line": "add name=x"}]))
     assert joined == "/ppp profile\nadd name=x"
+
+
+def test_export_via_api_falls_back_on_routeros_6x():
+    """RouterOS 6.49 rejects `show-sensitive` ("unknown parameter") -
+    CONFIRMED against a live router 2026-09-12. export_via_api must retry
+    without it rather than propagate the error."""
+
+    class C:
+        def __init__(self):
+            self.calls = []
+
+        def command(self, path, **kw):
+            self.calls.append(kw)
+            if kw:
+                raise RouterOSError("192.168.10.1: command /export failed: unknown parameter")
+            return [{"ret": "/ip address\nadd address=1.2.3.4/24"}]
+
+    c = C()
+    assert backup.export_via_api(c).startswith("/ip address")
+    assert c.calls == [{"show-sensitive": "no"}, {}]
+
+
+def test_export_via_api_reraises_unrelated_errors():
+    class C:
+        def command(self, path, **kw):
+            raise RouterOSError("192.168.10.1: connection refused")
+
+    with pytest.raises(RouterOSError, match="connection refused"):
+        backup.export_via_api(C())

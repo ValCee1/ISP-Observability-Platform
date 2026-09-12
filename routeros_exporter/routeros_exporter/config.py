@@ -66,7 +66,13 @@ class Config:
     # reason to hammer it faster than Prometheus scrapes (default 30s for
     # the slow SNMP jobs).
     poll_interval_seconds: int = 30
-    api_timeout_seconds: float = 10.0
+    # CONFIRMED (2026-09-12): 10s was too tight - /export on a router with a
+    # sizeable config (hundreds of PPP secrets + neighbours) timed out on a
+    # live ROS 6.49 box. One timeout applies to the whole connection (PPP/
+    # system/backup/topology share it), so it's sized for the slowest of
+    # those, not the common case - same tradeoff the SNMP jobs made for slow
+    # radio walks (see prometheus/prometheus.yml link-radio-health comment).
+    api_timeout_seconds: float = 30.0
     # Config backup cadence + destination. The repo is a plain `git init`
     # directory on its own volume; the exporter commits into it.
     backup_interval_seconds: int = 3600

@@ -11,9 +11,11 @@ Per router, per cycle:
        routeros_config_backup_success{router}
 
 The git repo is a plain ``git init`` directory on its own volume - restoring
-is ``git show <rev>:<router>.rsc``. Binary ``/system/backup/save`` is also
-supported (kept out of git, just rotated on disk) for a true restore image;
-the text export is what drift-detection and the change diff work from.
+is ``git show <rev>:<router>.rsc``. This is what drift-detection and the
+change diff work from; RouterOS masks passwords/secrets in ``/export`` by
+default, so it is NOT a full credential-recovery image. A true restore
+(binary ``/system/backup/save``, which does carry secrets) is a documented
+follow-up, not implemented yet - see routeros_exporter/README.md.
 
 RouterOS ``/export`` output contains a first-line timestamp comment that
 changes every run; it's stripped before diffing so an unchanged config
@@ -28,6 +30,8 @@ import re
 import subprocess
 import time
 from typing import Callable
+
+from .client import RouterOSError
 
 _TS_COMMENT_RE = re.compile(r"^# [0-9]{4}-[0-9]{2}-[0-9]{2} .*$", re.MULTILINE)
 _ROS_VERSION_COMMENT_RE = re.compile(r"^# software id =.*$|^# model =.*$|^# serial number =.*$", re.MULTILINE)
@@ -128,11 +132,32 @@ def back_up_router(
 def export_via_api(client) -> str:
     """Run ``/export`` over the API and join the returned rows into text.
 
-    UNVERIFIED - needs live device: librouteros surfaces ``/export`` output
-    as a sequence of rows each with a ``section``/``line`` field on most ROS
-    versions; some return a single blob. The join below handles both.
+    ``show-sensitive`` (explicitly mask passwords/secrets) only exists on
+    RouterOS 7.x - CONFIRMED (2026-09-12) a 6.49 router rejects it with
+    "unknown parameter". Rather than branch on version, try it first and
+    fall back to a bare ``/export`` when the parameter is unknown, so this
+    works unmodified across the 6.x/7.x fleet. Either way the output keeps
+    RouterOS's own default sensitive-value masking (passwords render as
+    ``***``) - this backup is for structural diffing/audit, not credential
+    recovery; see routeros_exporter/README.md.
+
+    CONFIRMED (2026-09-12), also against a live 6.49 router: the bare
+    fallback does not actually work with a read-only API user either - it
+    hangs for the full connection timeout (no reply at all, not even an
+    error) rather than raising quickly. A read-only ``read``-group user can
+    only get `/export` to reply promptly by adding ``file=<name>``, which
+    then needs the ``write`` policy to create the file - a real permissions
+    tradeoff this repo hasn't resolved yet (see the README). Until it is,
+    expect this call to cost up to the full ``api_timeout_seconds`` on every
+    router that only has a read-only credential, once per backup cycle.
     """
-    rows = client.command("/export", **{"show-sensitive": "no"})
+    try:
+        rows = client.command("/export", **{"show-sensitive": "no"})
+    except RouterOSError as exc:
+        if "unknown parameter" not in str(exc).lower():
+            raise
+        rows = client.command("/export")
+
     if len(rows) == 1 and "ret" in rows[0]:
         return str(rows[0]["ret"])
     return "\n".join(

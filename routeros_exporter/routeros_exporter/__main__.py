@@ -22,7 +22,7 @@ from prometheus_client import CollectorRegistry, generate_latest, start_http_ser
 from . import client as roc
 from . import config as cfg
 from . import topology as topo
-from .backup import back_up_router, ensure_repo, export_via_api
+from .backup import BackupResult, back_up_router, ensure_repo, export_via_api
 from .collectors import ppp as ppp_mod
 from .collectors.system import parse_system
 from .metrics import Metrics
@@ -31,6 +31,17 @@ log = logging.getLogger("routeros_exporter")
 
 
 def poll_router(c: cfg.RouterConfig, conf: cfg.Config, m: Metrics, *, do_backup: bool, do_topology: bool, repo=None, router_addresses=None) -> None:
+    """One poll cycle for one router.
+
+    `routeros_scrape_success` reflects only the CORE poll (PPP + system) -
+    the signal RouterOSAPICollectorDown alerts on. Config backup and
+    topology discovery are wrapped in their own try/except and never flip
+    it: a `/export` hiccup (CONFIRMED 2026-09-12: RouterOS 6.x rejects the
+    `show-sensitive` parameter 7.x accepts - see backup.export_via_api) or a
+    missing `/ip/neighbor` table on a device that doesn't run MNDP/LLDP
+    shouldn't make the subscriber pipeline look down. Backup failures still
+    surface via `routeros_config_backup_success` (RouterBackupFailing).
+    """
     started = time.monotonic()
     ok = True
     try:
@@ -49,19 +60,29 @@ def poll_router(c: cfg.RouterConfig, conf: cfg.Config, m: Metrics, *, do_backup:
             m.update_system(c.name, info)
 
             if do_backup and c.collect_backup and repo is not None:
-                result = back_up_router(c.name, export_via_api(api), repo)
+                try:
+                    result = back_up_router(c.name, export_via_api(api), repo)
+                except roc.RouterOSError as exc:
+                    # API-level failure (timeout, unsupported param, ...) -
+                    # turn it into the same BackupResult shape a git-commit
+                    # failure would produce, so there's exactly one log line
+                    # below regardless of which step failed.
+                    result = BackupResult(c.name, False, False, 0, "", error=str(exc))
                 m.update_backup(result)
                 if result.error:
                     log.warning("backup %s: %s", c.name, result.error)
 
             if do_topology and c.collect_topology:
-                gws = topo.parse_default_gateways(api.query("/ip/route/print"))
-                neighbors = topo.parse_neighbors(_safe(api, "/ip/neighbor/print"))
-                edges = topo.build_edges(
-                    c.name, gws, neighbors,
-                    router_addresses=router_addresses or {},
-                )
-                m.update_topology(c.name, edges)
+                try:
+                    gws = topo.parse_default_gateways(api.query("/ip/route/print"))
+                    neighbors = topo.parse_neighbors(_safe(api, "/ip/neighbor/print"))
+                    edges = topo.build_edges(
+                        c.name, gws, neighbors,
+                        router_addresses=router_addresses or {},
+                    )
+                    m.update_topology(c.name, edges)
+                except roc.RouterOSError as exc:
+                    log.warning("topology %s: %s", c.name, exc)
     except roc.RouterOSError as exc:
         ok = False
         log.warning("poll %s failed: %s", c.name, exc)

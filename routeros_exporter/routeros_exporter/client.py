@@ -113,7 +113,20 @@ class LibRouterOSClient:
 
 
 def _split(path: str) -> list[str]:
-    return [p for p in path.strip("/").split("/") if p]
+    """"/ppp/active/print" -> ["ppp", "active"].
+
+    librouteros' `.path(*parts)` already issues a `print` sentence when the
+    resulting resource is iterated - a literal "print" segment in the input
+    path (our collectors all call e.g. "/ppp/active/print", mirroring the
+    raw RouterOS API sentence) would otherwise double up into
+    "/ppp/active/print/print", which RouterOS rejects with "no such
+    command". CONFIRMED against a live router (2026-09-12): querying
+    without stripping "print" fails; stripping it works.
+    """
+    parts = [p for p in path.strip("/").split("/") if p]
+    if parts and parts[-1] == "print":
+        parts = parts[:-1]
+    return parts
 
 
 def _cmd(path: str) -> str:

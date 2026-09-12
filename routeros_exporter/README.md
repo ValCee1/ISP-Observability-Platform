@@ -48,13 +48,33 @@ list-of-dicts the API returns, tested against `tests/fixtures/*.json`
 (captured API output). Anything that could only be confirmed on real
 hardware is marked `UNVERIFIED - needs live device`.
 
-## UNVERIFIED — check against a live router
+## Confirmed against a live router (2026-09-12, RouterOS 6.49, hAP lite ×2)
+
+- PPP/secret/system polling, and topology discovery via `/ip/route` +
+  `/ip/neighbor`, all work as designed against real hardware.
+- `/export` needs the `show-sensitive` fallback (`export_via_api` retries
+  without it - ROS 6.x rejects the parameter, ROS 7.x accepts it).
+- **Config backup needs a write-capable RouterOS user, contradicting the
+  "read-only API user" this component was designed around.** A bare
+  `/export` over the API does not return on this ROS 6.x device (times out
+  - no console/pager over the API); `/export file=<name>` replies
+  immediately but requires the `write` policy to create the file, which the
+  `read` group's user correctly does not have (`not enough permissions`).
+  `routeros_scrape_success`/PPP data are unaffected (config-backup failures
+  are isolated in `__main__.poll_router` and only surface as
+  `routeros_config_backup_success=0` / `RouterBackupFailing`) - **until this
+  is redesigned, `RouterBackupFailing`/`RouterBackupStale` will fire for
+  every router and should be treated as a known gap, not a real incident.**
+  Options going forward (not yet decided): a second, `write`-scoped
+  credential used only for backups; or fetch the exported file over FTP
+  instead of the API; or drop the read-only requirement for this one
+  feature and document the tradeoff explicitly.
+
+## Still UNVERIFIED
 
 - `/log` message wording for connect / disconnect / auth-failure (parser in
-  `collectors/ppp.py` is deliberately permissive; confirm the ROS 7.x text).
+  `collectors/ppp.py` is deliberately permissive; no PPP sessions were active
+  on the test router, so this hasn't been exercised against real log lines).
 - pppoe `caller-id` format vs. the SNMP `cpe_mac` label format — the join in
   `prometheus/rules/subscriber-sessions.yml` assumes both normalise to
   lowercase `aa:bb:cc:dd:ee:ff`.
-- `/export` row shape from librouteros (single blob vs. per-line rows) —
-  `backup.export_via_api` handles both, but confirm which this ROS returns.
-- MNDP/LLDP enabled on sector/backhaul interfaces for neighbour discovery.
