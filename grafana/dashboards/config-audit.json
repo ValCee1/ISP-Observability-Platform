@@ -22,7 +22,7 @@
                 { "expr": "routeros_config_export_lines", "refId": "C", "instant": true, "format": "table" }
             ],
             "transformations": [
-                { "id": "merge", "options": {} },
+                { "id": "joinByField", "options": { "byField": "router", "mode": "outer" } },
                 { "id": "filterFieldsByName", "options": { "include": { "pattern": "^(router|Value #A|Value #B|Value #C)$" } } },
                 { "id": "organize", "options": { "renameByName": { "Value #A": "last backup age", "Value #B": "last cycle ok", "Value #C": "export lines" } } }
             ],
@@ -61,13 +61,14 @@
             "gridPos": { "h": 6, "w": 18, "x": 6, "y": 18 },
             "datasource": "Prometheus",
             "targets": [
-                { "expr": "routeros_system_info", "refId": "A", "instant": true, "format": "table" },
-                { "expr": "routeros_system_uptime_seconds", "refId": "B", "instant": true, "format": "table" }
+                {
+                    "expr": "routeros_system_uptime_seconds * on (router) group_left (version, board, architecture) routeros_system_info",
+                    "refId": "A", "instant": true, "format": "table"
+                }
             ],
             "transformations": [
-                { "id": "merge", "options": {} },
-                { "id": "filterFieldsByName", "options": { "include": { "pattern": "^(router|version|board|architecture|Value #B)$" } } },
-                { "id": "organize", "options": { "renameByName": { "Value #B": "uptime (s)" } } }
+                { "id": "filterFieldsByName", "options": { "include": { "pattern": "^(router|version|board|architecture|Value)$" } } },
+                { "id": "organize", "options": { "renameByName": { "Value": "uptime (s)" } } }
             ]
         }
     ]

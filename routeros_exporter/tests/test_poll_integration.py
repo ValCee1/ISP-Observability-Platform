@@ -40,11 +40,12 @@ def test_poll_router_populates_all_metric_families(tmp_path, monkeypatch):
     m.set_router_info(router.name, router.site, router.pop, router.role)
     repo = main_mod.ensure_repo(conf.backup_repo_path)
 
-    main_mod.poll_router(
+    ok = main_mod.poll_router(
         router, conf, m, do_backup=True, do_topology=True, repo=repo,
         router_addresses={"pop1": ["10.0.0.1"]},
     )
 
+    assert ok is True  # run() uses this to decide whether the backup/topology slot was consumed
     out = generate_latest(m.registry).decode()
     assert 'routeros_scrape_success{router="pop1"} 1.0' in out
     assert 'routeros_ppp_active_total{router="pop1"} 4.0' in out
@@ -89,12 +90,45 @@ def test_backup_failure_does_not_sink_scrape_success(tmp_path, monkeypatch):
     m = Metrics(CollectorRegistry())
     repo = main_mod.ensure_repo(conf.backup_repo_path)
 
-    main_mod.poll_router(
+    ok = main_mod.poll_router(
         router, conf, m, do_backup=True, do_topology=True, repo=repo,
         router_addresses={"pop1": ["10.0.0.1"]},
     )
 
+    assert ok is True  # core poll fine even though the backup sub-step failed
     out = generate_latest(m.registry).decode()
     assert 'routeros_scrape_success{router="pop1"} 1.0' in out       # PPP/system still fine
     assert 'routeros_config_backup_success{router="pop1"} 0.0' in out  # backup alone failed
     assert 'routeros_ppp_active_total{router="pop1"} 4.0' in out
+
+
+def test_poll_router_returns_false_on_connect_failure(tmp_path, monkeypatch):
+    """CONFIRMED 2026-09-13: a router unreachable exactly when its shared
+    backup/topology window came up silently missed the ENTIRE hour, because
+    run() advanced the schedule regardless of whether the poll actually got
+    anywhere. poll_router's return value is what run() now checks before
+    consuming that router's slot - this pins the return value the fix
+    depends on."""
+
+    @contextlib.contextmanager
+    def failing_connect(router):
+        raise RouterOSError(f"{router.host}: API connect failed: connection refused")
+        yield  # pragma: no cover - unreachable, contextmanager needs a yield
+
+    monkeypatch.setattr(main_mod.roc, "connect", failing_connect)
+
+    router = cfg.RouterConfig(name="pop1", host="10.0.0.1", username="ro", password="x")
+    conf = cfg.Config(routers=(router,), backup_repo_path=str(tmp_path / "b"))
+    m = Metrics(CollectorRegistry())
+    repo = main_mod.ensure_repo(conf.backup_repo_path)
+
+    ok = main_mod.poll_router(
+        router, conf, m, do_backup=True, do_topology=True, repo=repo,
+        router_addresses={"pop1": ["10.0.0.1"]},
+    )
+
+    assert ok is False
+    out = generate_latest(m.registry).decode()
+    assert 'routeros_scrape_success{router="pop1"} 0.0' in out
+    # Neither metric was even attempted this cycle - absent, not "0".
+    assert 'routeros_config_backup_success{router="pop1"}' not in out

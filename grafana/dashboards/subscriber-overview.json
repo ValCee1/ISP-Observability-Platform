@@ -105,13 +105,14 @@
             "gridPos": { "h": 10, "w": 24, "x": 0, "y": 24 },
             "datasource": "Prometheus",
             "targets": [
-                { "expr": "routeros_ppp_active_uptime_seconds", "refId": "A", "instant": true, "format": "table" },
-                { "expr": "routeros_ppp_active_caller_id_info", "refId": "B", "instant": true, "format": "table" }
+                {
+                    "expr": "routeros_ppp_active_uptime_seconds * on (router, user) group_left (caller_id, address) routeros_ppp_active_caller_id_info",
+                    "refId": "A", "instant": true, "format": "table"
+                }
             ],
             "transformations": [
-                { "id": "merge", "options": {} },
-                { "id": "filterFieldsByName", "options": { "include": { "pattern": "^(router|user|service|caller_id|address|Value #A)$" } } },
-                { "id": "organize", "options": { "renameByName": { "Value #A": "uptime (s)" } } }
+                { "id": "filterFieldsByName", "options": { "include": { "pattern": "^(router|user|service|caller_id|address|Value)$" } } },
+                { "id": "organize", "options": { "renameByName": { "Value": "uptime (s)" } } }
             ]
         }
     ]

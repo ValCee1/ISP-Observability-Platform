@@ -30,8 +30,17 @@ from .metrics import Metrics
 log = logging.getLogger("routeros_exporter")
 
 
-def poll_router(c: cfg.RouterConfig, conf: cfg.Config, m: Metrics, *, do_backup: bool, do_topology: bool, repo=None, router_addresses=None) -> None:
-    """One poll cycle for one router.
+def poll_router(c: cfg.RouterConfig, conf: cfg.Config, m: Metrics, *, do_backup: bool, do_topology: bool, repo=None, router_addresses=None) -> bool:
+    """One poll cycle for one router. Returns whether the core poll (PPP +
+    system) succeeded - the caller uses this to decide whether this
+    router's backup/topology schedule slot was actually consumed (see
+    `run()`: a router that's unreachable exactly when its hourly backup
+    window comes up must retry on its next 30s cycle, not wait a full hour
+    for the shared clock to come back around - CONFIRMED 2026-09-13: with a
+    single global `next_backup` clock, one router being briefly down during
+    the scheduled instant silently skipped its ENTIRE backup window, and
+    routeros_config_backup_success/_export_lines stayed completely absent -
+    not even "0" - for the following hour).
 
     `routeros_scrape_success` reflects only the CORE poll (PPP + system) -
     the signal RouterOSAPICollectorDown alerts on. Config backup and
@@ -88,6 +97,7 @@ def poll_router(c: cfg.RouterConfig, conf: cfg.Config, m: Metrics, *, do_backup:
         log.warning("poll %s failed: %s", c.name, exc)
     finally:
         m.update_scrape(c.name, ok, time.monotonic() - started)
+    return ok
 
 
 def _safe(api, path: str):
@@ -108,22 +118,30 @@ def run(conf: cfg.Config) -> None:
     start_http_server(conf.listen_port, registry=registry)
     log.info("listening on :%d, %d routers", conf.listen_port, len(conf.routers))
 
-    next_backup = 0.0
-    next_topology = 0.0
+    # Per-router clocks, not one shared clock: a router that's briefly
+    # unreachable exactly when its backup/topology window comes up retries
+    # on its own next 30s poll cycle instead of silently missing the whole
+    # hour (see poll_router's docstring). Every router starts at 0.0 so the
+    # first cycle after startup always attempts both, same as before.
+    next_backup: dict[str, float] = {}
+    next_topology: dict[str, float] = {}
     while True:
         now = time.time()
-        do_backup = now >= next_backup
-        do_topology = now >= next_topology
         for c in conf.routers:
-            poll_router(
+            do_backup = now >= next_backup.get(c.name, 0.0)
+            do_topology = now >= next_topology.get(c.name, 0.0)
+            ok = poll_router(
                 c, conf, m,
                 do_backup=do_backup, do_topology=do_topology,
                 repo=repo, router_addresses=router_addresses,
             )
-        if do_backup:
-            next_backup = now + conf.backup_interval_seconds
-        if do_topology:
-            next_topology = now + conf.topology_interval_seconds
+            # Only consume this router's slot if the poll actually reached
+            # far enough to attempt it - a connect failure must not burn an
+            # hour-long window on nothing.
+            if do_backup and ok:
+                next_backup[c.name] = now + conf.backup_interval_seconds
+            if do_topology and ok:
+                next_topology[c.name] = now + conf.topology_interval_seconds
         time.sleep(conf.poll_interval_seconds)
 
 
