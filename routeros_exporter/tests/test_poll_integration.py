@@ -5,12 +5,14 @@ import contextlib
 from prometheus_client import CollectorRegistry, generate_latest
 
 from routeros_exporter import __main__ as main_mod
+from routeros_exporter import backup
 from routeros_exporter import client as roc
 from routeros_exporter import config as cfg
 from routeros_exporter.client import RouterOSError
 from routeros_exporter.metrics import Metrics
 
 from .conftest import FakeClient, load
+from .test_backup import FakeFTP
 
 
 def test_poll_router_populates_all_metric_families(tmp_path, monkeypatch):
@@ -23,8 +25,14 @@ def test_poll_router_populates_all_metric_families(tmp_path, monkeypatch):
             "/system/routerboard/print": [],
             "/ip/route/print": load("ip_route.json"),
             "/ip/neighbor/print": load("ip_neighbor.json"),
-            "/export": [{"ret": "/ip address\nadd address=100.64.0.1/24\n"}],
         }
+    )
+    # export_via_api triggers /export over the API (FakeClient.command
+    # ignores the file= kwarg and returns [], which is realistic - the
+    # actual content comes back over FTP, faked here.
+    monkeypatch.setattr(
+        backup.ftplib, "FTP",
+        lambda: FakeFTP(content=b"/ip address\nadd address=100.64.0.1/24\n"),
     )
 
     @contextlib.contextmanager

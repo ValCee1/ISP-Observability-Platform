@@ -2,10 +2,43 @@ import subprocess
 
 import pytest
 
-from routeros_exporter import backup
+from routeros_exporter import backup, config as cfg
 from routeros_exporter.client import RouterOSError
 
 from .conftest import FIXTURES
+
+
+class FakeFTP:
+    """Stands in for ftplib.FTP. `calls` records what happened, in order,
+    for assertions; `content` / `fail_retr` / `fail_delete` steer behaviour."""
+
+    def __init__(self, content: bytes = b"", fail_retr: bool = False, fail_delete: bool = False):
+        self.calls = []
+        self._content = content
+        self._fail_retr = fail_retr
+        self._fail_delete = fail_delete
+
+    def connect(self, host, port, timeout):
+        self.calls.append(("connect", host, port, timeout))
+
+    def login(self, username, password):
+        self.calls.append(("login", username, password))
+
+    def retrbinary(self, cmd, write_fn):
+        self.calls.append(("retrbinary", cmd))
+        if self._fail_retr:
+            import ftplib
+            raise ftplib.error_perm("550 No such file")
+        write_fn(self._content)
+
+    def delete(self, name):
+        self.calls.append(("delete", name))
+        if self._fail_delete:
+            import ftplib
+            raise ftplib.error_perm("550 permission denied")
+
+    def quit(self):
+        self.calls.append(("quit",))
 
 
 def _log(repo):
@@ -39,43 +72,66 @@ def test_first_backup_then_idempotent_then_change(tmp_path):
     assert "pop1: config changed" in _log(repo)[0]
 
 
-def test_export_via_api_row_shapes():
-    class C:
-        def __init__(self, rows):
-            self.rows = rows
+class _RecordingClient:
+    """Stands in for client.APIClient - only `command` is used by
+    export_via_api, to trigger `/export file=...`."""
 
-        def command(self, path, **kw):
-            return self.rows
+    def __init__(self):
+        self.calls = []
 
-    assert backup.export_via_api(C([{"ret": "/ip address\nadd address=1.2.3.4/24"}])).startswith("/ip address")
-    joined = backup.export_via_api(C([{"line": "/ppp profile"}, {"line": "add name=x"}]))
-    assert joined == "/ppp profile\nadd name=x"
-
-
-def test_export_via_api_falls_back_on_routeros_6x():
-    """RouterOS 6.49 rejects `show-sensitive` ("unknown parameter") -
-    CONFIRMED against a live router 2026-09-12. export_via_api must retry
-    without it rather than propagate the error."""
-
-    class C:
-        def __init__(self):
-            self.calls = []
-
-        def command(self, path, **kw):
-            self.calls.append(kw)
-            if kw:
-                raise RouterOSError("192.168.10.1: command /export failed: unknown parameter")
-            return [{"ret": "/ip address\nadd address=1.2.3.4/24"}]
-
-    c = C()
-    assert backup.export_via_api(c).startswith("/ip address")
-    assert c.calls == [{"show-sensitive": "no"}, {}]
+    def command(self, path, **kw):
+        self.calls.append((path, kw))
+        return []  # /export file=... returns nothing useful over the API
 
 
-def test_export_via_api_reraises_unrelated_errors():
-    class C:
-        def command(self, path, **kw):
-            raise RouterOSError("192.168.10.1: connection refused")
+def _router(**overrides):
+    return cfg.RouterConfig(
+        name="pop1", host="192.168.10.1", username="prom-ro", password="x", **overrides
+    )
 
-    with pytest.raises(RouterOSError, match="connection refused"):
-        backup.export_via_api(C())
+
+def test_export_via_api_triggers_file_export_then_ftp_fetch(monkeypatch):
+    """CONFIRMED 2026-09-13 against a live RouterOS 6.49 router: the API
+    can trigger `/export file=...` (needs `write`) but cannot read a file's
+    contents back on this ROS version - only FTP (needs `ftp`) can."""
+    fake = FakeFTP(content=b"/ip address\nadd address=1.2.3.4/24\n")
+    monkeypatch.setattr(backup.ftplib, "FTP", lambda: fake)
+
+    client = _RecordingClient()
+    text = backup.export_via_api(client, _router())
+
+    assert text == "/ip address\nadd address=1.2.3.4/24\n"
+    assert client.calls == [("/export", {"file": "routeros-exporter-backup"})]
+    assert ("connect", "192.168.10.1", 21, 15.0) in fake.calls
+    assert ("login", "prom-ro", "x") in fake.calls
+    assert ("retrbinary", "RETR routeros-exporter-backup.rsc") in fake.calls
+    assert ("delete", "routeros-exporter-backup.rsc") in fake.calls
+    assert ("quit",) in fake.calls
+
+
+def test_export_via_api_uses_configured_ftp_port_and_timeout(monkeypatch):
+    fake = FakeFTP(content=b"ok")
+    monkeypatch.setattr(backup.ftplib, "FTP", lambda: fake)
+
+    backup.export_via_api(_RecordingClient(), _router(ftp_port=2121), ftp_timeout=5.0)
+
+    assert ("connect", "192.168.10.1", 2121, 5.0) in fake.calls
+
+
+def test_export_via_api_survives_a_failed_cleanup_delete(monkeypatch):
+    """A failed best-effort delete must not sink an otherwise-good fetch -
+    the fixed filename is overwritten next cycle regardless."""
+    fake = FakeFTP(content=b"/ip address\n", fail_delete=True)
+    monkeypatch.setattr(backup.ftplib, "FTP", lambda: fake)
+
+    text = backup.export_via_api(_RecordingClient(), _router())
+
+    assert text == "/ip address\n"
+
+
+def test_export_via_api_raises_routeros_error_on_ftp_failure(monkeypatch):
+    fake = FakeFTP(fail_retr=True)
+    monkeypatch.setattr(backup.ftplib, "FTP", lambda: fake)
+
+    with pytest.raises(RouterOSError, match="FTP fetch"):
+        backup.export_via_api(_RecordingClient(), _router())

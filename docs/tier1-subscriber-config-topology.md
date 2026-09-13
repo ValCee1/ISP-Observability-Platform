@@ -83,16 +83,17 @@ Alerts (`prometheus/rules/config-backup.yml`): `RouterConfigChanged`
 (warning, on every diff), `RouterBackupStale` (critical, >25h),
 `RouterBackupFailing` (warning), `RouterOSVersionDrift` (info).
 
-> **Known gap, confirmed 2026-09-12 against live RouterOS 6.49 hardware:**
-> with a read-only API user, `/export` never actually succeeds - a bare
-> `/export` hangs for the full connection timeout instead of returning, and
-> the only variant that replies promptly (`/export file=<name>`) needs the
-> `write` policy to create the file. Until this is redesigned (a separate
-> write-scoped backup credential, or fetching the export over FTP instead
-> of the API), `RouterBackupFailing`/`RouterBackupStale` will fire for every
-> router - that's this known gap, not a new incident. PPP/system/topology
-> collection is unaffected (isolated per-collector in `__main__.poll_router`).
-> Details: `routeros_exporter/README.md`.
+> **Resolved 2026-09-13** (was a known gap as of 2026-09-12): with a
+> read-only API user, `/export` never succeeded on this RouterOS 6.x fleet
+> - a bare `/export` hangs instead of returning, and the only variant that
+> replies (`/export file=<name>`) needs `write` to create the file, which
+> RouterOS 6.x's API then can't read back anyway (only FTP can). Fixed by
+> widening the monitoring credential to a custom group scoped to exactly
+> `api, read, write, ftp` and fetching the export over FTP -
+> `export_via_api` now does `/export file=...` then an FTP RETR + delete.
+> PPP/system/topology collection was never affected (isolated per-collector
+> in `__main__.poll_router`). Details + the RouterOS commands to run:
+> `routeros_exporter/README.md`.
 
 Dashboard: **Config Audit** (`grafana/dashboards/config-audit.json`).
 

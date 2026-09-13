@@ -1,7 +1,9 @@
 """Config backup + drift detection.
 
 Per router, per cycle:
-  1. Pull the full config text via ``/export`` (sensitive values hidden).
+  1. Trigger ``/export file=...`` over the API, then fetch + delete that
+     file over FTP (see ``export_via_api`` - RouterOS 6.x's API has no way
+     to read a file's contents back, only newer 7.x builds do).
   2. Write it to ``<repo>/<router>.rsc`` and ``git commit`` if it changed.
   3. Emit metrics so Prometheus can alert:
        routeros_config_last_backup_timestamp{router}
@@ -20,11 +22,25 @@ follow-up, not implemented yet - see routeros_exporter/README.md.
 RouterOS ``/export`` output contains a first-line timestamp comment that
 changes every run; it's stripped before diffing so an unchanged config
 doesn't look changed every cycle.
+
+REQUIRES a RouterOS user with more than read-only access - CONFIRMED
+2026-09-13 (see the README's permissions history): a bare ``/export`` over
+the API hangs indefinitely for a read-only user, and ``/export file=...``
+(the only variant that replies) needs the ``write`` policy to create the
+file. Chosen tradeoff (2026-09-13, by the user, over the alternative of a
+router-side scheduler + a permanently read-only credential): widen the one
+monitoring credential to a custom group scoped to exactly
+``api, read, write, ftp`` - never ``password``, ``sensitive``, ``policy``,
+``reboot``, or ``sniff`` - so it can create and fetch its own export file
+but nothing more dangerous. Exact RouterOS commands in the README.
 """
 
 from __future__ import annotations
 
+import contextlib
 import dataclasses
+import ftplib
+import io
 import pathlib
 import re
 import subprocess
@@ -32,6 +48,11 @@ import time
 from typing import Callable
 
 from .client import RouterOSError
+
+# Fixed name so every cycle overwrites the same file rather than
+# accumulating one per poll - RouterOS appends .rsc to whatever `file=`
+# names (CONFIRMED 2026-09-13 against a live 6.49 router).
+_BACKUP_EXPORT_FILENAME = "routeros-exporter-backup"
 
 _TS_COMMENT_RE = re.compile(r"^# [0-9]{4}-[0-9]{2}-[0-9]{2} .*$", re.MULTILINE)
 _ROS_VERSION_COMMENT_RE = re.compile(r"^# software id =.*$|^# model =.*$|^# serial number =.*$", re.MULTILINE)
@@ -129,37 +150,52 @@ def back_up_router(
     )
 
 
-def export_via_api(client) -> str:
-    """Run ``/export`` over the API and join the returned rows into text.
+def export_via_api(client, router, *, ftp_timeout: float = 15.0) -> str:
+    """Trigger ``/export file=...`` over the API, then fetch + delete that
+    file over FTP.
 
-    ``show-sensitive`` (explicitly mask passwords/secrets) only exists on
-    RouterOS 7.x - CONFIRMED (2026-09-12) a 6.49 router rejects it with
-    "unknown parameter". Rather than branch on version, try it first and
-    fall back to a bare ``/export`` when the parameter is unknown, so this
-    works unmodified across the 6.x/7.x fleet. Either way the output keeps
-    RouterOS's own default sensitive-value masking (passwords render as
-    ``***``) - this backup is for structural diffing/audit, not credential
-    recovery; see routeros_exporter/README.md.
+    Two round trips against two protocols, both needed:
+      1. API ``/export file=<name>`` - CONFIRMED 2026-09-13: replies in
+         under 2s once the credential has ``write`` (a bare ``/export``
+         over the API hangs indefinitely with a read-only user instead of
+         erroring - see the module docstring).
+      2. FTP RETR of ``<name>.rsc`` - RouterOS 6.x's API has no "read a
+         file's contents" call; only 7.x builds added that. FTP is what
+         every RouterOS version has always supported for this. Needs the
+         ``ftp`` policy on top of ``write``.
 
-    CONFIRMED (2026-09-12), also against a live 6.49 router: the bare
-    fallback does not actually work with a read-only API user either - it
-    hangs for the full connection timeout (no reply at all, not even an
-    error) rather than raising quickly. A read-only ``read``-group user can
-    only get `/export` to reply promptly by adding ``file=<name>``, which
-    then needs the ``write`` policy to create the file - a real permissions
-    tradeoff this repo hasn't resolved yet (see the README). Until it is,
-    expect this call to cost up to the full ``api_timeout_seconds`` on every
-    router that only has a read-only credential, once per backup cycle.
+    ``show-sensitive`` is deliberately not passed: it only exists on
+    RouterOS 7.x (CONFIRMED 2026-09-12: a 6.49 router rejects it as an
+    "unknown parameter") and ``/export file=...`` masks passwords/secrets
+    by default anyway - this backup is for structural diffing/audit, not
+    credential recovery; see routeros_exporter/README.md.
     """
-    try:
-        rows = client.command("/export", **{"show-sensitive": "no"})
-    except RouterOSError as exc:
-        if "unknown parameter" not in str(exc).lower():
-            raise
-        rows = client.command("/export")
-
-    if len(rows) == 1 and "ret" in rows[0]:
-        return str(rows[0]["ret"])
-    return "\n".join(
-        str(r.get("line", r.get("ret", ""))) for r in rows
+    client.command("/export", file=_BACKUP_EXPORT_FILENAME)
+    remote_name = f"{_BACKUP_EXPORT_FILENAME}.rsc"
+    return _ftp_fetch_and_delete(
+        router.host, router.username, router.password, remote_name,
+        port=router.ftp_port, timeout=ftp_timeout,
     )
+
+
+def _ftp_fetch_and_delete(
+    host: str, username: str, password: str, remote_name: str,
+    *, port: int = 21, timeout: float = 15.0,
+) -> str:
+    buf = io.BytesIO()
+    ftp = ftplib.FTP()
+    try:
+        ftp.connect(host, port, timeout=timeout)
+        ftp.login(username, password)
+        ftp.retrbinary(f"RETR {remote_name}", buf.write)
+        with contextlib.suppress(ftplib.all_errors):
+            # Best-effort: the fixed filename is overwritten next cycle
+            # regardless, so a failed delete here isn't fatal - don't let
+            # router-side cleanup failure sink an otherwise-good backup.
+            ftp.delete(remote_name)
+    except ftplib.all_errors as exc:
+        raise RouterOSError(f"{host}: FTP fetch of {remote_name} failed: {exc}") from exc
+    finally:
+        with contextlib.suppress(Exception):
+            ftp.quit()
+    return buf.getvalue().decode("utf-8", errors="replace")

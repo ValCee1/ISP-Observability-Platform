@@ -14,16 +14,36 @@ Prometheus scrapes it on **:9436** (job `routeros-api`). It augments the SNMP
 `ppp-sessions.yml` path, it does not replace it — if the API is unreachable
 the SNMP-derived `ppp:session:*` series still work.
 
-## RouterOS side — one read-only user
+## RouterOS side — one user, scoped to exactly what it needs
+
+Every read path (`/ppp/*/print`, `/log/print`, `/system/*/print`,
+`/ip/route/print`, `/ip/neighbor/print`, `/interface/print`) only ever
+needs `read`. Config backup is the one exception: RouterOS 6.x's API can't
+stream `/export` output to a read-only user at all (see CONFIRMED below),
+and even with `write` it can't hand back a file's contents on that ROS
+version - only FTP can. So the user gets a **custom group**, not the
+built-in `write` group, scoped to exactly `api, read, write, ftp` - never
+`password`, `sensitive`, `policy`, `reboot`, or `sniff`:
 
 ```
-/user add name=prom-ro group=read password=<strong> comment="routeros-exporter (read-only)"
-/ip service set api address=<prometheus-host>/32          # or api-ssl (8729)
+/user group add name=routeros-exporter policy=api,read,write,ftp
+/user add name=prom-ro group=routeros-exporter password=<strong> comment="routeros-exporter"
+/ip service set api address=<prometheus-host>/32      # or api-ssl (8729)
+/ip service set ftp address=<prometheus-host>/32
 ```
 
-The `read` group cannot change config; every API path used is read-only
-(`/ppp/*/print`, `/log/print`, `/system/*/print`, `/ip/route/print`,
-`/ip/neighbor/print`, `/interface/print`, `/export show-sensitive=no`).
+(If `prom-ro` already exists from before this policy existed:
+`/user set prom-ro group=routeros-exporter` - same username/password, no
+credentials-file change needed.)
+
+This means a compromised exporter (or a bug in it) could create, overwrite,
+or delete files on your routers - it cannot change passwords, reboot,
+touch firewall/routing policy, or read other users' saved passwords. If
+you'd rather keep it strictly read-only instead, the alternative considered
+and explicitly not chosen (2026-09-13) was a RouterOS-side scheduler
+running `/export` locally on each router (no network credential needed to
+create the file) paired with an FTP-only, permanently read-only fetch
+credential. Revisit that if the wider policy above becomes a concern.
 
 ## Configure
 
@@ -48,27 +68,27 @@ list-of-dicts the API returns, tested against `tests/fixtures/*.json`
 (captured API output). Anything that could only be confirmed on real
 hardware is marked `UNVERIFIED - needs live device`.
 
-## Confirmed against a live router (2026-09-12, RouterOS 6.49, hAP lite ×2)
+## Confirmed against a live router (2026-09-12/13, RouterOS 6.49, hAP lite ×2)
 
 - PPP/secret/system polling, and topology discovery via `/ip/route` +
   `/ip/neighbor`, all work as designed against real hardware.
-- `/export` needs the `show-sensitive` fallback (`export_via_api` retries
-  without it - ROS 6.x rejects the parameter, ROS 7.x accepts it).
-- **Config backup needs a write-capable RouterOS user, contradicting the
-  "read-only API user" this component was designed around.** A bare
-  `/export` over the API does not return on this ROS 6.x device (times out
-  - no console/pager over the API); `/export file=<name>` replies
-  immediately but requires the `write` policy to create the file, which the
-  `read` group's user correctly does not have (`not enough permissions`).
-  `routeros_scrape_success`/PPP data are unaffected (config-backup failures
-  are isolated in `__main__.poll_router` and only surface as
-  `routeros_config_backup_success=0` / `RouterBackupFailing`) - **until this
-  is redesigned, `RouterBackupFailing`/`RouterBackupStale` will fire for
-  every router and should be treated as a known gap, not a real incident.**
-  Options going forward (not yet decided): a second, `write`-scoped
-  credential used only for backups; or fetch the exported file over FTP
-  instead of the API; or drop the read-only requirement for this one
-  feature and document the tradeoff explicitly.
+- A bare `/export` over the API does not return AT ALL on this ROS 6.x
+  device with a read-only user (no console/pager over the API - it just
+  hangs) - `/export file=<name>` replies in under 2s once the credential
+  has `write`.
+- RouterOS 6.x's API has no way to read a file's contents back (only newer
+  7.x builds added that) - fetching the export text needs FTP, hence the
+  `ftp` policy above.
+- `show-sensitive` (explicit sensitive-value masking) only exists on
+  RouterOS 7.x - a 6.49 router rejects it as an "unknown parameter", so
+  `export_via_api` doesn't pass it; `/export`'s default masking still
+  applies either way.
+- **Resolved 2026-09-13**: config backup now uses the widened
+  `api, read, write, ftp` group above (`export_via_api` triggers
+  `/export file=...` then fetches + deletes it over FTP). Config-backup
+  failures stay isolated in `__main__.poll_router` and only surface as
+  `routeros_config_backup_success=0` / `RouterBackupFailing` - they never
+  affect `routeros_scrape_success` / PPP data.
 
 ## Still UNVERIFIED
 

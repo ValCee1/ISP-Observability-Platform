@@ -70,7 +70,11 @@ def poll_router(c: cfg.RouterConfig, conf: cfg.Config, m: Metrics, *, do_backup:
 
             if do_backup and c.collect_backup and repo is not None:
                 try:
-                    result = back_up_router(c.name, export_via_api(api), repo)
+                    result = back_up_router(
+                        c.name,
+                        export_via_api(api, c, ftp_timeout=conf.api_timeout_seconds),
+                        repo,
+                    )
                 except roc.RouterOSError as exc:
                     # API-level failure (timeout, unsupported param, ...) -
                     # turn it into the same BackupResult shape a git-commit

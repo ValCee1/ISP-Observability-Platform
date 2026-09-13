@@ -24,6 +24,8 @@ routers:
   - name: pop1-home            # -> `router` label; keep stable
     host: 192.168.10.1
     port: 8728                  # 8729 + use_tls: true for api-ssl
+    ftp_port: 21                 # config backup fetch - see README's RouterOS
+                                  # user setup (needs api, read, write, ftp)
     site: HOME
     pop: HOME
     role: core-router

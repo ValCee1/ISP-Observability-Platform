@@ -38,6 +38,9 @@ class RouterConfig:
     use_tls: bool = False
     username: str = ""         # filled in from the credentials file
     password: str = ""
+    ftp_port: int = 21        # config backup fetch (export_via_api) - see
+                               # routeros_exporter/README.md for the RouterOS
+                               # user policy this needs (api, read, write, ftp)
     # Label passthrough - these land on every metric for this router so the
     # exporter's series line up with the SNMP jobs' `site` / `pop` / `role`.
     site: str = ""
@@ -135,6 +138,7 @@ def load(
                 use_tls=bool(entry.get("use_tls", False)),
                 username=cred.get("username", entry.get("username", "")),
                 password=cred.get("password", entry.get("password", "")),
+                ftp_port=int(entry.get("ftp_port", 21)),
                 site=entry.get("site", ""),
                 pop=entry.get("pop", ""),
                 role=entry.get("role", "core-router"),
