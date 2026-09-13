@@ -203,6 +203,7 @@ Rule groups, by file:
 | `subscriber-alerts.yml` | `subscriber-mass-outage`, `subscriber-stability`, `subscriber-housekeeping` | SubscriberMassOutagePOP/Router, PPPoEAuthFailureSpike, SubscriberChronicFlapping, ProvisionedButOffline |
 | `config-backup.yml` | `config-backup` | RouterConfigChanged, RouterBackupStale/Failing, RouterOSVersionDrift |
 | `topology-rollup.yml` | `topology-rollup`, `topology-alerts` | `topology:pop:isolated`, POPIsolated (root-cause rollup) |
+| `anomaly-detection.yml` | `subscriber-anomaly`, `router-resource-anomaly`, `anomaly-alerts` | 1h-vs-6h baseline deviation - SubscriberCountAnomalyLow{POP,Router}, Router{CPU,Memory}AnomalyHigh |
 | `sector-normalization.yml` | `sector-availability`, `sector-aggregates`, `sector-cpe`, `sector-cpe-derived`, `sector-24h`, `sector-hourly`, `sector-hour-of-day` | `sector_*` / `sector:*` derived series |
 | `sector-thresholds.yml` | `sector-capacity-thresholds` | per-sector client/Mbps limits (default 15/20 clients, 20/25 Mbps) |
 | `sector-alerts.yml` | `sector-availability`, `sector-performance`, `sector-device`, `sector-cpe`, `sector-capacity` | SectorDown, SectorWideCPEDegradation, CPE\* alerts, capacity digest |

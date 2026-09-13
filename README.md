@@ -22,6 +22,9 @@ Routers        --API---> routeros-exporter -/            -> Alertmanager -> Tele
   topology auto-discovery + POP-isolation rollup.
 - [routeros_exporter/README.md](routeros_exporter/README.md) — the API collector
   itself (metrics, the read-only RouterOS user, `UNVERIFIED` list).
+- [docs/tier2-anomaly-detection.md](docs/tier2-anomaly-detection.md) —
+  baseline-deviation anomaly detection (subscriber counts, router CPU/memory)
+  that catches slow bleeds the threshold alerts can't.
 - [docs/DOCKER.md](docs/DOCKER.md) — building and publishing the
   `isp-observability` Prometheus image (repo config baked in) to a private
   registry.
@@ -85,6 +88,10 @@ docker compose -f docker-compose.yml -f docker-compose.image.yml up -d
   auto-discovery (`/ip/route` + `/ip/neighbor`) that finally activates the `pop`
   dependency-inhibition machinery. Details:
   [docs/tier1-subscriber-config-topology.md](docs/tier1-subscriber-config-topology.md).
+- **Anomaly detection** (`prometheus/rules/anomaly-detection.yml`): a metric compared
+  to its own recent baseline (1h vs 6h average) rather than a fixed threshold — catches
+  a slow subscriber-count bleed or a CPU/memory creep the sharp threshold alerts can't.
+  Details: [docs/tier2-anomaly-detection.md](docs/tier2-anomaly-detection.md).
 - Recording rules (`prometheus/rules/link-normalization.yml`) turn raw per-vendor SNMP
   metrics into vendor-agnostic `link_*` series and a single `link_health_score` per link.
 - Alerting rules (`prometheus/rules/link-alerts.yml`, `mikrotik-alerts.yml`) cover both

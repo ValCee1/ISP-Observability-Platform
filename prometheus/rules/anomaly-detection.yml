@@ -1,0 +1,154 @@
+# Tier 2, part 1: statistical anomaly detection - no LLM, no new service,
+# same "compare to its own recent baseline" idiom the repo already uses for
+# CPE signal drift (sector-normalization.yml's sector:cpe:signal_drift_db /
+# baseline_ready). Pure Prometheus recording + alerting rules.
+#
+# WHY THIS EXISTS ALONGSIDE THE EXISTING THRESHOLD ALERTS
+# Threshold alerts (SubscriberMassOutagePOP, HighCPU, HighMemory, ...) catch
+# FAST, SHARP problems by design - e.g. mass-outage needs a >=30% session
+# drop inside 5 minutes. They structurally cannot catch a SLOW bleed: a
+# sector losing subscribers 2% an hour, or CPU creeping up over a day
+# without ever crossing 80%. This file adds that: "is this metric far from
+# its OWN recent normal", independent of any fixed threshold.
+#
+# WINDOW CHOICE - v1, deliberately short, documented upgrade path.
+# The sector CPE baseline compares to a 7-DAY average because CPE signal is
+# stable week to week. Subscriber counts and router load are not that
+# settled yet on this deployment (SNMP/API history is currently only hours
+# deep - CONFIRMED 2026-09-13: `count_over_time(up[30d])` on pop1-home
+# returned ~2400 samples, i.e. ~10h, not 30 days - prior volumes were
+# recreated during development). So v1 compares a SHORT window (1h) against
+# a SLIGHTLY LONGER one (6h) rather than hour-of-day-of-week (which is what
+# sector-normalization.yml's `:hod` rules do, and which this SHOULD move to
+# once weeks of continuous history exist - same 24-explicit-rules pattern,
+# see that file's comments on why PromQL needs one rule per hour).
+# `baseline_ready` gates every alert here on ~5h+ of data in the 6h window,
+# mirroring sector:cpe:baseline_ready's "don't fire off a half-formed
+# baseline" rule.
+
+groups:
+  # ---------------------------------------------------------------------
+  # Subscriber count anomaly - complements SubscriberMassOutagePOP/Router
+  # (subscriber-alerts.yml), which only catches a drop inside ~5 minutes.
+  # ---------------------------------------------------------------------
+  - name: subscriber-anomaly
+    interval: 1m
+    rules:
+      - record: subscriber:active:by_pop:avg1h
+        expr: avg_over_time(subscriber:active:by_pop[1h])
+
+      - record: subscriber:active:by_pop:avg6h
+        expr: avg_over_time(subscriber:active:by_pop[6h])
+
+      - record: subscriber:active:by_pop:baseline_ready
+        expr: (count_over_time(subscriber:active:by_pop[6h:1m]) > bool 300)
+
+      - record: subscriber:active:by_router:avg1h
+        expr: avg_over_time(subscriber:active:by_router[1h])
+
+      - record: subscriber:active:by_router:avg6h
+        expr: avg_over_time(subscriber:active:by_router[6h])
+
+      - record: subscriber:active:by_router:baseline_ready
+        expr: (count_over_time(subscriber:active:by_router[6h:1m]) > bool 300)
+
+  # ---------------------------------------------------------------------
+  # Router CPU / memory anomaly - complements the flat HighCPU (>80%) /
+  # HighMemory (>75%) alerts in mikrotik-alerts.yml, which never fire on a
+  # router creeping from "normally 20%" to "consistently 65%" without ever
+  # crossing the hard ceiling.
+  # ---------------------------------------------------------------------
+  - name: router-resource-anomaly
+    interval: 1m
+    rules:
+      - record: router:cpu_percent:avg1h
+        expr: avg_over_time(hrProcessorLoad[1h])
+
+      - record: router:cpu_percent:avg6h
+        expr: avg_over_time(hrProcessorLoad[6h])
+
+      - record: router:cpu_percent:baseline_ready
+        expr: (count_over_time(hrProcessorLoad[6h:1m]) > bool 300)
+
+      - record: router:memory_percent:avg1h
+        expr: avg_over_time((100 * (hrStorageUsed{hrStorageDescr=~".*[Mm]emory.*"} / hrStorageSize{hrStorageDescr=~".*[Mm]emory.*"}))[1h:1m])
+
+      - record: router:memory_percent:avg6h
+        expr: avg_over_time((100 * (hrStorageUsed{hrStorageDescr=~".*[Mm]emory.*"} / hrStorageSize{hrStorageDescr=~".*[Mm]emory.*"}))[6h:1m])
+
+      - record: router:memory_percent:baseline_ready
+        expr: (count_over_time(hrStorageUsed{hrStorageDescr=~".*[Mm]emory.*"}[6h:1m]) > bool 300)
+
+  - name: anomaly-alerts
+    rules:
+      # >=40% below its own last-6h average, sustained 30m, and only once
+      # there's enough history to trust "normal" - a slow bleed, not the
+      # sharp drop SubscriberMassOutagePOP already covers (that one fires
+      # in minutes; this is the one that catches what it misses).
+      - alert: SubscriberCountAnomalyLowPOP
+        expr: |
+          (subscriber:active:by_pop:avg1h <= 0.6 * subscriber:active:by_pop:avg6h)
+          and (subscriber:active:by_pop:avg6h >= 3)
+          and (subscriber:active:by_pop:baseline_ready == 1)
+        for: 30m
+        labels: { severity: warning, category: degrading, scope: pop, alert_type: subscriber-anomaly-low }
+        annotations:
+          summary: "🟡 POP {{ $labels.pop }}: subscriber count drifting down"
+          description: >-
+            POP {{ $labels.pop }}'s 1h-average active sessions
+            ({{ $value | printf "%.1f" }}) is well below its own 6h average -
+            a gradual decline, not a sudden drop (SubscriberMassOutagePOP
+            would have already fired for that). Worth checking before it
+            becomes an outage.
+
+      - alert: SubscriberCountAnomalyLowRouter
+        expr: |
+          (subscriber:active:by_router:avg1h <= 0.6 * subscriber:active:by_router:avg6h)
+          and (subscriber:active:by_router:avg6h >= 3)
+          and (subscriber:active:by_router:baseline_ready == 1)
+        for: 30m
+        labels: { severity: warning, category: degrading, scope: subscriber, alert_type: subscriber-anomaly-low }
+        annotations:
+          summary: "🟡 {{ $labels.router }}: subscriber count drifting down"
+          description: >-
+            {{ $labels.router }}'s 1h-average active sessions
+            ({{ $value | printf "%.1f" }}) is well below its own 6h average.
+
+      - alert: RouterCPUAnomalyHigh
+        # CONFIRMED (2026-09-13, promtool): a 1h-vs-6h ratio is inherently
+        # transient for a step change - the 6h average catches up to the
+        # new level over time, so ratio >= 1.5 only holds for ~20-25 min
+        # even for a 20%->35% jump held indefinitely. `for: 30m` would never
+        # fire; 15m matches the width this technique can actually sustain
+        # (see anomaly_test.yml for the exact simulated crossing points).
+        expr: |
+          (router:cpu_percent:avg1h >= 1.5 * router:cpu_percent:avg6h)
+          and (router:cpu_percent:avg6h >= 10)
+          and (router:cpu_percent:avg1h < 80)
+          and (router:cpu_percent:baseline_ready == 1)
+        for: 15m
+        labels: { severity: info, category: degrading, scope: router, alert_type: cpu-anomaly-high }
+        annotations:
+          summary: "🟡 {{ $labels.instance }}: CPU load creeping up"
+          description: >-
+            CPU load has averaged {{ $value | printf "%.0f" }}% over the last
+            hour, well above its own 6h average, but still under the hard
+            HighCPU threshold (80%) - catch the trend before it crosses it.
+
+      - alert: RouterMemoryAnomalyHigh
+        # Same transient-ratio reasoning as RouterCPUAnomalyHigh - 15m, not 30m.
+        expr: |
+          (router:memory_percent:avg1h >= 1.3 * router:memory_percent:avg6h)
+          and (router:memory_percent:avg6h >= 10)
+          and (router:memory_percent:avg1h < 75)
+          and (router:memory_percent:baseline_ready == 1)
+        for: 15m
+        labels: { severity: info, category: degrading, scope: router, alert_type: memory-anomaly-high }
+        annotations:
+          summary: "🟡 {{ $labels.instance }}: memory use creeping up"
+          description: >-
+            Memory use has averaged {{ $value | printf "%.0f" }}% over the
+            last hour, well above its own 6h average, but still under the
+            hard HighMemory threshold (75%) - a slow leak or growing table
+            (routing, connection tracking, PPP secrets) is worth a look
+            before it crosses the hard alert.
