@@ -102,7 +102,7 @@ def test_export_via_api_triggers_file_export_then_ftp_fetch(monkeypatch):
 
     assert text == "/ip address\nadd address=1.2.3.4/24\n"
     assert client.calls == [("/export", {"file": "routeros-exporter-backup"})]
-    assert ("connect", "192.168.10.1", 21, 15.0) in fake.calls
+    assert ("connect", "192.168.10.1", 21, 90.0) in fake.calls  # export_via_api's default ftp_timeout
     assert ("login", "prom-ro", "x") in fake.calls
     assert ("retrbinary", "RETR routeros-exporter-backup.rsc") in fake.calls
     assert ("delete", "routeros-exporter-backup.rsc") in fake.calls

@@ -12,8 +12,14 @@
 options:
   listen_port: 9436
   poll_interval_seconds: 30          # PPP + system metrics
-  api_timeout_seconds: 30            # CONFIRMED 2026-09-12: /export on a
-                                      # real router needs more than 10s
+  api_timeout_seconds: 30            # routine PPP/system/topology polling
+  backup_timeout_seconds: 90         # config backup's OWN, longer timeout -
+                                      # CONFIRMED 2026-09-14: /export
+                                      # file=... took ~52s on a hAP AC Lite,
+                                      # not a hang, just slow. Kept separate
+                                      # from api_timeout_seconds so a slow
+                                      # backup never delays detecting a
+                                      # genuinely dead router too.
   backup_interval_seconds: 3600       # config export + git commit
   backup_repo_path: /var/lib/routeros-exporter/backups
   topology_interval_seconds: 900      # route/neighbour discovery

@@ -36,7 +36,7 @@ def test_poll_router_populates_all_metric_families(tmp_path, monkeypatch):
     )
 
     @contextlib.contextmanager
-    def fake_connect(router):
+    def fake_connect(router, *, timeout=None):
         yield fake
 
     monkeypatch.setattr(roc, "connect", fake_connect)
@@ -91,7 +91,7 @@ def test_backup_failure_does_not_sink_scrape_success(tmp_path, monkeypatch):
     )
 
     @contextlib.contextmanager
-    def fake_connect(router):
+    def fake_connect(router, *, timeout=None):
         yield fake
 
     monkeypatch.setattr(main_mod.roc, "connect", fake_connect)
@@ -124,7 +124,7 @@ def test_poll_router_returns_false_on_connect_failure(tmp_path, monkeypatch):
     depends on."""
 
     @contextlib.contextmanager
-    def failing_connect(router):
+    def failing_connect(router, *, timeout=None):
         raise RouterOSError(f"{router.host}: API connect failed: connection refused")
         yield  # pragma: no cover - unreachable, contextmanager needs a yield
 

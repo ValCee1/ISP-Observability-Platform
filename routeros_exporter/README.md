@@ -29,7 +29,9 @@ built-in `write` group, scoped to exactly `api, read, write, ftp` - never
 /user group add name=routeros-exporter policy=api,read,write,ftp
 /user add name=prom-ro group=routeros-exporter password=<strong> comment="routeros-exporter"
 /ip service set api address=<prometheus-host>/32      # or api-ssl (8729)
-/ip service set ftp address=<prometheus-host>/32
+/ip service enable ftp                                 # CONFIRMED 2026-09-14:
+/ip service set ftp address=<prometheus-host>/32       # `set address=` alone does NOT
+                                                        # enable a disabled service
 ```
 
 (If `prom-ro` already exists from before this policy existed:
@@ -44,6 +46,12 @@ and explicitly not chosen (2026-09-13) was a RouterOS-side scheduler
 running `/export` locally on each router (no network credential needed to
 create the file) paired with an FTP-only, permanently read-only fetch
 credential. Revisit that if the wider policy above becomes a concern.
+
+**The backup content itself is sensitive.** CONFIRMED 2026-09-14: RouterOS
+6.x's `/export` does not mask passwords/secrets by default - a live export
+came back with a WiFi PSK in plain text. Treat the backup git repo
+(`routeros_exporter_data` volume) like `secrets/`: never commit it, don't
+expose the volume, restrict who can read it.
 
 ## Configure
 
@@ -78,48 +86,44 @@ hardware is marked `UNVERIFIED - needs live device`.
 - RouterOS 6.x's API has no way to read a file's contents back (only newer
   7.x builds added that) - fetching the export text needs FTP, hence the
   `ftp` policy above.
-- `show-sensitive` (explicit sensitive-value masking) only exists on
-  RouterOS 7.x - a 6.49 router rejects it as an "unknown parameter", so
-  `export_via_api` doesn't pass it; `/export`'s default masking still
-  applies either way.
+- `show-sensitive` only exists on RouterOS 7.x - a 6.49 router rejects it
+  as an "unknown parameter", so `export_via_api` doesn't pass it.
+  **CORRECTION 2026-09-14**: this does NOT mean 6.x masks secrets some
+  other way - a live export came back with a WiFi PSK in **plain text**.
+  RouterOS 6.x's `/export` doesn't hide sensitive values by default at
+  all. **Treat the backup git repo/volume as holding real credentials**,
+  not just structural config - same handling as `secrets/`: never commit
+  it, don't expose the volume, restrict who can read it.
 - **`export_via_api` (2026-09-13) uses the widened `api, read, write, ftp`
-  group above: `/export file=...` over the API, then FTP fetch + delete.**
-  This is real and correctly implemented, but on this specific test
-  hardware (a **hAP AC Lite** - a modest single-core device) it does not
-  actually complete:
-  - **CONFIRMED 2026-09-14, at 2am with the router otherwise idle and
-    healthy (2ms ping, 0% loss)**: `/export file=...` still hung for the
-    full timeout (tested up to 90s) even with `write` granted. This isn't
-    a permissions problem or ordinary load - it looks like this ROS
-    6.49/hAP-AC-Lite combination just can't complete `/export` over the
-    API at all, at least not with `file=` either. (An earlier quick test
-    that appeared to "reply in under 2s" was actually RouterOS failing the
-    *permission check* fast, before ever attempting the export - it told
-    us nothing about whether the export itself would complete once
-    permission was granted.)
-  - **CONFIRMED 2026-09-13/14**: retrying that every ~30s poll cycle (safe
-    for a *transient* miss) is actively harmful against a command that
-    fails the same way *every* time - it keeps a hung API connection in
-    flight almost continuously, which exhausted this router's API
-    connections badly enough to break its routine PPP/system polling too.
-    Fixed in `__main__.py` (`BACKOFF_AFTER_FAILURES`,
-    `_schedule_after_attempt`): after 2 consecutive failures, back off to
-    the full hourly interval instead of hammering it. A router that
-    recovers still gets picked up fast (2 quick tries before backing off);
-    a router where the command is simply unsupported settles into one
-    gentle attempt an hour, forever - `RouterBackupFailing` reflects that
-    correctly, without making the router worse.
-  - Config-backup failures stay isolated in `__main__.poll_router` either
-    way and never affect `routeros_scrape_success` / PPP data.
-  - **Open question, not yet answered**: does `/export` (with or without
-    `file=`) work over the API on stronger hardware, or on RouterOS 7.x?
-    The user's guidance (2026-09-13): production routers/radios are more
-    robust than this test box, so treat this as unresolved for THIS device
-    rather than a verdict on the whole design - re-test on real production
-    hardware before concluding Option A doesn't work at all. If it turns
-    out this is a broader RouterOS 6.x/API limitation, Option B (a
-    RouterOS-side scheduler running `/export` locally, no live API call
-    involved) sidesteps it entirely - see the section above.
+  group above: `/export file=...` over the API, then FTP fetch + delete.
+  CONFIRMED WORKING END-TO-END 2026-09-14** against pop1-home (a hAP AC
+  Lite) - `routeros_config_backup_success=1`, a real 110-line export
+  committed to git. Getting there took two more fixes than expected:
+  - **A real bug, not a hardware ceiling**: `client.connect()` never
+    accepted or passed through a `timeout` at all - every connection
+    silently got librouteros's 10s default no matter what
+    `Config.api_timeout_seconds` said, so `/export file=...` (which
+    genuinely takes ~52s on this device) was doomed regardless of
+    permissions. An initial test that looked like "replies in under 2s
+    with `write`" was misleading: that was RouterOS failing the
+    *permission check* fast, before ever attempting the real export.
+    Fixed: `connect()` now takes `timeout=`, and backup gets its own
+    connection on a separate, longer `Config.backup_timeout_seconds`
+    (90s default) so a slow backup never delays routine polling's
+    dead-router detection.
+  - **FTP has to actually be enabled** (`/ip ip service enable ftp` +
+    address restriction) - obvious in hindsight, easy to miss since the
+    API-side symptom (a hang) looked unrelated to FTP entirely.
+  - **CONFIRMED 2026-09-13/14, separately**: retrying a failed backup
+    every ~30s poll cycle (safe for a *transient* miss) is actively harmful
+    against a command that keeps failing the same way - it kept a hung API
+    connection in flight almost continuously and was enough, on this
+    device, to break routine PPP/system polling too. Fixed in
+    `__main__.py` (`BACKOFF_AFTER_FAILURES`, `_schedule_after_attempt`):
+    after 2 consecutive misses, back off to the full hourly interval
+    instead of hammering. Verified live: exactly 2 attempts, then silence.
+  - Config-backup failures stay isolated in `__main__.poll_router` and
+    never affect `routeros_scrape_success` / PPP data, success or not.
 
 ## Still UNVERIFIED
 

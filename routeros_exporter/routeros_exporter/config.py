@@ -69,13 +69,22 @@ class Config:
     # reason to hammer it faster than Prometheus scrapes (default 30s for
     # the slow SNMP jobs).
     poll_interval_seconds: int = 30
-    # CONFIRMED (2026-09-12): 10s was too tight - /export on a router with a
-    # sizeable config (hundreds of PPP secrets + neighbours) timed out on a
-    # live ROS 6.49 box. One timeout applies to the whole connection (PPP/
-    # system/backup/topology share it), so it's sized for the slowest of
-    # those, not the common case - same tradeoff the SNMP jobs made for slow
-    # radio walks (see prometheus/prometheus.yml link-radio-health comment).
+    # Connection timeout for the fast PPP/system/topology poll. Kept short
+    # deliberately: a router that's actually unreachable should be detected
+    # (and RouterOSAPICollectorDown fired) quickly, not after a minute-plus
+    # wait every 30s cycle. 30s is comfortable headroom for those calls in
+    # practice - CONFIRMED 2026-09-14: they were fine even under the
+    # previously-hidden 10s default (see client.connect's docstring for
+    # that bug). Config backup is deliberately NOT sized against this value
+    # - see backup_timeout_seconds below.
     api_timeout_seconds: float = 30.0
+    # Separate, longer timeout for the config-backup connection only.
+    # CONFIRMED 2026-09-14, live: `/export file=...` took ~52s to complete
+    # on a hAP AC Lite (a modest single-core device) - not a hang, just
+    # slow. Backup gets its OWN connection (see __main__.poll_router) with
+    # this timeout instead of sharing api_timeout_seconds, so a slow backup
+    # never makes routine polling's dead-router detection slower too.
+    backup_timeout_seconds: float = 90.0
     # Config backup cadence + destination. The repo is a plain `git init`
     # directory on its own volume; the exporter commits into it.
     backup_interval_seconds: int = 3600
@@ -156,7 +165,12 @@ def load(
         routers=tuple(routers),
         listen_port=int(opts.get("listen_port", 9436)),
         poll_interval_seconds=int(opts.get("poll_interval_seconds", 30)),
-        api_timeout_seconds=float(opts.get("api_timeout_seconds", 10.0)),
+        # NOTE the fallback here previously said 10.0 while the Config
+        # dataclass field default said 30.0 - harmless in practice (every
+        # committed config.yml sets this explicitly) but fixed for
+        # consistency, 2026-09-14.
+        api_timeout_seconds=float(opts.get("api_timeout_seconds", 30.0)),
+        backup_timeout_seconds=float(opts.get("backup_timeout_seconds", 90.0)),
         backup_interval_seconds=int(opts.get("backup_interval_seconds", 3600)),
         backup_repo_path=opts.get(
             "backup_repo_path", "/var/lib/routeros-exporter/backups"

@@ -14,10 +14,19 @@ Per router, per cycle:
 
 The git repo is a plain ``git init`` directory on its own volume - restoring
 is ``git show <rev>:<router>.rsc``. This is what drift-detection and the
-change diff work from; RouterOS masks passwords/secrets in ``/export`` by
-default, so it is NOT a full credential-recovery image. A true restore
-(binary ``/system/backup/save``, which does carry secrets) is a documented
-follow-up, not implemented yet - see routeros_exporter/README.md.
+change diff work from.
+
+CORRECTION, CONFIRMED 2026-09-14 against a real router's real export: on
+RouterOS 6.x, ``/export`` does NOT mask passwords/secrets by default - a
+live export came back with a WiFi PSK in plain text. (The earlier
+assumption here was wrong; it likely conflated this with `show-sensitive`,
+which only *exists* on 7.x and, per its name, is for *showing* sensitive
+values that 7.x hides by default - 6.x apparently never hid them at all.)
+**Treat the backup git repo/volume as containing real secrets, not just
+structural config** - it needs the same handling as the credentials file
+it's adjacent to: never commit it, don't expose the volume, restrict who
+can read it. A true DR restore image (binary ``/system/backup/save``) is
+still a separate, not-implemented follow-up - see routeros_exporter/README.md.
 
 RouterOS ``/export`` output contains a first-line timestamp comment that
 changes every run; it's stripped before diffing so an unchanged config
@@ -150,15 +159,21 @@ def back_up_router(
     )
 
 
-def export_via_api(client, router, *, ftp_timeout: float = 15.0) -> str:
+def export_via_api(client, router, *, ftp_timeout: float = 90.0) -> str:
     """Trigger ``/export file=...`` over the API, then fetch + delete that
     file over FTP.
 
     Two round trips against two protocols, both needed:
-      1. API ``/export file=<name>`` - CONFIRMED 2026-09-13: replies in
-         under 2s once the credential has ``write`` (a bare ``/export``
-         over the API hangs indefinitely with a read-only user instead of
-         erroring - see the module docstring).
+      1. API ``/export file=<name>`` - CONFIRMED 2026-09-14: takes ~52s to
+         complete on a hAP AC Lite once the credential actually has
+         ``write`` - not a hang, just slow (a bare `/export` over the API
+         hangs indefinitely for a read-only user instead of erroring - see
+         the module docstring). An earlier "replies in under 2s" reading
+         was wrong: that was RouterOS failing the *permission check*
+         quickly, before ever attempting the real export - it told us
+         nothing about how long a successful one takes. Caller should pass
+         a generous timeout (`Config.backup_timeout_seconds`, not the
+         faster `api_timeout_seconds` routine polling uses).
       2. FTP RETR of ``<name>.rsc`` - RouterOS 6.x's API has no "read a
          file's contents" call; only 7.x builds added that. FTP is what
          every RouterOS version has always supported for this. Needs the
@@ -166,9 +181,11 @@ def export_via_api(client, router, *, ftp_timeout: float = 15.0) -> str:
 
     ``show-sensitive`` is deliberately not passed: it only exists on
     RouterOS 7.x (CONFIRMED 2026-09-12: a 6.49 router rejects it as an
-    "unknown parameter") and ``/export file=...`` masks passwords/secrets
-    by default anyway - this backup is for structural diffing/audit, not
-    credential recovery; see routeros_exporter/README.md.
+    "unknown parameter"). CORRECTION 2026-09-14: `/export` does NOT mask
+    passwords/secrets by default on 6.x either - a live export came back
+    with a WiFi PSK in plain text. This is a real credential-bearing
+    artifact; see the module docstring's note on treating the backup repo
+    accordingly.
     """
     client.command("/export", file=_BACKUP_EXPORT_FILENAME)
     remote_name = f"{_BACKUP_EXPORT_FILENAME}.rsc"

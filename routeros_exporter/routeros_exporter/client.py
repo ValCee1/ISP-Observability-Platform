@@ -140,14 +140,25 @@ def _where(resource, where: dict[str, Any]):
 
 
 @contextlib.contextmanager
-def connect(router) -> Iterator[APIClient]:
-    """Context manager yielding a connected client for a RouterConfig."""
+def connect(router, *, timeout: float = 10.0) -> Iterator[APIClient]:
+    """Context manager yielding a connected client for a RouterConfig.
+
+    BUG, CONFIRMED 2026-09-14: this never accepted a `timeout` at all until
+    now, so every caller silently got LibRouterOSClient's 10s default no
+    matter what `Config.api_timeout_seconds` was set to - the config option
+    was a complete no-op. That's why `/export file=...` kept failing at a
+    consistent-ish mark: it was hitting the hidden 10s default, not the 30s
+    the config claimed. A direct test bypassing this bug (passing timeout
+    explicitly to librouteros) is what revealed the real duration (~52s on
+    a hAP AC Lite) - see routeros_exporter/README.md.
+    """
     cli = LibRouterOSClient(
         host=router.host,
         username=router.username,
         password=router.password,
         port=router.port,
         use_tls=router.use_tls,
+        timeout=timeout,
     )
     try:
         yield cli

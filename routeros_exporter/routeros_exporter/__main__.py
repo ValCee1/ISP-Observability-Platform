@@ -67,7 +67,7 @@ def poll_router(c: cfg.RouterConfig, conf: cfg.Config, m: Metrics, *, do_backup:
     backup_ok = True
     topology_ok = True
     try:
-        with roc.connect(c) as api:
+        with roc.connect(c, timeout=conf.api_timeout_seconds) as api:
             if c.collect_ppp:
                 active = ppp_mod.parse_active(api.query("/ppp/active/print"))
                 secrets = ppp_mod.parse_secrets(api.query("/ppp/secret/print"))
@@ -83,11 +83,18 @@ def poll_router(c: cfg.RouterConfig, conf: cfg.Config, m: Metrics, *, do_backup:
 
             if do_backup and c.collect_backup and repo is not None:
                 try:
-                    result = back_up_router(
-                        c.name,
-                        export_via_api(api, c, ftp_timeout=conf.api_timeout_seconds),
-                        repo,
-                    )
+                    # A SEPARATE connection, deliberately not `api` above:
+                    # backup needs much more patience than routine polling
+                    # (CONFIRMED 2026-09-14: ~52s for /export file=... on a
+                    # hAP AC Lite - not a hang, just slow) and giving the
+                    # whole cycle that much timeout would also slow down
+                    # detecting a genuinely dead router every 30s tick.
+                    with roc.connect(c, timeout=conf.backup_timeout_seconds) as backup_api:
+                        result = back_up_router(
+                            c.name,
+                            export_via_api(backup_api, c, ftp_timeout=conf.backup_timeout_seconds),
+                            repo,
+                        )
                 except roc.RouterOSError as exc:
                     # API-level failure (timeout, unsupported param, ...) -
                     # turn it into the same BackupResult shape a git-commit

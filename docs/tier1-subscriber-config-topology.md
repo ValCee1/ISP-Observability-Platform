@@ -83,26 +83,30 @@ Alerts (`prometheus/rules/config-backup.yml`): `RouterConfigChanged`
 (warning, on every diff), `RouterBackupStale` (critical, >25h),
 `RouterBackupFailing` (warning), `RouterOSVersionDrift` (info).
 
-> **Design fixed 2026-09-13, hardware finding 2026-09-14** (was a known gap
-> as of 2026-09-12): with a read-only API user, `/export` never succeeded
-> on this RouterOS 6.x fleet - a bare `/export` hangs instead of returning,
-> and the only variant that replies (`/export file=<name>`) needs `write`
-> to create the file, which RouterOS 6.x's API then can't read back anyway
-> (only FTP can). Fixed by widening the monitoring credential to a custom
-> group scoped to exactly `api, read, write, ftp` and fetching the export
-> over FTP - `export_via_api` now does `/export file=...` then an FTP RETR
-> + delete. **But CONFIRMED 2026-09-14, at 2am with the test router
-> otherwise idle**: on this specific box (a hAP AC Lite), `/export
-> file=...` still hangs the full timeout even with `write` granted - this
-> looks like a hardware/firmware limit on this device, not a permissions
-> gap. Also confirmed live: retrying that every cycle was aggressive enough
-> to break the router's routine polling too, so a backoff was added
+> **Resolved 2026-09-14** (was a known gap as of 2026-09-12): with a
+> read-only API user, `/export` never succeeded on this RouterOS 6.x fleet
+> - a bare `/export` hangs instead of returning, and the only variant that
+> replies (`/export file=<name>`) needs `write` to create the file, which
+> RouterOS 6.x's API then can't read back anyway (only FTP can). Fixed by
+> widening the monitoring credential to a custom group scoped to exactly
+> `api, read, write, ftp` and fetching the export over FTP -
+> `export_via_api` now does `/export file=...` then an FTP RETR + delete.
+> Getting there took chasing what looked like a hardware ceiling on the
+> test router (a hAP AC Lite): `/export file=...` kept hanging even with
+> `write` granted, right up until CONFIRMED 2026-09-14 that `client.connect`
+> had a real bug (it ignored the configured timeout entirely, always using
+> librouteros's 10s default) - the export genuinely just takes ~52s on this
+> device, and FTP needed to actually be enabled too. With both fixed,
+> confirmed working end-to-end: a real 110-line export committed to git.
+> **The backup content itself turned out to be sensitive** - RouterOS 6.x's
+> `/export` does not mask passwords by default (a live export had a WiFi
+> PSK in plain text); treat the backup repo like `secrets/`. Also confirmed
+> live: retrying a failed attempt every cycle was aggressive enough to
+> break the router's routine polling too, so a backoff was added
 > (`__main__.py`'s `BACKOFF_AFTER_FAILURES`) - after 2 misses it settles to
-> one gentle attempt an hour. Whether `/export` works on stronger
-> production hardware is still open; PPP/system/topology collection was
-> never affected either way (isolated per-collector in
-> `__main__.poll_router`). Details + the RouterOS commands to run:
-> `routeros_exporter/README.md`.
+> one gentle attempt an hour. PPP/system/topology collection was never
+> affected either way (isolated per-collector in `__main__.poll_router`).
+> Details + the RouterOS commands to run: `routeros_exporter/README.md`.
 
 Dashboard: **Config Audit** (`grafana/dashboards/config-audit.json`).
 
