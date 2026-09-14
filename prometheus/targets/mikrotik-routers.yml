@@ -4,26 +4,64 @@
 # `site`/`role` are free-form labels attached to every metric from this
 # router - used by dashboards to group/filter by location or function.
 #
+# `router` (added 2026-09-12) is the same stable id used as the `name` in
+# routeros_exporter/config.yml for this box. It exists purely so
+# Alertmanager can `equal: [router]` a SNMP-side alert (CoreRouterDown,
+# keyed by `instance`=IP) against the API-side alert for the same router
+# (RouterOSAPICollectorDown, keyed by `router`=this name) - see the
+# inhibit_rules note in alertmanager/alertmanager.yml. Not the file
+# unification discussed and declined earlier: this is one label, kept in
+# sync by hand, not a shared source of truth.
+#
 # `wan_ifname` documents which ifName is this router's real WAN uplink
 # (dashboards use it, e.g. "WAN Interface: {{wan_ifname}}"). It is NOT
 # currently consumed by the WANInterfaceDown alert in mikrotik-alerts.yml -
 # PromQL can't dynamically join an alert's ifName match against a
 # per-instance label value, so that alert still hardcodes its ifName regex
-# per router. With one router this is a non-issue; if a second router with
-# a different WAN ifName is added, either give it its own alert rule or
-# switch to a generated rules file. Confirmed on this router
-# (2026-08-23): "ether1" is NOT the WAN - it's an unused/down physical
-# port, the real uplink is the "chiemerie-ppp" PPPoE interface.
+# per router. With one router this was a non-issue; now that a second
+# router (Sam ISP) has its own WAN ifName, either give it its own alert
+# rule or switch to a generated rules file.
+#
+# pop1-home's wan_ifname was "chiemerie-ppp" (CONFIRMED 2026-08-23: ether1
+# was an unused/down port then). CONFIRMED CHANGED (2026-09-13, per the
+# user): ether1 is the real WAN uplink now - the wiring/config on this
+# router genuinely changed. The WAN/LAN Interfaces dashboard's "WAN /
+# Backhaul regex" textbox default was updated to match; it's still a
+# textbox, adjust it live if this changes again.
 - targets:
     - 192.168.10.1
   labels:
     site: "HOME"
     role: "core-router"
-    wan_ifname: "chiemerie-ppp"
+    pop: "HOME"
+    router: "pop1-home" # keep in sync with routeros_exporter/config.yml `name`
+    wan_ifname: "ether1"
 
 - targets:
     - 192.168.10.19
   labels:
     site: "room-office"
     role: "Repeater"
+    router: "room-office-repeater" # keep in sync with routeros_exporter/config.yml `name`
     wan_ifname: "wlan1"
+
+# Two physically separate boxes for the "Sam" site/client - an SSTP router
+# and a hotspot gateway. `router` MUST be unique per box (like `sector:`
+# elsewhere) - CONFIRMED 2026-09-13: sharing one value ("Sam ISP") made
+# their CoreRouterDown incidents indistinguishable on the NOC Overview
+# (one row named "Sam ISP", no way to tell which of the two was down).
+- targets:
+    - 192.168.11.1
+  labels:
+    site: "Sam Router"
+    role: "sstp"
+    router: "Sam OFT"
+    wan_ifname: "chidinma-ppp"
+
+- targets:
+    - 192.168.11.2
+  labels:
+    site: "Sam Hotspot"
+    role: "Hotspot Router"
+    router: "Sam Hotspot"
+    wan_ifname: "chidinma-ppp"

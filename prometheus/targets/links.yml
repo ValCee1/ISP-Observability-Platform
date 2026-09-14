@@ -24,58 +24,66 @@
       vendor: ubiquiti_airmax,
     }
 
-# LINK-002: Tower A ↔ Tower B (AirFiber)
-- targets: ["10.10.6.82"]
-  labels:
-    {
-      module: ubiquiti_airfiber_link,
-      auth: public_v2,
-      link_name: AirFiber-a,
-      link_id: LINK-002,
-      pop: BASE,
-      endpoint: a,
-      site: "BASE A",
-      role: Backhaul,
-      vendor: ubiquiti_airfiber,
-    }
-- targets: ["10.10.6.83"]
-  labels:
-    {
-      module: ubiquiti_airfiber_link,
-      auth: public_v2,
-      link_name: AirFiber-b,
-      link_id: LINK-002,
-      pop: BASE,
-      endpoint: b,
-      site: "BASE B",
-      role: Backhaul,
-      vendor: ubiquiti_airfiber,
-    }
-
-# LINK-003: Tower B ↔ Branch (SAF)
-- targets: ["10.10.6.90"]
-  labels:
-    {
-      module: saf_link,
-      auth: saf_v2,
-      link_name: saf-a,
-      link_id: LINK003,
-      pop: BASE,
-      endpoint: a,
-      site: BASE A,
-      role: Backhaul,
-      vendor: saf,
-    }
-- targets: ["10.10.6.91"]
-  labels:
-    {
-      module: saf_link,
-      auth: saf_v2,
-      link_name: saf-b,
-      link_id: LINK003,
-      pop: BASE,
-      endpoint: b,
-      site: BASE B,
-      role: Backhaul,
-      vendor: saf,
-    }
+# LINK-002 (AirFiber) and LINK-003 (SAF) - the BASE POP's backhaul pair -
+# are DISABLED (2026-09-12): this hardware isn't deployed/reachable yet, so
+# left enabled they just page LinkDown/PacketLoss/etc. forever for equipment
+# that doesn't exist. Uncomment both endpoints of a link together (they
+# share one link_id) when BASE goes live; nothing else needs to change -
+# sector-alerts.yml, sector-thresholds.yml, and the `pop: BASE` inhibit
+# rules in alertmanager.yml already expect it.
+#
+# # LINK-002: Tower A ↔ Tower B (AirFiber)
+# - targets: ["10.10.6.82"]
+#   labels:
+#     {
+#       module: ubiquiti_airfiber_link,
+#       auth: public_v2,
+#       link_name: AirFiber-a,
+#       link_id: LINK-002,
+#       pop: BASE,
+#       endpoint: a,
+#       site: "BASE A",
+#       role: Backhaul,
+#       vendor: ubiquiti_airfiber,
+#     }
+# - targets: ["10.10.6.83"]
+#   labels:
+#     {
+#       module: ubiquiti_airfiber_link,
+#       auth: public_v2,
+#       link_name: AirFiber-b,
+#       link_id: LINK-002,
+#       pop: BASE,
+#       endpoint: b,
+#       site: "BASE B",
+#       role: Backhaul,
+#       vendor: ubiquiti_airfiber,
+#     }
+#
+# # LINK-003: Tower B ↔ Branch (SAF)
+# - targets: ["10.10.6.90"]
+#   labels:
+#     {
+#       module: saf_link,
+#       auth: saf_v2,
+#       link_name: saf-a,
+#       link_id: LINK003,
+#       pop: BASE,
+#       endpoint: a,
+#       site: BASE A,
+#       role: Backhaul,
+#       vendor: saf,
+#     }
+# - targets: ["10.10.6.91"]
+#   labels:
+#     {
+#       module: saf_link,
+#       auth: saf_v2,
+#       link_name: saf-b,
+#       link_id: LINK003,
+#       pop: BASE,
+#       endpoint: b,
+#       site: BASE B,
+#       role: Backhaul,
+#       vendor: saf,
+#     }

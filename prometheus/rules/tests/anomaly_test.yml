@@ -1,0 +1,119 @@
+# promtool unit tests for Tier 2's baseline-deviation anomaly detection
+# (anomaly-detection.yml). Each series is long enough to exercise the
+# `baseline_ready` gate explicitly: evaluated once BEFORE ~5h of history
+# exists (must NOT fire, even though the raw ratio condition is already
+# true) and again AFTER (must fire).
+#
+# Run:
+#   docker run --rm --entrypoint promtool -v "$PWD/prometheus":/p \
+#     prom/prometheus:v3.13.2 test rules /p/rules/tests/anomaly_test.yml
+
+rule_files:
+  - ../anomaly-detection.yml
+
+evaluation_interval: 1m
+
+tests:
+  # ------------------------------------------------------------------
+  # SubscriberCountAnomalyLowPOP: a POP holding steady at 20 sessions,
+  # then settling at 3 (an 85% decline, well past the 40% trigger) - a
+  # slow bleed, not the sharp 5-minute drop SubscriberMassOutagePOP covers.
+  # ------------------------------------------------------------------
+  - interval: 1m
+    input_series:
+      - series: 'subscriber:active:by_pop{pop="TESTPOP"}'
+        values: '20x99 3x301'
+    alert_rule_test:
+      - eval_time: 140m       # ratio condition already true, but only
+        alertname: SubscriberCountAnomalyLowPOP  # ~141 samples exist - baseline_ready must block it
+        exp_alerts: []
+      - eval_time: 400m       # >300 samples in the 6h window now, and the
+        alertname: SubscriberCountAnomalyLowPOP  # decline has held well past `for: 30m`
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              category: degrading
+              scope: pop
+              alert_type: subscriber-anomaly-low
+              pop: TESTPOP
+            exp_annotations:
+              summary: "🟡 POP TESTPOP: subscriber count drifting down"
+              description: "POP TESTPOP's 1h-average active sessions (3.0) is well below its own 6h average - a gradual decline, not a sudden drop (SubscriberMassOutagePOP would have already fired for that). Worth checking before it becomes an outage."
+
+  # A gentle, healthy dip (20 -> 16, 20%) must never fire regardless of how
+  # much history exists - only a decline past the 40% line should.
+  - interval: 1m
+    input_series:
+      - series: 'subscriber:active:by_pop{pop="TESTPOP"}'
+        values: '20x399 16x100'
+    alert_rule_test:
+      - eval_time: 490m
+        alertname: SubscriberCountAnomalyLowPOP
+        exp_alerts: []
+
+  # ------------------------------------------------------------------
+  # RouterCPUAnomalyHigh: CPU creeping from a ~20% norm to a sustained 35%
+  # at t=400. Exact crossing points below are from simulating avg_over_time
+  # directly (see the comment on the alert itself) - the ratio only holds
+  # >=1.5 for the window t~455-479, so both eval times must land inside it.
+  # ------------------------------------------------------------------
+  - interval: 1m
+    input_series:
+      - series: 'hrProcessorLoad{instance="192.168.10.1"}'
+        values: '20x399 35x100'
+    alert_rule_test:
+      - eval_time: 465m       # ratio only crossed 1.5 at t~455 - not 15m yet
+        alertname: RouterCPUAnomalyHigh
+        exp_alerts: []
+      - eval_time: 478m       # held >=1.5 continuously since ~455 - past `for: 15m`
+        alertname: RouterCPUAnomalyHigh
+        exp_alerts:
+          - exp_labels:
+              severity: info
+              category: degrading
+              scope: router
+              alert_type: cpu-anomaly-high
+              instance: 192.168.10.1
+            exp_annotations:
+              summary: "🟡 192.168.10.1: CPU load creeping up"
+              description: "CPU load has averaged 35% over the last hour, well above its own 6h average, but still under the hard HighCPU threshold (80%) - catch the trend before it crosses it."
+
+  # A jump straight past the HighCPU line (80%+) must NOT double-fire this
+  # alert too - `avg1h < 80` hands that case to HighCPU alone.
+  - interval: 1m
+    input_series:
+      - series: 'hrProcessorLoad{instance="192.168.10.1"}'
+        values: '20x399 90x100'
+    alert_rule_test:
+      - eval_time: 478m
+        alertname: RouterCPUAnomalyHigh
+        exp_alerts: []
+
+  # RouterMemoryAnomalyHigh mirrors RouterCPUAnomalyHigh's series exactly
+  # (hrStorageSize held at 100 so 100*used/size == used numerically), but
+  # its ratio bar is lower (1.3x vs 1.5x) so it crosses earlier (~t=430,
+  # simulated) and stays crossed longer - different eval times than the CPU
+  # case above.
+  - interval: 1m
+    input_series:
+      - series: 'hrStorageUsed{instance="192.168.10.1", hrStorageDescr="Memory"}'
+        values: '20x399 35x100'
+      - series: 'hrStorageSize{instance="192.168.10.1", hrStorageDescr="Memory"}'
+        values: '100x500'
+    alert_rule_test:
+      - eval_time: 440m       # ratio crossed 1.3 at t~430 - only ~10m held
+        alertname: RouterMemoryAnomalyHigh
+        exp_alerts: []
+      - eval_time: 460m       # held >=1.3 continuously since ~430 - past `for: 15m`
+        alertname: RouterMemoryAnomalyHigh
+        exp_alerts:
+          - exp_labels:
+              severity: info
+              category: degrading
+              scope: router
+              alert_type: memory-anomaly-high
+              instance: 192.168.10.1
+              hrStorageDescr: Memory
+            exp_annotations:
+              summary: "🟡 192.168.10.1: memory use creeping up"
+              description: "Memory use has averaged 35% over the last hour, well above its own 6h average, but still under the hard HighMemory threshold (75%) - a slow leak or growing table (routing, connection tracking, PPP secrets) is worth a look before it crosses the hard alert."

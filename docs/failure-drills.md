@@ -57,6 +57,33 @@ example.)
 | Recover | Backhaul back → sectors re-register → everything resolves together. |
 | Storm check | ~2 messages per backhaul link, **0** extra for the sectors. |
 
+## Drill 3b — POP isolated / subscriber mass outage (RouterOS API)
+
+**Break it:** same as Drill 3 — down both `pop: BASE` backhauls — with
+routeros-exporter polling a router behind BASE.
+
+| Stage | Expect |
+|---|---|
+| Detect | `topology:pop:isolated{pop="BASE"}` → 1 (every backhaul `link_up` for BASE is 0). `subscriber:active:by_pop{pop="BASE"}` collapses. `routeros_scrape_success` for the BASE router → 0. |
+| Alert | **`POPIsolated`** (critical, `scope: pop`) after `for: 3m`. `SubscriberMassOutagePOP` and per-router `SubscriberMassOutageRouter`, `RouterOSAPICollectorDown`, `LinkDown` ×2, `SectorDown` ×2 all fire in Prometheus but are **inhibited** by the `alertname: POPIsolated` → `scope=~"sector\|subscriber\|link\|router"`, `equal: [pop]` rule. |
+| Telegram | **One** message: `🔴 POP BASE — CRITICAL` → "Every backhaul into POP BASE is unreachable. ~N subscribers…". |
+| Dashboard | Subscriber Overview → *Active sessions by POP* shows the cliff; *POPs isolated* stat = 1. NOC Active Incidents → one `BASE` row. |
+| Recover | Backhaul back → `topology:pop:isolated` clears → sessions re-establish → everything resolves together. |
+| Storm check | 1 message, not ~10. |
+
+## Drill 3c — Unplanned config change
+
+**Break it:** on a polled router, `/ip firewall filter add chain=forward
+action=drop` (or any real change). Wait one `backup_interval_seconds`.
+
+| Stage | Expect |
+|---|---|
+| Detect | routeros-exporter commits the new `/export`; `routeros_config_changed{router}` → 1 for that cycle; `routeros_config_last_change_timestamp` updates. |
+| Alert | **`RouterConfigChanged`** (warning, `scope: router`), `keep_firing_for: 20m`. |
+| Telegram | One message: `🟠 Router <name> — degraded` → "config changed (now N lines)… review the diff". |
+| Investigate | `git -C <backup-repo> log -p -- <router>.rsc` shows exactly what changed and when. |
+| Recover | Revert the change (or accept it); next cycle `routeros_config_changed` → 0, alert resolves after `keep_firing_for`. |
+
 ## Drill 4 — Widespread CPE degradation (derived intelligence)
 
 **Break it:** hard to fake cleanly — wait for weather, or nudge the sector
@@ -109,8 +136,8 @@ The machinery that keeps one fault = one message:
 - **`group_by: [link_id | sector | instance]`** + `group_interval: 10m` —
   every alert about one object lands in one message.
 - **`inhibit_rules`** — a parent incident (LinkDown, SectorDown,
-  SectorEther1Down, SectorWideCPEDegradation, POP backhaul/router down)
-  silences its symptoms.
+  SectorEther1Down, SectorWideCPEDegradation, POP backhaul/router down,
+  **POPIsolated**, **SubscriberMassOutagePOP**) silences its symptoms.
 - **Two-tier collapse** — `PacketLoss` / `HighLatency` warn+critical pairs:
   the critical inhibits the warning.
 - **Capacity digest** — `SectorOverClientCapacity` /

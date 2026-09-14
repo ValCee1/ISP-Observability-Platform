@@ -1,0 +1,88 @@
+# Per-subscriber PPP/PPPoE session view built from the RouterOS API
+# (routeros_exporter, job "routeros-api") - the richer companion to the
+# SNMP-derived ppp:session:* rules in ppp-sessions.yml.
+#
+# WHAT THE API GIVES THAT SNMP DOESN'T (see ppp-sessions.yml for the SNMP
+# limitations in full):
+#   - caller-id: the pppoe client MAC, our (best-effort) key to a sector.
+#   - real /ppp/active session uptime, assigned address.
+#   - /ppp/secret: the provisioned account book -> "provisioned but offline".
+#   - /log-derived disconnect reason + auth-failure counters.
+#
+# LABEL JOIN: routeros_* series carry only `router`. pop/site/role come from
+# routeros_router_info via `* on(router) group_left(pop, site)`.
+#
+# SECTOR ATTRIBUTION IS BEST-EFFORT. UNVERIFIED - needs live device: the
+# pppoe caller-id is whatever MAC the POP sees as the frame source. If the
+# client radio is in station-bridge that is the client router's MAC, which
+# is NOT the radio's registration MAC in the sector table - so the
+# caller_id <-> cpe_mac join below only lights up where they happen to
+# match. Router- and POP-level rollups (which mass-outage detection uses)
+# do not depend on it.
+
+groups:
+  - name: subscriber-sessions
+    interval: 1m
+    rules:
+      # Active sessions per POP and per router. group_left(pop) tags each
+      # router's total with its POP; routers with no `pop` set fall into
+      # pop="".
+      - record: subscriber:active:by_router
+        expr: |
+          routeros_ppp_active_total
+          * on (router) group_left (pop, site) routeros_router_info
+
+      - record: subscriber:active:by_pop
+        expr: |
+          sum by (pop) (
+            routeros_ppp_active_total
+            * on (router) group_left (pop) routeros_router_info
+          )
+
+      # Provisioned (enabled) accounts that are not currently connected.
+      # clamp_min guards the moment a session count briefly exceeds the
+      # secret count (a session lingering as the secret is deleted).
+      - record: subscriber:provisioned_offline:by_router
+        expr: |
+          clamp_min(
+            routeros_ppp_secret_total
+            - routeros_ppp_active_total,
+            0
+          )
+          * on (router) group_left (pop, site) routeros_router_info
+
+      # Reconnect counts per account - session-stability signal for the
+      # subscriber table and the chronic-flapping alert.
+      - record: subscriber:reconnects:1h
+        expr: increase(routeros_ppp_connect_total[1h])
+
+      - record: subscriber:reconnects:24h
+        expr: increase(routeros_ppp_connect_total[24h])
+
+      # Auth failures per router over the last 15m (bad password after a
+      # reset, or an account being shared / brute-forced).
+      - record: subscriber:auth_failures:15m
+        expr: increase(routeros_ppp_auth_failure_total[15m])
+
+      # Disconnect events per reason bucket, per router, last 1h - feeds the
+      # "why are sessions dropping" panel.
+      - record: subscriber:disconnects_by_reason:1h
+        expr: sum by (router, reason) (increase(routeros_ppp_disconnect_total[1h]))
+
+      # BEST-EFFORT sector attribution: match a session's caller_id to a
+      # sector CPE MAC. Absent for a session whose caller_id != any
+      # registration MAC (see the header note).
+      - record: subscriber:session:sector
+        expr: |
+          routeros_ppp_active_caller_id_info
+          * on (caller_id) group_left (sector) (
+            topk by (caller_id) (1,
+              label_replace(
+                group by (cpe_mac, sector) (sector_cpe_signal_dbm),
+                "caller_id", "$1", "cpe_mac", "(.+)"
+              )
+            )
+          )
+
+      - record: subscriber:active:by_sector
+        expr: count by (sector) (subscriber:session:sector)

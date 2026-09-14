@@ -83,7 +83,7 @@
             "id": 13,
             "type": "stat",
             "title": "High CPU",
-            "description": "Routers with CPU load at or above 90%.",
+            "description": "Routers with CPU load above 80% - matches the HighCPU alert threshold (mikrotik-alerts.yml). FIXED 2026-09-13: this stat used to threshold at >=90%, so it could read 0 while HighCPU was actually firing on the NOC incidents table.",
             "gridPos": {
                 "h": 4,
                 "w": 6,
@@ -93,7 +93,7 @@
             "datasource": "Prometheus",
             "targets": [
                 {
-                    "expr": "count(sum by (instance) (hrProcessorLoad) >= 90) or vector(0)",
+                    "expr": "count(sum by (instance) (hrProcessorLoad) > 80) or vector(0)",
                     "instant": true
                 }
             ],
@@ -111,7 +111,7 @@
             "id": 14,
             "type": "stat",
             "title": "High Memory",
-            "description": "Routers with memory used at or above 90%.",
+            "description": "Routers with memory used above 75% - matches the HighMemory alert threshold (mikrotik-alerts.yml). FIXED 2026-09-13: this stat used to threshold at >=90%, so it could read 0 while HighMemory was actually firing on the NOC incidents table (confirmed live on pop1-home).",
             "gridPos": {
                 "h": 4,
                 "w": 6,
@@ -121,7 +121,7 @@
             "datasource": "Prometheus",
             "targets": [
                 {
-                    "expr": "count(sum by (instance) (100 * (hrStorageUsed{hrStorageDescr=~\".*[Mm]emory.*\"} / hrStorageSize{hrStorageDescr=~\".*[Mm]emory.*\"})) >= 90) or vector(0)",
+                    "expr": "count(sum by (instance) (100 * (hrStorageUsed{hrStorageDescr=~\".*[Mm]emory.*\"} / hrStorageSize{hrStorageDescr=~\".*[Mm]emory.*\"})) > 75) or vector(0)",
                     "instant": true
                 }
             ],

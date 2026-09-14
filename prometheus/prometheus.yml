@@ -160,6 +160,19 @@ scrape_configs:
       - regex: "wlan_ifindex|hrDeviceIndex|hrStorageIndex|ifIndex"
         action: labeldrop
 
+  # RouterOS API collector (routeros_exporter/). NOT the proxy-scrape pattern
+  # above - it walks the routers itself over the RouterOS API and exposes
+  # routeros_* metrics directly on :9436. Covers what SNMP can't: per-
+  # subscriber PPP/PPPoE sessions (caller-id -> sector, disconnect reason,
+  # provisioned-vs-online), config backup + drift, topology auto-discovery.
+  # Each series is self-labelled router/site/pop/role from the exporter's own
+  # config file, so no target labels are set here.
+  - job_name: "routeros-api"
+    scrape_interval: 30s
+    scrape_timeout: 20s
+    static_configs:
+      - targets: ["routeros-exporter:9436"]
+
 # Where Prometheus sends firing/resolved alerts once rule_files below
 # evaluate them - routed onward to Telegram per alertmanager/alertmanager.yml.
 alerting:

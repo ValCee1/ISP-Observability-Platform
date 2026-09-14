@@ -1,0 +1,151 @@
+# promtool unit tests for the Tier-1 (RouterOS API) alert logic:
+# subscriber mass-outage, config drift, backup staleness, POP isolation.
+#
+# Run:
+#   docker run --rm --entrypoint promtool -v "$PWD/prometheus":/p \
+#     prom/prometheus:v3.13.2 test rules /p/rules/tests/subscriber_test.yml
+#
+# Each test loads only the rule file under test and injects the recorded
+# series it consumes, so the alert logic is exercised in isolation from the
+# recording-rule plumbing (which promtool would otherwise need live scrape
+# data for).
+
+rule_files:
+  - ../subscriber-alerts.yml
+  - ../config-backup.yml
+  - ../topology-rollup.yml
+
+evaluation_interval: 1m
+
+tests:
+  # ------------------------------------------------------------------
+  # SubscriberMassOutagePOP: >=30% of a POP's sessions gone vs 5m ago
+  # (and >=3 absolute). 20 -> 10 at t=5m.
+  # ------------------------------------------------------------------
+  - interval: 1m
+    input_series:
+      - series: 'subscriber:active:by_pop{pop="BASE"}'
+        values: '20 20 20 20 20 10 10 10 10 10 10 10'
+    alert_rule_test:
+      - eval_time: 4m            # drop hasn't happened yet
+        alertname: SubscriberMassOutagePOP
+        exp_alerts: []
+      - eval_time: 9m            # dropped at 5m, held past for: 3m
+        alertname: SubscriberMassOutagePOP
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              category: state
+              scope: pop
+              alert_type: mass-outage-pop
+              pop: BASE
+            exp_annotations:
+              summary: "🔴 Subscriber mass outage at POP BASE"
+              description: "POP BASE dropped from 20 to 10 active PPPoE sessions in ~5 min - look for a backhaul, power, or sector RF event before working individual subscribers."
+
+  # A gentle 20 -> 18 dip (10%, only 2 sessions) must NOT page.
+  - interval: 1m
+    input_series:
+      - series: 'subscriber:active:by_pop{pop="BASE"}'
+        values: '20 20 20 20 20 18 18 18 18 18 18 18'
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: SubscriberMassOutagePOP
+        exp_alerts: []
+
+  # ------------------------------------------------------------------
+  # RouterConfigChanged fires the cycle a diff lands (routeros_config_changed
+  # flips to 1) and rides keep_firing_for after it clears.
+  # ------------------------------------------------------------------
+  - interval: 1m
+    input_series:
+      - series: 'routeros_config_changed{router="pop1-home"}'
+        values: '0 0 0 1 0 0 0 0'
+      - series: 'routeros_config_export_lines{router="pop1-home"}'
+        values: '412x8'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: RouterConfigChanged
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: RouterConfigChanged
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              category: health
+              scope: router
+              alert_type: config-changed
+              router: pop1-home
+            exp_annotations:
+              summary: "🟠 Config changed on pop1-home"
+              description: "pop1-home's /export changed (now 412 lines). If this was not a planned change, review the diff: `git -C <backup-repo> log -p -- pop1-home.rsc`."
+      - eval_time: 10m          # value back to 0 but keep_firing_for: 20m
+        alertname: RouterConfigChanged
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              category: health
+              scope: router
+              alert_type: config-changed
+              router: pop1-home
+            exp_annotations:
+              summary: "🟠 Config changed on pop1-home"
+              description: "pop1-home's /export changed (now 412 lines). If this was not a planned change, review the diff: `git -C <backup-repo> log -p -- pop1-home.rsc`."
+
+  # ------------------------------------------------------------------
+  # RouterBackupFailing: the backup cycle has returned an error for 1h.
+  # (RouterBackupStale uses a 25h gap that isn't practical to unit-test.)
+  # ------------------------------------------------------------------
+  - interval: 5m
+    input_series:
+      - series: 'routeros_config_backup_success{router="pop2-base"}'
+        values: '0x20'
+    alert_rule_test:
+      - eval_time: 45m
+        alertname: RouterBackupFailing
+        exp_alerts: []
+      - eval_time: 75m
+        alertname: RouterBackupFailing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              category: health
+              scope: router
+              alert_type: backup-failing
+              router: pop2-base
+            exp_annotations:
+              summary: "🟠 Config backup failing for pop2-base"
+              description: "The last pop2-base backup cycle returned an error (git commit or /export). Check routeros-exporter logs."
+
+  # ------------------------------------------------------------------
+  # POPIsolated: every backhaul link_up series for the POP is 0.
+  # BASE has two backhaul links, two ICMP endpoints each = 4 series.
+  # ------------------------------------------------------------------
+  - interval: 1m
+    input_series:
+      - series: 'link_up{link_id="LINK-002", role="Backhaul", pop="BASE", endpoint="a"}'
+        values: '1 1 0x18'
+      - series: 'link_up{link_id="LINK-002", role="Backhaul", pop="BASE", endpoint="b"}'
+        values: '1 1 0x18'
+      - series: 'link_up{link_id="LINK003", role="Backhaul", pop="BASE", endpoint="a"}'
+        values: '1 1 1 0x17'
+      - series: 'link_up{link_id="LINK003", role="Backhaul", pop="BASE", endpoint="b"}'
+        values: '1 1 1 0x17'
+      - series: 'subscriber:active:by_pop{pop="BASE"}'
+        values: '55x25'
+    alert_rule_test:
+      - eval_time: 2m            # only one link down so far - not isolated
+        alertname: POPIsolated
+        exp_alerts: []
+      - eval_time: 15m           # both backhauls fully down, past for: 3m
+        alertname: POPIsolated
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              category: state
+              scope: pop
+              alert_type: pop-isolated
+              pop: BASE
+            exp_annotations:
+              summary: "🔴 POP BASE isolated - all backhaul down"
+              description: "Every backhaul link into POP BASE is unreachable. ~55 subscribers and all sectors behind this POP are affected - this is the root cause; downstream sector / CPE / subscriber alerts for BASE are inhibited."
