@@ -83,16 +83,25 @@ Alerts (`prometheus/rules/config-backup.yml`): `RouterConfigChanged`
 (warning, on every diff), `RouterBackupStale` (critical, >25h),
 `RouterBackupFailing` (warning), `RouterOSVersionDrift` (info).
 
-> **Resolved 2026-09-13** (was a known gap as of 2026-09-12): with a
-> read-only API user, `/export` never succeeded on this RouterOS 6.x fleet
-> - a bare `/export` hangs instead of returning, and the only variant that
-> replies (`/export file=<name>`) needs `write` to create the file, which
-> RouterOS 6.x's API then can't read back anyway (only FTP can). Fixed by
-> widening the monitoring credential to a custom group scoped to exactly
-> `api, read, write, ftp` and fetching the export over FTP -
-> `export_via_api` now does `/export file=...` then an FTP RETR + delete.
-> PPP/system/topology collection was never affected (isolated per-collector
-> in `__main__.poll_router`). Details + the RouterOS commands to run:
+> **Design fixed 2026-09-13, hardware finding 2026-09-14** (was a known gap
+> as of 2026-09-12): with a read-only API user, `/export` never succeeded
+> on this RouterOS 6.x fleet - a bare `/export` hangs instead of returning,
+> and the only variant that replies (`/export file=<name>`) needs `write`
+> to create the file, which RouterOS 6.x's API then can't read back anyway
+> (only FTP can). Fixed by widening the monitoring credential to a custom
+> group scoped to exactly `api, read, write, ftp` and fetching the export
+> over FTP - `export_via_api` now does `/export file=...` then an FTP RETR
+> + delete. **But CONFIRMED 2026-09-14, at 2am with the test router
+> otherwise idle**: on this specific box (a hAP AC Lite), `/export
+> file=...` still hangs the full timeout even with `write` granted - this
+> looks like a hardware/firmware limit on this device, not a permissions
+> gap. Also confirmed live: retrying that every cycle was aggressive enough
+> to break the router's routine polling too, so a backoff was added
+> (`__main__.py`'s `BACKOFF_AFTER_FAILURES`) - after 2 misses it settles to
+> one gentle attempt an hour. Whether `/export` works on stronger
+> production hardware is still open; PPP/system/topology collection was
+> never affected either way (isolated per-collector in
+> `__main__.poll_router`). Details + the RouterOS commands to run:
 > `routeros_exporter/README.md`.
 
 Dashboard: **Config Audit** (`grafana/dashboards/config-audit.json`).

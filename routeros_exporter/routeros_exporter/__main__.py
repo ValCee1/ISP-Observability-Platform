@@ -13,6 +13,7 @@ discovery.
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import logging
 import sys
 import time
@@ -30,29 +31,41 @@ from .metrics import Metrics
 log = logging.getLogger("routeros_exporter")
 
 
-def poll_router(c: cfg.RouterConfig, conf: cfg.Config, m: Metrics, *, do_backup: bool, do_topology: bool, repo=None, router_addresses=None) -> bool:
-    """One poll cycle for one router. Returns whether the core poll (PPP +
-    system) succeeded - the caller uses this to decide whether this
-    router's backup/topology schedule slot was actually consumed (see
-    `run()`: a router that's unreachable exactly when its hourly backup
-    window comes up must retry on its next 30s cycle, not wait a full hour
-    for the shared clock to come back around - CONFIRMED 2026-09-13: with a
-    single global `next_backup` clock, one router being briefly down during
-    the scheduled instant silently skipped its ENTIRE backup window, and
-    routeros_config_backup_success/_export_lines stayed completely absent -
-    not even "0" - for the following hour).
+@dataclasses.dataclass(frozen=True)
+class PollOutcome:
+    """What actually happened this cycle, per concern - `run()` uses each
+    field independently to decide whether that concern's schedule slot was
+    consumed. Collapsing this to one bool was the bug CONFIRMED 2026-09-13:
+    pop1-home's core poll (`ok`) can succeed while its backup step times out
+    (the router being briefly slow/loaded, not a permissions problem) - if
+    `next_backup` only checked `ok`, that one timeout burned the router's
+    ENTIRE hourly backup window even though the very next 30s cycle would
+    likely have succeeded. Each field defaults to True ("nothing to retry")
+    so a concern that wasn't even attempted this cycle (`do_backup=False`,
+    or `collect_backup=False`) doesn't look like a failure.
+    """
+
+    ok: bool                # core poll (PPP + system) - routeros_scrape_success
+    backup_ok: bool = True
+    topology_ok: bool = True
+
+
+def poll_router(c: cfg.RouterConfig, conf: cfg.Config, m: Metrics, *, do_backup: bool, do_topology: bool, repo=None, router_addresses=None) -> PollOutcome:
+    """One poll cycle for one router. See `PollOutcome` for what the return
+    value means and why it isn't just one bool.
 
     `routeros_scrape_success` reflects only the CORE poll (PPP + system) -
     the signal RouterOSAPICollectorDown alerts on. Config backup and
     topology discovery are wrapped in their own try/except and never flip
-    it: a `/export` hiccup (CONFIRMED 2026-09-12: RouterOS 6.x rejects the
-    `show-sensitive` parameter 7.x accepts - see backup.export_via_api) or a
-    missing `/ip/neighbor` table on a device that doesn't run MNDP/LLDP
-    shouldn't make the subscriber pipeline look down. Backup failures still
-    surface via `routeros_config_backup_success` (RouterBackupFailing).
+    it: a `/export` hiccup or a missing `/ip/neighbor` table on a device
+    that doesn't run MNDP/LLDP shouldn't make the subscriber pipeline look
+    down. Backup failures still surface via `routeros_config_backup_success`
+    (RouterBackupFailing).
     """
     started = time.monotonic()
     ok = True
+    backup_ok = True
+    topology_ok = True
     try:
         with roc.connect(c) as api:
             if c.collect_ppp:
@@ -79,8 +92,11 @@ def poll_router(c: cfg.RouterConfig, conf: cfg.Config, m: Metrics, *, do_backup:
                     # API-level failure (timeout, unsupported param, ...) -
                     # turn it into the same BackupResult shape a git-commit
                     # failure would produce, so there's exactly one log line
-                    # below regardless of which step failed.
+                    # below regardless of which step failed. Marks the
+                    # attempt itself as not-consumed (see PollOutcome) so
+                    # run() retries next cycle instead of waiting an hour.
                     result = BackupResult(c.name, False, False, 0, "", error=str(exc))
+                    backup_ok = False
                 m.update_backup(result)
                 if result.error:
                     log.warning("backup %s: %s", c.name, result.error)
@@ -96,12 +112,13 @@ def poll_router(c: cfg.RouterConfig, conf: cfg.Config, m: Metrics, *, do_backup:
                     m.update_topology(c.name, edges)
                 except roc.RouterOSError as exc:
                     log.warning("topology %s: %s", c.name, exc)
+                    topology_ok = False
     except roc.RouterOSError as exc:
         ok = False
         log.warning("poll %s failed: %s", c.name, exc)
     finally:
         m.update_scrape(c.name, ok, time.monotonic() - started)
-    return ok
+    return PollOutcome(ok=ok, backup_ok=backup_ok, topology_ok=topology_ok)
 
 
 def _safe(api, path: str):
@@ -109,6 +126,28 @@ def _safe(api, path: str):
         return api.query(path)
     except roc.RouterOSError:
         return []
+
+
+# After this many consecutive failed attempts at one concern (backup or
+# topology) on one router, stop retrying every poll cycle and fall back to
+# the full hourly interval - see run()'s docstring-comment for why.
+BACKOFF_AFTER_FAILURES = 2
+
+
+def _schedule_after_attempt(streak: int, succeeded: bool) -> tuple[bool, int]:
+    """Pure scheduling decision for one concern on one router, given its
+    previous consecutive-failure streak and whether this attempt succeeded.
+
+    Returns (advance_schedule, new_streak). `advance_schedule=True` means
+    the caller should push that concern's next-attempt clock a full
+    interval out; False means leave it alone so the very next poll cycle
+    retries - the fast path for a genuinely transient miss, not a
+    persistently broken command.
+    """
+    if succeeded:
+        return True, 0
+    streak += 1
+    return streak >= BACKOFF_AFTER_FAILURES, streak
 
 
 def run(conf: cfg.Config) -> None:
@@ -129,23 +168,43 @@ def run(conf: cfg.Config) -> None:
     # first cycle after startup always attempts both, same as before.
     next_backup: dict[str, float] = {}
     next_topology: dict[str, float] = {}
+    # CONFIRMED 2026-09-14, live, against a hAP AC Lite: retrying a failed
+    # backup every cycle is only safe for a TRANSIENT miss. A command that
+    # fails the same way every single time (that router's `/export
+    # file=...` hung the full timeout on every attempt, healthy or not) got
+    # retried every ~30s and kept a hung API connection in flight almost
+    # continuously - which exhausted the router's API connections badly
+    # enough to break its routine PPP/system polling too. After a couple of
+    # consecutive misses, back off to the full hourly interval instead of
+    # hammering it - still surfaces promptly via RouterBackupFailing/Stale,
+    # just without making things worse. Resets to fast-retry the moment a
+    # backup actually succeeds, so a genuine transient blip still recovers
+    # quickly.
+    backup_fail_streak: dict[str, int] = {}
+    topology_fail_streak: dict[str, int] = {}
+
     while True:
         now = time.time()
         for c in conf.routers:
             do_backup = now >= next_backup.get(c.name, 0.0)
             do_topology = now >= next_topology.get(c.name, 0.0)
-            ok = poll_router(
+            outcome = poll_router(
                 c, conf, m,
                 do_backup=do_backup, do_topology=do_topology,
                 repo=repo, router_addresses=router_addresses,
             )
-            # Only consume this router's slot if the poll actually reached
-            # far enough to attempt it - a connect failure must not burn an
-            # hour-long window on nothing.
-            if do_backup and ok:
-                next_backup[c.name] = now + conf.backup_interval_seconds
-            if do_topology and ok:
-                next_topology[c.name] = now + conf.topology_interval_seconds
+            if do_backup and outcome.ok:
+                advance, backup_fail_streak[c.name] = _schedule_after_attempt(
+                    backup_fail_streak.get(c.name, 0), outcome.backup_ok
+                )
+                if advance:
+                    next_backup[c.name] = now + conf.backup_interval_seconds
+            if do_topology and outcome.ok:
+                advance, topology_fail_streak[c.name] = _schedule_after_attempt(
+                    topology_fail_streak.get(c.name, 0), outcome.topology_ok
+                )
+                if advance:
+                    next_topology[c.name] = now + conf.topology_interval_seconds
         time.sleep(conf.poll_interval_seconds)
 
 

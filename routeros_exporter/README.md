@@ -68,14 +68,13 @@ list-of-dicts the API returns, tested against `tests/fixtures/*.json`
 (captured API output). Anything that could only be confirmed on real
 hardware is marked `UNVERIFIED - needs live device`.
 
-## Confirmed against a live router (2026-09-12/13, RouterOS 6.49, hAP lite ×2)
+## Confirmed against a live router (2026-09-12 through 14, RouterOS 6.49, hAP lite ×2 / hAP AC Lite)
 
 - PPP/secret/system polling, and topology discovery via `/ip/route` +
   `/ip/neighbor`, all work as designed against real hardware.
 - A bare `/export` over the API does not return AT ALL on this ROS 6.x
   device with a read-only user (no console/pager over the API - it just
-  hangs) - `/export file=<name>` replies in under 2s once the credential
-  has `write`.
+  hangs).
 - RouterOS 6.x's API has no way to read a file's contents back (only newer
   7.x builds added that) - fetching the export text needs FTP, hence the
   `ftp` policy above.
@@ -83,12 +82,44 @@ hardware is marked `UNVERIFIED - needs live device`.
   RouterOS 7.x - a 6.49 router rejects it as an "unknown parameter", so
   `export_via_api` doesn't pass it; `/export`'s default masking still
   applies either way.
-- **Resolved 2026-09-13**: config backup now uses the widened
-  `api, read, write, ftp` group above (`export_via_api` triggers
-  `/export file=...` then fetches + deletes it over FTP). Config-backup
-  failures stay isolated in `__main__.poll_router` and only surface as
-  `routeros_config_backup_success=0` / `RouterBackupFailing` - they never
-  affect `routeros_scrape_success` / PPP data.
+- **`export_via_api` (2026-09-13) uses the widened `api, read, write, ftp`
+  group above: `/export file=...` over the API, then FTP fetch + delete.**
+  This is real and correctly implemented, but on this specific test
+  hardware (a **hAP AC Lite** - a modest single-core device) it does not
+  actually complete:
+  - **CONFIRMED 2026-09-14, at 2am with the router otherwise idle and
+    healthy (2ms ping, 0% loss)**: `/export file=...` still hung for the
+    full timeout (tested up to 90s) even with `write` granted. This isn't
+    a permissions problem or ordinary load - it looks like this ROS
+    6.49/hAP-AC-Lite combination just can't complete `/export` over the
+    API at all, at least not with `file=` either. (An earlier quick test
+    that appeared to "reply in under 2s" was actually RouterOS failing the
+    *permission check* fast, before ever attempting the export - it told
+    us nothing about whether the export itself would complete once
+    permission was granted.)
+  - **CONFIRMED 2026-09-13/14**: retrying that every ~30s poll cycle (safe
+    for a *transient* miss) is actively harmful against a command that
+    fails the same way *every* time - it keeps a hung API connection in
+    flight almost continuously, which exhausted this router's API
+    connections badly enough to break its routine PPP/system polling too.
+    Fixed in `__main__.py` (`BACKOFF_AFTER_FAILURES`,
+    `_schedule_after_attempt`): after 2 consecutive failures, back off to
+    the full hourly interval instead of hammering it. A router that
+    recovers still gets picked up fast (2 quick tries before backing off);
+    a router where the command is simply unsupported settles into one
+    gentle attempt an hour, forever - `RouterBackupFailing` reflects that
+    correctly, without making the router worse.
+  - Config-backup failures stay isolated in `__main__.poll_router` either
+    way and never affect `routeros_scrape_success` / PPP data.
+  - **Open question, not yet answered**: does `/export` (with or without
+    `file=`) work over the API on stronger hardware, or on RouterOS 7.x?
+    The user's guidance (2026-09-13): production routers/radios are more
+    robust than this test box, so treat this as unresolved for THIS device
+    rather than a verdict on the whole design - re-test on real production
+    hardware before concluding Option A doesn't work at all. If it turns
+    out this is a broader RouterOS 6.x/API limitation, Option B (a
+    RouterOS-side scheduler running `/export` locally, no live API call
+    involved) sidesteps it entirely - see the section above.
 
 ## Still UNVERIFIED
 

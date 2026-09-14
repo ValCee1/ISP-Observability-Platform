@@ -48,12 +48,12 @@ def test_poll_router_populates_all_metric_families(tmp_path, monkeypatch):
     m.set_router_info(router.name, router.site, router.pop, router.role)
     repo = main_mod.ensure_repo(conf.backup_repo_path)
 
-    ok = main_mod.poll_router(
+    outcome = main_mod.poll_router(
         router, conf, m, do_backup=True, do_topology=True, repo=repo,
         router_addresses={"pop1": ["10.0.0.1"]},
     )
 
-    assert ok is True  # run() uses this to decide whether the backup/topology slot was consumed
+    assert outcome == main_mod.PollOutcome(ok=True, backup_ok=True, topology_ok=True)
     out = generate_latest(m.registry).decode()
     assert 'routeros_scrape_success{router="pop1"} 1.0' in out
     assert 'routeros_ppp_active_total{router="pop1"} 4.0' in out
@@ -66,10 +66,13 @@ def test_poll_router_populates_all_metric_families(tmp_path, monkeypatch):
 
 
 def test_backup_failure_does_not_sink_scrape_success(tmp_path, monkeypatch):
-    """CONFIRMED against a live RouterOS 6.49 router (2026-09-12): /export
-    can fail independently of PPP/system data being fine. That must not
-    make routeros_scrape_success (and therefore RouterOSAPICollectorDown)
-    lie about the core poll being down."""
+    """CONFIRMED against a live RouterOS 6.49 router (2026-09-12/13): /export
+    can fail independently of PPP/system data being fine - both because the
+    credential lacked write/ftp, and later because the router was simply
+    slow to respond. Neither should make routeros_scrape_success (and
+    therefore RouterOSAPICollectorDown) lie about the core poll being down,
+    and the caller must be able to tell backup specifically failed (so it
+    retries next cycle instead of waiting a full hour - see PollOutcome)."""
 
     class BrokenExportClient(FakeClient):
         def command(self, path, **params):
@@ -98,12 +101,14 @@ def test_backup_failure_does_not_sink_scrape_success(tmp_path, monkeypatch):
     m = Metrics(CollectorRegistry())
     repo = main_mod.ensure_repo(conf.backup_repo_path)
 
-    ok = main_mod.poll_router(
+    outcome = main_mod.poll_router(
         router, conf, m, do_backup=True, do_topology=True, repo=repo,
         router_addresses={"pop1": ["10.0.0.1"]},
     )
 
-    assert ok is True  # core poll fine even though the backup sub-step failed
+    assert outcome.ok is True          # core poll fine even though the backup sub-step failed
+    assert outcome.backup_ok is False  # ... but the caller must know backup specifically failed
+    assert outcome.topology_ok is True
     out = generate_latest(m.registry).decode()
     assert 'routeros_scrape_success{router="pop1"} 1.0' in out       # PPP/system still fine
     assert 'routeros_config_backup_success{router="pop1"} 0.0' in out  # backup alone failed
@@ -130,12 +135,12 @@ def test_poll_router_returns_false_on_connect_failure(tmp_path, monkeypatch):
     m = Metrics(CollectorRegistry())
     repo = main_mod.ensure_repo(conf.backup_repo_path)
 
-    ok = main_mod.poll_router(
+    outcome = main_mod.poll_router(
         router, conf, m, do_backup=True, do_topology=True, repo=repo,
         router_addresses={"pop1": ["10.0.0.1"]},
     )
 
-    assert ok is False
+    assert outcome.ok is False
     out = generate_latest(m.registry).decode()
     assert 'routeros_scrape_success{router="pop1"} 0.0' in out
     # Neither metric was even attempted this cycle - absent, not "0".
