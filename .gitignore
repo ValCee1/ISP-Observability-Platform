@@ -9,6 +9,10 @@ routeros_exporter/.venv/
 routeros_exporter/config.yml
 routeros_exporter_data/
 
+# freq_migration: local sector inventory (credentials live under secrets/,
+# already ignored above)
+routeros_exporter/freq_migration_sectors.yml
+
 # python
 __pycache__/
 *.pyc

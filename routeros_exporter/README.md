@@ -64,6 +64,58 @@ expose the volume, restrict who can read it.
 `docker compose run --rm routeros-exporter --check` validates config +
 credentials without polling. `--once` prints one scrape to stdout.
 
+## Sector frequency migration (`freq_migration`)
+
+A separate, operator-run CLI - not part of the always-on exporter daemon -
+for moving a live sector to a cleaner frequency without stranding its CPEs.
+Design discussion: `docs/tier1-subscriber-config-topology.md`. Scoped down
+(2026-09-16) from a larger auto-remediation design to exactly five steps,
+with a human approval gate before each of the three steps that touch live
+hardware:
+
+1. Discover every CPE registered on the sector (MAC, signal, CCQ) and
+   resolve each one's management IP via the sector's own MNDP/`/ip/neighbor`
+   table - the same mechanism Winbox uses to connect by MAC. Read-only, no
+   gate.
+2. **Gate.** Run a spectral scan on the sector and pick old/new/fallback
+   frequencies from the cleanest part of the allowed band. Disruptive: scan
+   mode drops every CPE on the sector for its duration.
+3. **Gate.** Push that short scan-list (old + new + fallbacks, deliberately
+   not a wide sweep) to every reachable CPE, while they're still on the old
+   frequency.
+4. **Gate.** Change the sector's frequency over its own connection, then
+   poll its registration table until every pre-change CPE reappears or a
+   timeout elapses, and report who didn't come back.
+
+Setup - separate inventory/credentials from the polling daemon's, since the
+blast radius (write access to every CPE on a sector) is much bigger:
+
+1. `cp freq_migration_sectors.example.yml freq_migration_sectors.yml` -
+   sector list (host, wireless interface names, allowed frequency band).
+2. `cp freq_migration_credentials.example.json secrets/freq_migration_credentials.json` -
+   `cpe_shared` (one login used by every CPE, confirmed 2026-09-16) plus a
+   per-sector credential under `sectors`.
+3. `python -m routeros_exporter.freq_migration <sector-name>` from the
+   exporter's venv/container.
+
+**UNVERIFIED - needs live device**, unlike everything else in this README:
+none of this has run against real hardware yet.
+
+- The `/interface/wireless/spectral-scan` row schema (which key carries the
+  power reading) varies by RouterOS version/chipset - `spectrum.py` tries a
+  short list of plausible keys and raises loudly on a mismatch rather than
+  silently misreading a scan.
+- The reconnection wait's poll interval (15s) and total timeout (180s) are
+  starting guesses. Per the user: "the exact timeout should be determined
+  through lab testing" - the same lesson config backup's timeout bug
+  taught the hard way (see "Confirmed against a live router" above). Tune
+  `migrate.wait_for_reconnection`'s defaults once this has actually run.
+- Verification is deliberately simple for this scope: "the MAC reappeared
+  in the sector's registration table within the timeout." A stricter
+  identity check (same SSID, same frequency, same expected mgmt IP - not
+  just "something with this MAC answered") was considered and explicitly
+  deferred; see the design discussion doc if that's ever needed.
+
 ## Develop
 
 ```

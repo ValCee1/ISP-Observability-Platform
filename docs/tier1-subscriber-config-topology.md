@@ -145,6 +145,16 @@ docker compose restart prometheus                                         # pick
 
 ## Out of scope (later tiers)
 
-Automated remediation / channel-frequency changes / self-healing (Tier 3),
+Automated remediation / self-healing (Tier 3, still fully out of scope),
 the anomaly-detection + LLM incident-summary layer (Tier 2), billing-system
 provisioning integration.
+
+**Sector frequency migration started 2026-09-16** as a scoped-down,
+human-gated exception to "later tier": `routeros_exporter`'s `freq_migration`
+CLI (see its README section) scans a sector's RF environment, prepares
+every connected CPE with a short migration scan-list, then changes the
+sector frequency and reports who reconnected - with an explicit approval
+gate before each of those three steps, never automatic. This is
+deliberately not the fuller "controller verifies CPE identity post-move,
+retries CPE-by-CPE" design considered first; that's still available to
+revisit if the simpler version proves insufficient in practice.
