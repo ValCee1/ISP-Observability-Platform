@@ -13,6 +13,13 @@ routeros_exporter_data/
 # already ignored above)
 routeros_exporter/freq_migration_sectors.yml
 
+# feature packaging: this ISP's actual on/off choices (features.example.yml
+# stays committed), plus the symlink farms scripts/apply_features.py
+# generates from it - never hand-edit these, re-run the script instead.
+features.yml
+prometheus/rules.active/
+grafana/dashboards.active/
+
 # python
 __pycache__/
 *.pyc

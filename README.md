@@ -30,6 +30,9 @@ Routers        --API---> routeros-exporter -/            -> Alertmanager -> Tele
   registry.
 - [docs/failure-drills.md](docs/failure-drills.md) — end-to-end failure runbook
   (detect → alert → explain → recover → no storm).
+- [docs/feature-packaging.md](docs/feature-packaging.md) — picking which
+  optional features a deployment ships (`features.yml` +
+  `scripts/apply_features.py`), for an ISP that only wants a subset.
 
 ## Running the stack
 
@@ -42,11 +45,24 @@ Routers        --API---> routeros-exporter -/            -> Alertmanager -> Tele
      even if you're not using the API collector yet.
    - `routeros_exporter/config.yml` — the router list for the API collector
      (`cp routeros_exporter/config.example.yml routeros_exporter/config.yml`).
-2. Start everything:
+2. Choose which optional features to run — `cp features.example.yml
+   features.yml`, edit it, then:
+
+   ```bash
+   routeros_exporter/.venv/bin/python scripts/apply_features.py
+   ```
+
+   (Skipping this step is fine too — the script falls back to
+   `features.example.yml`'s defaults, which is everything except anomaly
+   detection. See [docs/feature-packaging.md](docs/feature-packaging.md).)
+3. Start everything:
 
    ```bash
    docker compose up -d
    ```
+
+   Compose only starts the RouterOS API collector if step 2 enabled a
+   feature that needs it — see `COMPOSE_PROFILES` in the generated `.env`.
 
 - Grafana: http://localhost:3000 (user: `admin`, password from the secret file above)
 - Prometheus: http://localhost:9090

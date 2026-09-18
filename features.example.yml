@@ -1,0 +1,19 @@
+# Which features THIS deployment ships. Copy to features.yml (gitignored -
+# every ISP's copy is their own choice, not committed) and toggle, then run:
+#
+#   routeros_exporter/.venv/bin/python scripts/apply_features.py
+#   docker compose up -d
+#
+# base_monitoring isn't listed here because it can't be turned off - see
+# feature-manifest.yml. Everything below defaults to `true`; an ISP that
+# only wants the SNMP/ICMP baseline sets all four to `false`.
+#
+# ppp_intelligence, config_backup, and topology_discovery all run inside
+# the one routeros-exporter container (they share a single RouterOS API
+# connection per router) - turning any of them on starts that container.
+# Per-router opt-outs still live in routeros_exporter/config.yml.
+
+ppp_intelligence: true      # PPPoE session intelligence, mass-outage detection
+config_backup: true         # RouterOS config export + drift detection
+topology_discovery: true    # POP dependency mapping + alert-storm suppression
+anomaly_detection: false    # Tier 2 baseline-deviation alerts (subscriber/CPU/mem)
