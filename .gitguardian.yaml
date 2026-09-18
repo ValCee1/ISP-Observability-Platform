@@ -1,0 +1,12 @@
+# GitGuardian (ggshield) config.
+#
+# routeros_exporter/tests/ uses fake, obviously-not-real credential strings
+# as test fixtures (e.g. "cpepass", "sectorpass" in test_freq_migration.py)
+# - these never touch a real connection, only FakeClient stubs and
+# tmp_path-generated files. GitGuardian's generic-password detector can't
+# tell a fixture from a leaked credential and flags it as one (PR #1,
+# GitGuardian incident 37318415). Excluding the test directory from
+# secret scanning, rather than picking fake strings that happen to dodge
+# the heuristic today - that would just recur with the next test file.
+paths-ignore:
+  - routeros_exporter/tests/**
