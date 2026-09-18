@@ -1,12 +1,31 @@
-# GitGuardian (ggshield) config.
+# GitGuardian (ggshield) config - schema per
+# https://docs.gitguardian.com/ggshield-docs/configuration (v2).
 #
 # routeros_exporter/tests/ uses fake, obviously-not-real credential strings
-# as test fixtures (e.g. "cpepass", "sectorpass" in test_freq_migration.py)
-# - these never touch a real connection, only FakeClient stubs and
-# tmp_path-generated files. GitGuardian's generic-password detector can't
-# tell a fixture from a leaked credential and flags it as one (PR #1,
-# GitGuardian incident 37318415). Excluding the test directory from
-# secret scanning, rather than picking fake strings that happen to dodge
-# the heuristic today - that would just recur with the next test file.
-paths-ignore:
-  - routeros_exporter/tests/**
+# as test fixtures - these never touch a real connection, only FakeClient
+# stubs and tmp_path-generated files. GitGuardian's generic-password
+# detector flagged one as a hardcoded secret (PR #1, incident 37318415):
+# "cpepass"/"sectorpass" in test_freq_migration.py, since fixed to values
+# that don't look password-shaped (see that file). Both belt-and-braces
+# fixes are kept here: excluding the whole test directory going forward,
+# and explicitly ignoring the exact strings already flagged, since
+# GitGuardian's own guidance is that changing content in a later commit
+# does not by itself clear an incident already recorded against an
+# earlier commit still in the branch's history.
+#
+# NOTE: this file configures the `ggshield` CLI. It is not confirmed
+# whether GitGuardian's hosted "GitGuardian Security Checks" GitHub App
+# (as opposed to a repo-run ggshield CI job) honors a committed
+# .gitguardian.yaml at all, or only dashboard-side ignore settings - if
+# this check is still red after this change, the incident likely needs to
+# be marked as a known false positive on https://dashboard.gitguardian.com
+# directly (workspace 500498, incident 37318415).
+version: 2
+secret:
+  ignored_paths:
+    - "routeros_exporter/tests/**"
+  ignored_matches:
+    - name: freq-migration-test-fixture-cpe-password
+      match: cpepass
+    - name: freq-migration-test-fixture-sector-password
+      match: sectorpass

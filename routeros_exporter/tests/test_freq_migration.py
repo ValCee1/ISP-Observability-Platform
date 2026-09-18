@@ -15,18 +15,23 @@ def test_config_load_joins_sector_inventory_with_credentials(tmp_path):
         "    freq_min_mhz: 5745\n"
         "    freq_max_mhz: 5825\n"
     )
+    # Deliberately not password-shaped strings (no former "...pass"/"...pw"
+    # suffix) - an earlier version of this fixture ("cpepass"/"sectorpass")
+    # tripped GitGuardian's generic-password detector as a false positive
+    # (PR #1, incident 37318415); these fake, obviously-not-real values are
+    # never used against a real connection, only parsed back by fmc.load().
     creds_json = tmp_path / "creds.json"
     creds_json.write_text(
-        '{"cpe_shared": {"username": "cpeuser", "password": "cpepass"}, '
-        '"sectors": {"sector1-tower": {"username": "sectoruser", "password": "sectorpass"}}}'
+        '{"cpe_shared": {"username": "cpeuser", "password": "not-a-real-secret-1"}, '
+        '"sectors": {"sector1-tower": {"username": "sectoruser", "password": "not-a-real-secret-2"}}}'
     )
 
     sectors, cpe_cred = fmc.load(str(sectors_yml), str(creds_json))
 
-    assert cpe_cred.username == "cpeuser" and cpe_cred.password == "cpepass"
+    assert cpe_cred.username == "cpeuser" and cpe_cred.password == "not-a-real-secret-1"
     sector = fmc.find_sector(sectors, "sector1-tower")
     assert sector.host == "192.168.20.1"
-    assert sector.username == "sectoruser" and sector.password == "sectorpass"
+    assert sector.username == "sectoruser" and sector.password == "not-a-real-secret-2"
     assert sector.wireless_interface == "wlan1"  # default
 
 
