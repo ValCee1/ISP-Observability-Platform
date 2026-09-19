@@ -15,23 +15,27 @@ def test_config_load_joins_sector_inventory_with_credentials(tmp_path):
         "    freq_min_mhz: 5745\n"
         "    freq_max_mhz: 5825\n"
     )
-    # Deliberately not password-shaped strings (no former "...pass"/"...pw"
-    # suffix) - an earlier version of this fixture ("cpepass"/"sectorpass")
-    # tripped GitGuardian's generic-password detector as a false positive
-    # (PR #1, incident 37318415); these fake, obviously-not-real values are
-    # never used against a real connection, only parsed back by fmc.load().
+    # Trivial one-character values, matching every other credential fixture
+    # in this file (CPETarget/SectorConfig below all use username="u",
+    # password="p") - that convention has never tripped GitGuardian. Two
+    # earlier, more realistic-looking attempts here did: "cpepass"/
+    # "sectorpass" (Generic Password, incident 37318415) and then
+    # "not-a-real-secret-1"/"-2" (still enough length/entropy to trip both
+    # Generic Password AND the structural Username Password detector,
+    # incidents 37418701/37418702) - renaming the *value* couldn't have
+    # worked for the latter, it fires on a username+password pair existing
+    # together regardless of content. None of these were ever real
+    # credentials; only parsed back by fmc.load() in this one test.
     creds_json = tmp_path / "creds.json"
-    creds_json.write_text(
-        '{"cpe_shared": {"username": "cpeuser", "password": "not-a-real-secret-1"}, '
-        '"sectors": {"sector1-tower": {"username": "sectoruser", "password": "not-a-real-secret-2"}}}'
-    )
+    creds_json.write_text('{"cpe_shared": {"username": "u", "password": "p"}, '
+                           '"sectors": {"sector1-tower": {"username": "u", "password": "p"}}}')
 
     sectors, cpe_cred = fmc.load(str(sectors_yml), str(creds_json))
 
-    assert cpe_cred.username == "cpeuser" and cpe_cred.password == "not-a-real-secret-1"
+    assert cpe_cred.username == "u" and cpe_cred.password == "p"
     sector = fmc.find_sector(sectors, "sector1-tower")
     assert sector.host == "192.168.20.1"
-    assert sector.username == "sectoruser" and sector.password == "not-a-real-secret-2"
+    assert sector.username == "u" and sector.password == "p"
     assert sector.wireless_interface == "wlan1"  # default
 
 
