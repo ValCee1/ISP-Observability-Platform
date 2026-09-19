@@ -1,0 +1,5 @@
+[
+  {"name": "ether1", "type": "ether", "running": "true", "disabled": "false"},
+  {"name": "ether2", "type": "ether", "running": "true", "disabled": "false"},
+  {"name": "bridge-sector", "type": "bridge", "running": "true", "disabled": "false"}
+]

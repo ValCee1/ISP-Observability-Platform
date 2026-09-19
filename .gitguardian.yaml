@@ -1,0 +1,26 @@
+# GitGuardian (ggshield) config - schema per
+# https://docs.gitguardian.com/ggshield-docs/configuration (v2).
+#
+# routeros_exporter/tests/ uses fake, trivial credential fixtures
+# (username="u"/password="p" - never a real connection, only FakeClient
+# stubs and tmp_path-generated files). GitGuardian's hosted PR check
+# flagged three false positives here across PR #1 (incidents 37318415,
+# 37418701, 37418702) before the fixtures settled on that convention -
+# see test_freq_migration.py's comment for the history. Confirmed the
+# hard way: renaming a flagged VALUE to something less password-shaped
+# doesn't reliably help, since one of the three was GitGuardian's
+# structural "Username Password" detector, which fires on a username+
+# password pair existing together regardless of content.
+#
+# `ignored_paths` below excludes the whole test directory from the
+# `ggshield` CLI's own scans. NOTE: it is not confirmed whether
+# GitGuardian's hosted "GitGuardian Security Checks" GitHub App (as
+# opposed to a repo-run ggshield CI job) honors this file at all, versus
+# only dashboard-side ignore settings - if a future test trips this again,
+# the durable fix is a filepath exclusion on the GitGuardian dashboard
+# (workspace 500498) for routeros_exporter/tests/**, not another round of
+# renaming fixture values.
+version: 2
+secret:
+  ignored_paths:
+    - "routeros_exporter/tests/**"

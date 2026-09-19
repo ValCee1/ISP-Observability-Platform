@@ -1,0 +1,78 @@
+# The fixed "menu": which rule files, dashboards, and Compose profiles each
+# feature owns. NOT user-edited - this is the map from a feature name to
+# the concrete files that implement it. An operator's actual on/off choices
+# live in features.yml (copied from features.example.yml), which names
+# features from this file. Adding a new rule file or dashboard to an
+# existing feature, or moving one between features, is a one-line change
+# here rather than a hunt through every ISP's features.yml.
+#
+# `compose_profiles` lists the docker-compose.yml service profile(s) that
+# must be active for this feature to actually produce data - scripts/
+# apply_features.py unions these across every enabled feature and writes
+# them to .env as COMPOSE_PROFILES, so `docker compose up -d` starts
+# exactly the services that are needed and no others.
+#
+# base_monitoring has `always_on: true` - it's the SNMP/ICMP baseline
+# (prometheus, snmp-exporter, blackbox-exporter, grafana, alertmanager
+# already run with no profile in docker-compose.yml) every other feature
+# sits on top of; it can't be switched off from features.yml.
+
+features:
+  base_monitoring:
+    always_on: true
+    rule_files:
+      - mikrotik-alerts.yml
+      - link-alerts.yml
+      - link-normalization.yml
+      - sector-normalization.yml
+      - sector-thresholds.yml
+      - sector-alerts.yml
+      - capacity-rules.yml
+      - incidents.yml
+    dashboards:
+      - all-interfaces.json
+      - lan-wan-interfaces.json
+      - mikrotik-fleet-overview.json
+      - noc-overview.json
+      - ptp-link-monitoring.json
+      - sector-detail.json
+      - sector-fleet-overview.json
+      - capacity-planning.json
+    compose_profiles: []
+
+  # These three share one running container (routeros-exporter) because
+  # they share one RouterOS API connection per router - see
+  # routeros_exporter/README.md and __main__.py's poll loop. Turning any
+  # one of them on brings that container up (compose_profiles below);
+  # per-router fine control within it (e.g. "don't back up THIS router")
+  # stays in routeros_exporter/config.yml's collect_ppp / collect_backup /
+  # collect_topology flags, unchanged by this system.
+  ppp_intelligence:
+    rule_files:
+      - ppp-sessions.yml
+      - subscriber-sessions.yml
+      - subscriber-alerts.yml
+    dashboards:
+      - subscriber-overview.json
+    compose_profiles: [routeros-api]
+
+  config_backup:
+    rule_files:
+      - config-backup.yml
+    dashboards:
+      - config-audit.json
+    compose_profiles: [routeros-api]
+
+  topology_discovery:
+    rule_files:
+      - topology-rollup.yml
+    dashboards: []
+    compose_profiles: [routeros-api]
+
+  # Rules-only - rides on whatever base/PPP metrics are already flowing,
+  # no separate service or profile of its own.
+  anomaly_detection:
+    rule_files:
+      - anomaly-detection.yml
+    dashboards: []
+    compose_profiles: []

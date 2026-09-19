@@ -1,0 +1,9 @@
+[
+  {".id": "*1A", "time": "sep/09 01:02:03", "topics": "pppoe,ppp,info", "message": "<pppoe-adebayo-01>: authenticated"},
+  {".id": "*1B", "time": "sep/09 01:05:41", "topics": "pppoe,ppp,info", "message": "<pppoe-adebayo-01>: connected"},
+  {".id": "*1C", "time": "sep/09 02:11:09", "topics": "pppoe,ppp,info", "message": "<pppoe-chinedu-house>: disconnected, timeout (no activity for 10m)"},
+  {".id": "*1D", "time": "sep/09 02:12:00", "topics": "pppoe,ppp,error", "message": "<pppoe-okoro-shop>: authentication failed"},
+  {".id": "*1E", "time": "sep/09 02:13:30", "topics": "pppoe,ppp,info", "message": "<pppoe-adaeze-flat>: disconnected, closed by peer"},
+  {".id": "*1F", "time": "sep/09 02:15:00", "topics": "system,info,account", "message": "user admin logged in from 192.168.10.50 via winbox"},
+  {".id": "*20", "time": "sep/09 02:20:00", "topics": "pppoe,ppp,info", "message": "<pppoe-adebayo-01>: terminating... - peer is not responding"}
+]

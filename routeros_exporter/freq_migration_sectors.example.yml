@@ -1,0 +1,19 @@
+# Sector inventory for the frequency migration tool (routeros_exporter's
+# freq_migration CLI). Copy to freq_migration_sectors.yml (gitignored, same
+# as config.yml) and fill in your real sectors.
+#
+# This is separate from routeros_exporter/config.yml on purpose - that file
+# is the always-on polling daemon's router list; this is an occasional,
+# human-gated tool with a much bigger blast radius (write access to every
+# CPE on a sector). See routeros_exporter/routeros_exporter/freq_migration/config.py.
+
+sectors:
+  - name: sector1-tower
+    host: 192.168.20.1
+    wireless_interface: wlan1        # the sector radio's own interface
+    cpe_wireless_interface: wlan1    # same interface name, on each CPE
+    freq_min_mhz: 5745               # keep inside this radio's actual
+    freq_max_mhz: 5825               # regulatory/country config - this is
+                                      # a second guard, not a substitute
+    channel_width_mhz: 20
+    fallback_count: 2                # candidates beyond old+new

@@ -1,0 +1,47 @@
+# Dependency-aware rollup: turn "every backhaul into a POP is down" into ONE
+# POPIsolated incident that inhibits all the downstream sector / link /
+# subscriber symptom alerts for that POP (see the inhibit_rules keyed on
+# `pop` in alertmanager/alertmanager.yml, and prometheus/topology.yml for
+# the model this implements).
+#
+# Until now those POP inhibit rules were inert - no target carried a `pop`
+# label. links.yml backhaul endpoints now do (role: Backhaul, pop: <name>),
+# the sectors do (prometheus/targets/mikrotik-sectors.yml), and the RouterOS
+# API series get it via routeros_router_info - so this can finally fire.
+
+groups:
+  - name: topology-rollup
+    interval: 30s
+    rules:
+      # 1 when EVERY backhaul link series for a POP is down (both ICMP
+      # endpoints of every backhaul link). Absent otherwise.
+      - record: topology:pop:isolated
+        expr: |
+          (
+            count by (pop) (link_up{role="Backhaul", pop!=""} == 0)
+            == bool
+            count by (pop) (link_up{role="Backhaul", pop!=""})
+          )
+          == 1
+
+      # Best-effort "how many subscribers are behind this POP", measured 10m
+      # back so an in-progress outage (which starves the API poll too)
+      # doesn't deflate the number.
+      - record: topology:pop:subscribers_impacted
+        expr: subscriber:active:by_pop offset 10m
+
+  - name: topology-alerts
+    rules:
+      - alert: POPIsolated
+        expr: topology:pop:isolated == 1
+        for: 3m
+        keep_firing_for: 10m
+        labels: { severity: critical, category: state, scope: pop, alert_type: pop-isolated }
+        annotations:
+          summary: "🔴 POP {{ $labels.pop }} isolated - all backhaul down"
+          description: >-
+            Every backhaul link into POP {{ $labels.pop }} is unreachable.
+            ~{{ with query (printf "topology:pop:subscribers_impacted{pop='%s'}" $labels.pop) }}{{ . | first | value | printf "%.0f" }}{{ else }}?{{ end }}
+            subscribers and all sectors behind this POP are affected - this
+            is the root cause; downstream sector / CPE / subscriber alerts
+            for {{ $labels.pop }} are inhibited.

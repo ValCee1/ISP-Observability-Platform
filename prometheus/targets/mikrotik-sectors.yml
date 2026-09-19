@@ -21,18 +21,27 @@
 # defaults every sector to 15/20 clients and 20/25 Mbps and lets you
 # override one sector in one place. See that file to change them.
 
-- targets: ["10.10.13.1"]
-  labels:
-    auth: public_v2
-    sector: 4B
-    site: BASE 5
-    role: sector-ap
-    pop: BASE
-
-- targets: ["10.10.13.129"]
-  labels:
-    auth: public_v2
-    sector: 4E
-    site: BASE 4
-    role: sector-ap
-    pop: BASE
+# Both BASE sectors are DISABLED (2026-09-12): not deployed/reachable yet,
+# so left enabled they just page SectorDown forever. Uncomment when BASE
+# goes live - nothing else needs to change.
+#
+# An all-comment file parses as YAML `null`, not an empty list - file_sd
+# wants a list, so an explicit `[]` keeps this file valid Prometheus config
+# with zero targets rather than relying on null being tolerated.
+[]
+#
+# - targets: ["10.10.13.1"]
+#   labels:
+#     auth: public_v2
+#     sector: 4B
+#     site: BASE 5
+#     role: sector-ap
+#     pop: BASE
+#
+# - targets: ["10.10.13.129"]
+#   labels:
+#     auth: public_v2
+#     sector: 4E
+#     site: BASE 4
+#     role: sector-ap
+#     pop: BASE

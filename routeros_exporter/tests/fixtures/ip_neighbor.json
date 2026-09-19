@@ -1,0 +1,5 @@
+[
+  {"interface": "ether2", "identity": "sector-4B", "address": "10.10.13.1", "mac-address": "CC:2D:E0:00:00:01", "board": "RB921GS"},
+  {"interface": "ether3", "identity": "sector-4E", "address": "10.10.13.129", "mac-address": "CC:2D:E0:00:00:02", "board": "RB921GS"},
+  {"interface": "ether1", "identity": "AF60-BASE-A", "address": "10.10.6.82", "mac-address": "04:18:D6:AA:BB:CC", "platform": "Ubiquiti"}
+]

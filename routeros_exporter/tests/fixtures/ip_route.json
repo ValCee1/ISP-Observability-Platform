@@ -1,0 +1,5 @@
+[
+  {"dst-address": "0.0.0.0/0", "gateway": "10.10.6.82", "active": "true", "disabled": "false", "distance": "1"},
+  {"dst-address": "10.10.13.0/24", "gateway": "bridge-sector", "active": "true", "disabled": "false"},
+  {"dst-address": "0.0.0.0/0", "gateway": "10.10.6.90", "active": "false", "disabled": "false", "distance": "2"}
+]
