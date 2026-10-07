@@ -16,7 +16,7 @@
 # Requires Docker Compose >= 2.24.4 for the `!override` directive.
 services:
   prometheus:
-    image: ${ISP_OBS_IMAGE:-valcee1/isp-observability:v1.0}
+    image: ${ISP_OBS_IMAGE:-valcee1/isp-observability:v1.1}
     build:
       context: .
       args:

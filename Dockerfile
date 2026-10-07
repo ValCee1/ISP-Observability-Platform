@@ -10,8 +10,8 @@
 # blackbox-exporter) keeps running from unmodified upstream images via
 # docker-compose.yml, mounting its config straight from this repo.
 #
-#   docker build -t <dockerhub-user>/isp-observability:v1.0 .
-#   docker push   <dockerhub-user>/isp-observability:v1.0
+#   docker build -t <dockerhub-user>/isp-observability:v1.1 .
+#   docker push   <dockerhub-user>/isp-observability:v1.1
 #
 # Config is baked but not frozen: bind-mount over /etc/prometheus/... at run
 # time to hot-patch targets without a rebuild.
@@ -23,7 +23,7 @@ FROM prom/prometheus:${PROMETHEUS_VERSION}
 ARG PROMETHEUS_VERSION
 LABEL org.opencontainers.image.title="ISP Network Observability Platform" \
       org.opencontainers.image.description="Prometheus with baked-in ISP monitoring config: MikroTik core routers, PTP backhaul links (airMAX/AirFiber/SAF), MikroTik PtMP sectors + CPEs" \
-      org.opencontainers.image.version="v1.0" \
+      org.opencontainers.image.version="v1.1" \
       org.opencontainers.image.source="https://github.com/ValCee1/ISP-Observability-Platform" \
       org.opencontainers.image.base.name="docker.io/prom/prometheus:${PROMETHEUS_VERSION}"
 
