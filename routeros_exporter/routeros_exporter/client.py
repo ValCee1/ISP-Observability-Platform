@@ -11,8 +11,6 @@ API paths used, all read-only:
   /ip/route/print          default route + nexthops  (topology)
   /ip/neighbor/print       MNDP/LLDP neighbours       (topology)
   /interface/print         running interfaces         (topology)
-  /export                  full config text           (backup) - run via a
-                           command channel, not /print
 
 A dedicated RouterOS user in the "read" group is enough for all of the above
 except nothing here needs write. See routeros_exporter/README.md for the
@@ -146,11 +144,7 @@ def connect(router, *, timeout: float = 10.0) -> Iterator[APIClient]:
     BUG, CONFIRMED 2026-09-14: this never accepted a `timeout` at all until
     now, so every caller silently got LibRouterOSClient's 10s default no
     matter what `Config.api_timeout_seconds` was set to - the config option
-    was a complete no-op. That's why `/export file=...` kept failing at a
-    consistent-ish mark: it was hitting the hidden 10s default, not the 30s
-    the config claimed. A direct test bypassing this bug (passing timeout
-    explicitly to librouteros) is what revealed the real duration (~52s on
-    a hAP AC Lite) - see routeros_exporter/README.md.
+    was a complete no-op.
     """
     cli = LibRouterOSClient(
         host=router.host,

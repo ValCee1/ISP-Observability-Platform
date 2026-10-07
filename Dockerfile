@@ -39,7 +39,8 @@ RUN ["promtool", "check", "config", "/etc/prometheus/prometheus.yml"]
 RUN ["promtool", "test", "rules", \
      "/etc/prometheus/rules/tests/alerts_test.yml", \
      "/etc/prometheus/rules/tests/subscriber_test.yml", \
-     "/etc/prometheus/rules/tests/anomaly_test.yml"]
+     "/etc/prometheus/rules/tests/anomaly_test.yml", \
+     "/etc/prometheus/rules/tests/fixes_test.yml", "/etc/prometheus/rules/tests/exporter_test.yml"]
 
 # Entrypoint is inherited from the base image (/bin/prometheus). CMD is
 # repeated verbatim from upstream so the config path isn't silently lost if

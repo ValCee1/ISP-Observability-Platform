@@ -123,8 +123,15 @@ route:
             severity: warning
           repeat_interval: 12h
 
-    # Router-scope config-backup alerts (config-backup.yml) carry scope=router
-    # + a `router` label but no `instance`. Group by router.
+    # Router-scope alerts carry scope=router + a `router` label. Group by router.
+    # ExporterDown (exporter-health.yml): one group per exporter.
+    - match:
+        scope: monitoring
+      group_by: ["exporter"]
+      group_wait: 30s
+      group_interval: 10m
+      repeat_interval: 2h
+
     - match:
         scope: router
       group_by: ["router"]
@@ -176,7 +183,8 @@ receivers:
         # time they'd get here (inhibit_rules below), so the list is the
         # real picture, not a storm.
         message: |
-          {{- $obj := "" }}{{ if .CommonLabels.link_id }}{{ $obj = printf "Link %s" .CommonLabels.link_id }}
+          {{- $obj := "" }}{{ if .CommonLabels.exporter }}{{ $obj = printf "Monitoring: %s" .CommonLabels.exporter }}
+          {{- else if .CommonLabels.link_id }}{{ $obj = printf "Link %s" .CommonLabels.link_id }}
           {{- else if .CommonLabels.sector }}{{ $obj = printf "Sector %s" .CommonLabels.sector }}
           {{- else if .CommonLabels.instance }}{{ $obj = printf "Router %s" .CommonLabels.instance }}
           {{- else if .CommonLabels.router }}{{ $obj = printf "Router %s" .CommonLabels.router }}
@@ -199,6 +207,24 @@ receivers:
 # as separate messages, you get LinkDown, and the other two are inhibited
 # for as long as LinkDown keeps firing.
 inhibit_rules:
+  # An exporter being down makes every device behind it look dead. Hold back
+  # the per-device alerts from the jobs it feeds; ExporterDown is the one
+  # message. (exporter-health.yml)
+  - source_match:
+      alertname: ExporterDown
+      exporter: snmp-exporter
+    target_match_re:
+      job: "snmp-mikrotik|snmp-sectors|link-interface-health|link-radio-health"
+  - source_match:
+      alertname: ExporterDown
+      exporter: blackbox-exporter
+    target_match_re:
+      job: "link-availability"
+  - source_match:
+      alertname: ExporterDown
+      exporter: routeros-exporter
+    target_match_re:
+      job: "routeros-api"
   # A link that's fully down doesn't need its degrading/health-tier alerts
   # (WeakSignal, LowLinkQuality, HighLatencyVariability, RisingInterfaceErrors,
   # LinkUpButDegrading) also notifying - they're just noise once you already
@@ -286,7 +312,7 @@ inhibit_rules:
   # POPIsolated (topology-rollup.yml) is the single root-cause incident when
   # every backhaul into a POP is down. Everything else about that POP - its
   # sectors, its backhaul link health/degrading alerts, its subscriber
-  # mass-outage / flapping / auth alerts, its config-backup staleness - is
+  # mass-outage / flapping / auth alerts - is
   # downstream of it. `equal: [pop]` scopes the suppression to that POP.
   - source_match:
       alertname: POPIsolated

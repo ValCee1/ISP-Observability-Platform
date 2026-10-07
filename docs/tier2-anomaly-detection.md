@@ -50,7 +50,7 @@ one.
 | `RouterMemoryAnomalyHigh` | 1h avg memory ≥1.3× the 6h avg, still under HighMemory's 75% | ditto, `for: 15m` |
 
 All four route through the existing `scope: pop|subscriber|router`
-Alertmanager routes (subscriber-alerts.yml / config-backup.yml already
+Alertmanager routes (subscriber-alerts.yml already
 wired these) — no new routing needed. `category: degrading` matches the
 convention used for other slow-symptom alerts (`SectorWideCPEDegradation`,
 `LinkUpButDegrading`).

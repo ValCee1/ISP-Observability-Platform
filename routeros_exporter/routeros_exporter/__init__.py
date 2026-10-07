@@ -1,15 +1,13 @@
 """RouterOS API collector for the ISP Observability Platform.
 
-This package fills the three gaps RouterOS SNMP cannot cover (see
+This package fills the two gaps RouterOS SNMP cannot cover (see
 ``prometheus/rules/ppp-sessions.yml`` and ``prometheus/topology.yml`` for the
 long-form explanation):
 
   1. Per-subscriber PPP/PPPoE session intelligence from ``/ppp/active`` and
      ``/ppp/secret`` - caller-id, real session uptime, assigned address,
      disconnect reason, provisioned-vs-online gap.
-  2. Config backup + drift detection - periodic ``/export`` committed to a
-     git repo, with a ``routeros_config_changed`` metric on every diff.
-  3. Topology auto-discovery - default route / neighbour / interface walk to
+  2. Topology auto-discovery - default route / neighbour / interface walk to
      build the POP -> backhaul -> router -> sector tree that the currently
      hand-maintained ``prometheus/topology.yml`` describes.
 

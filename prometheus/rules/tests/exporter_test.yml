@@ -1,0 +1,60 @@
+# promtool unit tests for ExporterDown (exporter-health.yml).
+rule_files:
+  - ../exporter-health.yml
+  - ../mikrotik-alerts.yml
+
+evaluation_interval: 15s
+
+tests:
+  # snmp-exporter stops: ExporterDown fires after 30s with exporter label.
+  # CoreRouterDown also fires in Prometheus (Alertmanager does the
+  # inhibiting, not Prometheus) - both carry the labels the inhibit rule
+  # needs: exporter=snmp-exporter on the source, job=snmp-mikrotik on the target.
+  - interval: 15s
+    input_series:
+      - series: 'up{job="snmp-exporter", instance="snmp-exporter:9116"}'
+        values: '1 1 0 0 0 0 0 0 0 0'
+      - series: 'up{job="snmp-mikrotik", instance="192.168.10.1"}'
+        values: '1 1 0 0 0 0 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: ExporterDown
+        exp_alerts: []
+      - eval_time: 75s
+        alertname: ExporterDown
+        exp_alerts:
+          - exp_labels:
+              alertname: ExporterDown
+              severity: critical
+              category: state
+              scope: monitoring
+              alert_type: exporter-down
+              exporter: snmp-exporter
+              job: snmp-exporter
+              instance: snmp-exporter:9116
+            exp_annotations:
+              summary: "🔴 snmp-exporter is down"
+              description: "Prometheus cannot scrape snmp-exporter (snmp-exporter:9116). Every device polled through it shows as unreachable, so those per-device alerts are held back until it recovers. The devices themselves are probably fine - check the container (`docker compose ps`, `docker compose logs snmp-exporter`)."
+      - eval_time: 105s
+        alertname: CoreRouterDown
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              category: state
+              scope: router
+              alert_type: router-down
+              job: snmp-mikrotik
+              instance: 192.168.10.1
+            exp_annotations:
+              summary: "🔴 Core Router DOWN"
+              description: "Router 192.168.10.1 has been unreachable for 1 minute."
+
+  # Healthy exporters never fire.
+  - interval: 15s
+    input_series:
+      - series: 'up{job="blackbox-exporter", instance="blackbox-exporter:9115"}'
+        values: '1x20'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: ExporterDown
+        exp_alerts: []

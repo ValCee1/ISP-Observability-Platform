@@ -13,14 +13,12 @@
 # unification discussed and declined earlier: this is one label, kept in
 # sync by hand, not a shared source of truth.
 #
-# `wan_ifname` documents which ifName is this router's real WAN uplink
-# (dashboards use it, e.g. "WAN Interface: {{wan_ifname}}"). It is NOT
-# currently consumed by the WANInterfaceDown alert in mikrotik-alerts.yml -
-# PromQL can't dynamically join an alert's ifName match against a
-# per-instance label value, so that alert still hardcodes its ifName regex
-# per router. With one router this was a non-issue; now that a second
-# router (Sam ISP) has its own WAN ifName, either give it its own alert
-# rule or switch to a generated rules file.
+# `wan_ifname` is the ifName of this router's real WAN uplink. It IS the
+# source of truth (since 2026-10-06) for both the WANInterfaceDown alert
+# (prometheus/rules/mikrotik-alerts.yml) and the WAN panels of the WAN/LAN
+# Interfaces dashboard - both join ifOperStatus/ifHC*Octets against this
+# label via label_replace(up, "ifName", ..., "wan_ifname", ...). Change a
+# router's WAN here and the alert + dashboard follow; no rule edit needed.
 #
 # pop1-home's wan_ifname was "chiemerie-ppp" (CONFIRMED 2026-08-23: ether1
 # was an unused/down port then). CONFIRMED CHANGED (2026-09-13, per the
@@ -38,18 +36,13 @@
     wan_ifname: "ether1"
 
 - targets:
-    - 192.168.10.19
+    - 192.168.10.15
   labels:
     site: "room-office"
     role: "Repeater"
     router: "room-office-repeater" # keep in sync with routeros_exporter/config.yml `name`
     wan_ifname: "wlan1"
 
-# Two physically separate boxes for the "Sam" site/client - an SSTP router
-# and a hotspot gateway. `router` MUST be unique per box (like `sector:`
-# elsewhere) - CONFIRMED 2026-09-13: sharing one value ("Sam ISP") made
-# their CoreRouterDown incidents indistinguishable on the NOC Overview
-# (one row named "Sam ISP", no way to tell which of the two was down).
 - targets:
     - 192.168.11.1
   labels:
