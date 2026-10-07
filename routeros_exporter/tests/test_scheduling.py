@@ -1,14 +1,10 @@
-"""Unit tests for the per-router backup/topology retry backoff.
+"""Unit tests for the per-router topology retry backoff.
 
-CONFIRMED 2026-09-14, live, against a hAP AC Lite: retrying a failed
-backup every ~30s poll cycle is only safe for a genuinely transient miss.
-A command that fails the same way every time (that router's `/export
-file=...` hung the full timeout on every attempt, load or no load) kept a
-hung API connection in flight almost continuously when retried that fast,
-which exhausted the router's API connections badly enough to break its
-routine PPP/system polling too. `_schedule_after_attempt` is the pure
-scheduling decision `run()` uses to back off after a couple of consecutive
-misses instead of hammering the router forever.
+Retrying a failed command every ~30s poll cycle is only safe for a
+genuinely transient miss; one that fails the same way every time would keep
+an API connection busy almost continuously. `_schedule_after_attempt` is the
+pure scheduling decision `run()` uses to back off after a couple of
+consecutive misses instead of hammering the router forever.
 """
 
 from routeros_exporter.__main__ import BACKOFF_AFTER_FAILURES, _schedule_after_attempt

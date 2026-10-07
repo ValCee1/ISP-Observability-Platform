@@ -3,7 +3,7 @@ groups:
     rules:
       - alert: CoreRouterDown
         expr: up{job="snmp-mikrotik"} == 0
-        for: 30s
+        for: 1m
         keep_firing_for: 5m
         labels:
           severity: critical
@@ -12,21 +12,24 @@ groups:
           alert_type: router-down
         annotations:
           summary: "🔴 Core Router DOWN"
-          description: "Router {{ $labels.instance }} has been unreachable for 30 seconds."
+          description: "Router {{ $labels.instance }} has been unreachable for 1 minute."
 
       # FIXED (2026-08-23): this used to also match "ether1", which on the
-      # live router is oper-down permanently because it's simply an unused
-      # port - not the WAN. That made WANInterfaceDown fire forever as a
-      # false positive alongside a permanently-firing WANInterfaceUp for
-      # chiemerie-ppp. "chiemerie-ppp" (the PPPoE session) is the actual
-      # WAN uplink - see the wan_ifname label/comment in
-      # prometheus/targets/mikrotik-routers.yml. If you add a second
-      # router with a different WAN interface name, this regex needs a
-      # second alternative (or its own rule) added explicitly - Prometheus
-      # alert expressions can't dynamically read the wan_ifname label of
-      # the instance they're evaluating.
+      # live router was then an unused, permanently-down port - a false
+      # positive. FIXED AGAIN (2026-10-06): the follow-up hardcoded
+      # ifName="chiemerie-ppp", which went stale when pop1-home's WAN moved
+      # to ether1 (2026-09-13) and never covered the other routers at all.
+      # The WAN ifName now comes from each router's own `wan_ifname` target
+      # label (prometheus/targets/mikrotik-routers.yml): label_replace
+      # copies wan_ifname into an ifName label on that router's `up` series,
+      # and the `and on (instance, ifName)` join keeps only the interface
+      # whose name matches. Adding a router = setting wan_ifname on its
+      # target block; no rule edit needed.
       - alert: WANInterfaceDown
-        expr: ifOperStatus{ifName="chiemerie-ppp"} == 2
+        expr: |
+          ifOperStatus{job="snmp-mikrotik"} == 2
+          and on (instance, ifName)
+            label_replace(up{job="snmp-mikrotik"}, "ifName", "$1", "wan_ifname", "(.+)")
         for: 2m
         keep_firing_for: 10m
         labels:
@@ -56,7 +59,7 @@ groups:
           alert_type: high-cpu
         annotations:
           summary: "🟠 High CPU"
-          description: 'CPU on {{ $labels.instance }} has been above 80% for 5 minutes (currently {{ $value | printf "%.1f" }}%).'
+          description: 'CPU on {{ $labels.instance }} has been above 80% for 3 minutes (currently {{ $value | printf "%.1f" }}%).'
 
       - alert: HighMemory
         expr: 100 * (hrStorageUsed{hrStorageDescr=~".*[Mm]emory.*"} / hrStorageSize{hrStorageDescr=~".*[Mm]emory.*"}) > 75
@@ -70,16 +73,17 @@ groups:
           summary: "🟠 High Memory"
           description: 'Memory on {{ $labels.instance }} has been above 75% for 3 minutes (currently {{ $value | printf "%.1f" }}%).'
 
-      # NOTE: link_signal_dbm is the normalized link_* schema metric
-      # (populated by the link-radio-health job for PTP link endpoints,
-      # not by snmp-mikrotik). This rule intentionally duplicates the
-      # threshold check already covered by link-alerts.yml's WeakSignal
-      # rule; kept here as a router-scoped safety net in case a link
-      # radio ever gets scraped only via the mikrotik job. If that never
-      # happens, this rule simply never fires (no ifName/instance overlap
-      # with mikrotik-core's other alerts).
+      # Router-scoped safety net ONLY: fires if a link radio is ever scraped
+      # via the snmp-mikrotik job. FIXED (2026-10-06): this used to match
+      # every link_signal_dbm series - i.e. exactly the same series as
+      # link-alerts.yml's WeakSignal, with the same alertname and labels
+      # but a different threshold (-75/5m vs -80/10m). Alertmanager
+      # identifies alerts by their label set, so below -80 dBm the two
+      # rules collapsed into one alert with flip-flopping annotations, and
+      # between -75 and -80 this one paged on its own. The job filter keeps
+      # it to its stated purpose; PTP link signal is link-alerts.yml's job.
       - alert: WeakSignal
-        expr: link_signal_dbm < -75
+        expr: link_signal_dbm{job="snmp-mikrotik"} < -75
         for: 5m
         labels:
           severity: warning

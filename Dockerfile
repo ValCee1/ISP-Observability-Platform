@@ -10,8 +10,8 @@
 # blackbox-exporter) keeps running from unmodified upstream images via
 # docker-compose.yml, mounting its config straight from this repo.
 #
-#   docker build -t <dockerhub-user>/isp-observability:v1.0 .
-#   docker push   <dockerhub-user>/isp-observability:v1.0
+#   docker build -t <dockerhub-user>/isp-observability:v1.1 .
+#   docker push   <dockerhub-user>/isp-observability:v1.1
 #
 # Config is baked but not frozen: bind-mount over /etc/prometheus/... at run
 # time to hot-patch targets without a rebuild.
@@ -23,7 +23,7 @@ FROM prom/prometheus:${PROMETHEUS_VERSION}
 ARG PROMETHEUS_VERSION
 LABEL org.opencontainers.image.title="ISP Network Observability Platform" \
       org.opencontainers.image.description="Prometheus with baked-in ISP monitoring config: MikroTik core routers, PTP backhaul links (airMAX/AirFiber/SAF), MikroTik PtMP sectors + CPEs" \
-      org.opencontainers.image.version="v1.0" \
+      org.opencontainers.image.version="v1.1" \
       org.opencontainers.image.source="https://github.com/ValCee1/ISP-Observability-Platform" \
       org.opencontainers.image.base.name="docker.io/prom/prometheus:${PROMETHEUS_VERSION}"
 
@@ -39,7 +39,8 @@ RUN ["promtool", "check", "config", "/etc/prometheus/prometheus.yml"]
 RUN ["promtool", "test", "rules", \
      "/etc/prometheus/rules/tests/alerts_test.yml", \
      "/etc/prometheus/rules/tests/subscriber_test.yml", \
-     "/etc/prometheus/rules/tests/anomaly_test.yml"]
+     "/etc/prometheus/rules/tests/anomaly_test.yml", \
+     "/etc/prometheus/rules/tests/fixes_test.yml", "/etc/prometheus/rules/tests/exporter_test.yml"]
 
 # Entrypoint is inherited from the base image (/bin/prometheus). CMD is
 # repeated verbatim from upstream so the config path isn't silently lost if

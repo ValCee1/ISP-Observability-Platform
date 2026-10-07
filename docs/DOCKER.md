@@ -17,7 +17,7 @@ The build fails if the bundled config or rules don't parse
 
 > **Image name.** Docker image references can't contain spaces or uppercase, so
 > the repository is `isp-observability` (not "isp observability"). Full
-> reference: `<dockerhub-namespace>/isp-observability:v1.0`.
+> reference: `<dockerhub-namespace>/isp-observability:v1.1`.
 
 ## Files
 
@@ -31,20 +31,20 @@ The build fails if the bundled config or rules don't parse
 
 ```bash
 # from the repo root
-docker build -t valcee1/isp-observability:v1.0 .
+docker build -t valcee1/isp-observability:v1.1 .
 ```
 
 Override the Prometheus base version if needed:
 
 ```bash
-docker build --build-arg PROMETHEUS_VERSION=v3.13.2 -t valcee1/isp-observability:v1.0 .
+docker build --build-arg PROMETHEUS_VERSION=v3.13.2 -t valcee1/isp-observability:v1.1 .
 ```
 
 Verify before pushing:
 
 ```bash
-docker run --rm valcee1/isp-observability:v1.0 --version
-docker run --rm --entrypoint promtool valcee1/isp-observability:v1.0 \
+docker run --rm valcee1/isp-observability:v1.1 --version
+docker run --rm --entrypoint promtool valcee1/isp-observability:v1.1 \
   check config /etc/prometheus/prometheus.yml
 ```
 
@@ -63,13 +63,13 @@ docker run --rm --entrypoint promtool valcee1/isp-observability:v1.0 \
 3. **Tag** (skip if you already built with the final name above):
 
    ```bash
-   docker tag valcee1/isp-observability:v1.0 valcee1/isp-observability:v1.0
+   docker tag valcee1/isp-observability:v1.1 valcee1/isp-observability:v1.1
    ```
 
 4. **Push:**
 
    ```bash
-   docker push valcee1/isp-observability:v1.0
+   docker push valcee1/isp-observability:v1.1
    ```
 
 The repo stays private — anyone pulling it (including other hosts running this
@@ -82,7 +82,7 @@ If your monitoring host is arm64 (or mixed):
 ```bash
 docker buildx create --use --name isp-obs 2>/dev/null || docker buildx use isp-obs
 docker buildx build --platform linux/amd64,linux/arm64 \
-  -t valcee1/isp-observability:v1.0 --push .
+  -t valcee1/isp-observability:v1.1 --push .
 ```
 
 ## Run the stack from the image

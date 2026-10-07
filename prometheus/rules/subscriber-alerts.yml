@@ -109,7 +109,7 @@ groups:
           summary: "🟠 RouterOS API collector cannot reach {{ $labels.router }}"
           description: >-
             routeros-exporter has failed to poll {{ $labels.router }} for
-            10 min - subscriber session / config-backup / topology data for
+            10 min - subscriber session / topology data for
             this router is stale. SNMP-derived signals are unaffected.
 
   # -------------------------------------------------------------------

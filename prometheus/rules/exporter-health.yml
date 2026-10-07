@@ -1,0 +1,39 @@
+# Monitoring-the-monitoring: is each exporter itself reachable?
+#
+# Why: every SNMP/ICMP device job goes THROUGH an exporter container. If
+# snmp-exporter stops, Prometheus sees up == 0 for every router and sector
+# at once and CoreRouterDown/SectorDown fire for all of them, even though
+# the devices are fine (CONFIRMED 2026-10-07, ~03:30-03:53: snmp-exporter
+# container stopped, 4x CoreRouterDown + SectorDown went to Telegram).
+#
+# ExporterDown fires instead, ONE alert per exporter, and
+# alertmanager/alertmanager.yml inhibits the per-device alerts from the
+# jobs that exporter feeds (matched on the `job` label).
+#
+# The `exporter` label is the container name, used by the Telegram template.
+groups:
+  - name: exporter-health
+    rules:
+      - alert: ExporterDown
+        # for: 30s - shorter than CoreRouterDown's 1m so the inhibiting
+        # alert is already firing when the per-device ones would start.
+        expr: |
+          label_replace(up{job="snmp-exporter"}     == 0, "exporter", "snmp-exporter",     "", "")
+          or
+          label_replace(up{job="blackbox-exporter"} == 0, "exporter", "blackbox-exporter", "", "")
+          or
+          label_replace(up{job="routeros-api"}      == 0, "exporter", "routeros-exporter", "", "")
+        for: 30s
+        labels:
+          severity: critical
+          category: state
+          scope: monitoring
+          alert_type: exporter-down
+        annotations:
+          summary: "🔴 {{ $labels.exporter }} is down"
+          description: >-
+            Prometheus cannot scrape {{ $labels.exporter }} ({{ $labels.instance }}).
+            Every device polled through it shows as unreachable, so those
+            per-device alerts are held back until it recovers. The devices
+            themselves are probably fine - check the container
+            (`docker compose ps`, `docker compose logs {{ $labels.exporter }}`).

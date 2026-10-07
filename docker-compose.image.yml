@@ -13,14 +13,18 @@
 #   ISP_OBS_IMAGE=youruser/isp-observability:v1.1 docker compose \
 #     -f docker-compose.yml -f docker-compose.image.yml up -d
 #
-# Requires Docker Compose >= 2.24 for the `!reset` list directive.
+# Requires Docker Compose >= 2.24.4 for the `!override` directive.
 services:
   prometheus:
-    image: ${ISP_OBS_IMAGE:-valcee1/isp-observability:v1.0}
+    image: ${ISP_OBS_IMAGE:-valcee1/isp-observability:v1.1}
     build:
       context: .
       args:
         PROMETHEUS_VERSION: v3.13.2
-    volumes:
-      - !reset null            # drop the read-only config bind mounts
+    # !override REPLACES the base file's volume list (drops the read-only
+    # config bind mounts, keeps only TSDB storage). The previous
+    # `- !reset null` list item was a no-op - `docker compose config`
+    # showed all three repo bind mounts still attached, so "baked image"
+    # mode was silently still running the repo's live config.
+    volumes: !override
       - prometheus_data:/prometheus

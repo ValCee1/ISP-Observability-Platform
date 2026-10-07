@@ -3,18 +3,6 @@
 # ICMP (through blackbox-exporter). Grafana visualizes it, Alertmanager
 # routes firing alerts to Telegram. All services share the "monitoring"
 # bridge network so they can reach each other by container name.
-#
-# FEATURE PACKAGING: which of this stack's optional features (PPP
-# intelligence, config backup, topology discovery, anomaly detection) an
-# ISP actually wants is controlled by features.yml + feature-manifest.yml,
-# not by editing this file - see scripts/apply_features.py. That script
-# generates two things this file reads instead of the raw source
-# directories: prometheus/rules.active/ and grafana/dashboards.active/
-# (generated copies of only the enabled features' files), and a
-# COMPOSE_PROFILES entry in .env (so `docker compose up -d`, with no
-# --profile flags, starts exactly the services enabled features need).
-# Run `routeros_exporter/.venv/bin/python scripts/apply_features.py`
-# before the first `docker compose up` and after any features.yml change.
 services:
   # Metrics store + rule/alert evaluation engine. Reads its own config plus
   # the recording/alerting rules and SNMP/ICMP target lists from the repo,
@@ -26,7 +14,7 @@ services:
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./prometheus/targets:/etc/prometheus/targets:ro
-      - ./prometheus/rules.active:/etc/prometheus/rules:ro   # generated - see scripts/apply_features.py
+      - ./prometheus/rules:/etc/prometheus/rules:ro
       - prometheus_data:/prometheus   # TSDB storage, persisted across restarts
     ports:
       - "9090:9090"
@@ -49,9 +37,8 @@ services:
       - monitoring
 
   # Dashboards. Auto-provisioned from grafana/provisioning (datasource +
-  # dashboard folder pointers) and grafana/dashboards.active (generated -
-  # see scripts/apply_features.py; only the enabled features' dashboard
-  # JSON), so dashboards are version-controlled rather than edited only
+  # dashboard folder pointers) and grafana/dashboards (the dashboard JSON
+  # itself), so dashboards are version-controlled rather than edited only
   # in the UI. Admin password is injected via a Docker secret, never a
   # plaintext env var.
   grafana:
@@ -61,12 +48,17 @@ services:
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD__FILE=/run/secrets/grafana_admin_password
+      # Grafana 13 no longer bundles the Prometheus datasource - it's a
+      # catalog plugin. Install it synchronously at startup, at a pinned
+      # version, and never auto-update it (same rule as every image here).
+      - GF_PLUGINS_PREINSTALL_SYNC=prometheus@13.2.3
+      - GF_PLUGINS_PREINSTALL_AUTO_UPDATE=false
     secrets:
       - grafana_admin_password
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./grafana/dashboards.active:/var/lib/grafana/dashboards:ro   # generated - see scripts/apply_features.py
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
     ports:
       - "3000:3000"
     depends_on:
@@ -110,8 +102,7 @@ services:
       - monitoring
 
   # RouterOS API collector. Covers what SNMP can't: per-subscriber PPP/PPPoE
-  # session intelligence (/ppp active + secret + log), config backup + drift
-  # detection (/export committed to a git repo on its own volume), and
+  # session intelligence (/ppp active + secret + log) and
   # topology auto-discovery (/ip route + neighbour walk). Prometheus scrapes
   # it on :9436 (job "routeros-api"). Read-only RouterOS user only - see
   # routeros_exporter/README.md. The router list + labels are a bind-mounted
@@ -120,17 +111,9 @@ services:
   routeros-exporter:
     build:
       context: ./routeros_exporter
-    image: ${ISP_ROUTEROS_EXPORTER_IMAGE:-valcee1/isp-routeros-exporter:v0.1}
+    image: isp-routeros-exporter:dev   # local build tag - not published anywhere
     container_name: routeros-exporter
     restart: unless-stopped
-    # Only starts if the "routeros-api" profile is active - i.e. if
-    # ppp_intelligence, config_backup, or topology_discovery is enabled in
-    # features.yml (they share this one container/connection - see
-    # feature-manifest.yml). scripts/apply_features.py writes that profile
-    # into .env; an ISP that wants only SNMP/ICMP monitoring never builds
-    # or starts this container at all.
-    profiles:
-      - routeros-api
     volumes:
       - ./routeros_exporter/config.yml:/etc/routeros-exporter/config.yml:ro
       - routeros_exporter_data:/var/lib/routeros-exporter
@@ -158,7 +141,7 @@ volumes:
   prometheus_data:
   grafana_data:
   alertmanager_data:
-  routeros_exporter_data:   # config-backup git repo + generated topology file
+  routeros_exporter_data:   # generated topology file
 
 networks:
   monitoring:

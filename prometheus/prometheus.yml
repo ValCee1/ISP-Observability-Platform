@@ -16,12 +16,29 @@ scrape_configs:
     static_configs:
       - targets: ["localhost:9090"]
 
+  # The exporters' OWN /metrics endpoints (not the devices behind them).
+  # up{job="snmp-exporter"} / up{job="blackbox-exporter"} == 0 means the
+  # exporter itself is down - ExporterDown (rules/exporter-health.yml) fires
+  # once and Alertmanager holds back the per-device alerts it would cause.
+  - job_name: "snmp-exporter"
+    static_configs:
+      - targets: ["snmp-exporter:9116"]
+
+  - job_name: "blackbox-exporter"
+    static_configs:
+      - targets: ["blackbox-exporter:9115"]
+
   # Core router health: CPU, memory, uptime, interface counters/state.
   # Uses the generic `mikrotik` SNMP module (snmp_exporter/snmp.yml).
   # Target list (router IPs + site/role labels) lives in
   # prometheus/targets/mikrotik-routers.yml, reloaded every 1m without a
   # Prometheus restart.
   - job_name: "snmp-mikrotik"
+    # Remote routers (Sam OFT / Sam Hotspot over SSTP) take 4-10s to walk;
+    # the 10s global timeout made them flap and fire false CoreRouterDown.
+    # Same headroom as the link/sector jobs.
+    scrape_interval: 30s
+    scrape_timeout: 25s
     metrics_path: /snmp
     params:
       module: [mikrotik]
@@ -164,7 +181,7 @@ scrape_configs:
   # above - it walks the routers itself over the RouterOS API and exposes
   # routeros_* metrics directly on :9436. Covers what SNMP can't: per-
   # subscriber PPP/PPPoE sessions (caller-id -> sector, disconnect reason,
-  # provisioned-vs-online), config backup + drift, topology auto-discovery.
+  # provisioned-vs-online) and topology auto-discovery.
   # Each series is self-labelled router/site/pop/role from the exporter's own
   # config file, so no target labels are set here.
   - job_name: "routeros-api"

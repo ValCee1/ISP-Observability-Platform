@@ -3,7 +3,7 @@
 A small observability stack for an ISP network: MikroTik core routers, PTP wireless
 backhaul links (AirMAX, AirFiber, SAF), monitored via SNMP (routers + radios) and ICMP
 (link reachability), plus a RouterOS **API** collector for what SNMP can't reach —
-per-subscriber PPP/PPPoE sessions, config backup + drift, topology auto-discovery.
+per-subscriber PPP/PPPoE sessions and topology auto-discovery.
 Visualized in Grafana, alerted on Telegram via Alertmanager.
 
 ```
@@ -18,7 +18,7 @@ Routers        --API---> routeros-exporter -/            -> Alertmanager -> Tele
   layout, monitored topology, metric-normalization and alert pipelines, with
   diagrams.
 - [docs/tier1-subscriber-config-topology.md](docs/tier1-subscriber-config-topology.md)
-  — the RouterOS API layer: subscriber intelligence, config backup + drift,
+  — the RouterOS API layer: subscriber intelligence,
   topology auto-discovery + POP-isolation rollup.
 - [routeros_exporter/README.md](routeros_exporter/README.md) — the API collector
   itself (metrics, the read-only RouterOS user, `UNVERIFIED` list).
@@ -30,9 +30,6 @@ Routers        --API---> routeros-exporter -/            -> Alertmanager -> Tele
   registry.
 - [docs/failure-drills.md](docs/failure-drills.md) — end-to-end failure runbook
   (detect → alert → explain → recover → no storm).
-- [docs/feature-packaging.md](docs/feature-packaging.md) — picking which
-  optional features a deployment ships (`features.yml` +
-  `scripts/apply_features.py`), for an ISP that only wants a subset.
 
 ## Running the stack
 
@@ -45,24 +42,11 @@ Routers        --API---> routeros-exporter -/            -> Alertmanager -> Tele
      even if you're not using the API collector yet.
    - `routeros_exporter/config.yml` — the router list for the API collector
      (`cp routeros_exporter/config.example.yml routeros_exporter/config.yml`).
-2. Choose which optional features to run — `cp features.example.yml
-   features.yml`, edit it, then:
-
-   ```bash
-   routeros_exporter/.venv/bin/python scripts/apply_features.py
-   ```
-
-   (Skipping this step is fine too — the script falls back to
-   `features.example.yml`'s defaults, which is everything except anomaly
-   detection. See [docs/feature-packaging.md](docs/feature-packaging.md).)
-3. Start everything:
+2. Start everything:
 
    ```bash
    docker compose up -d
    ```
-
-   Compose only starts the RouterOS API collector if step 2 enabled a
-   feature that needs it — see `COMPOSE_PROFILES` in the generated `.env`.
 
 - Grafana: http://localhost:3000 (user: `admin`, password from the secret file above)
 - Prometheus: http://localhost:9090
@@ -96,11 +80,10 @@ docker compose -f docker-compose.yml -f docker-compose.image.yml up -d
   (clients / Mbps) live in `prometheus/rules/sector-thresholds.yml`. See
   `sector-normalization.yml` for the derived `sector_*` / `sector:*` series
   (RF throughput, per-CPE chain imbalance / drift, alignment score, 24h rollups).
-- **Subscribers + config + topology** (`routeros_exporter/`, job `routeros-api`): the
+- **Subscribers + topology** (`routeros_exporter/`, job `routeros-api`): the
   RouterOS API collector. Per-subscriber PPP/PPPoE sessions from `/ppp/active` +
   `/ppp/secret` + `/log` (caller-id, real uptime, disconnect reason,
-  provisioned-vs-online, mass-outage detection); config backup + drift (`/export`
-  committed to a git repo, `routeros_config_changed` on every diff); topology
+  provisioned-vs-online, mass-outage detection); topology
   auto-discovery (`/ip/route` + `/ip/neighbor`) that finally activates the `pop`
   dependency-inhibition machinery. Details:
   [docs/tier1-subscriber-config-topology.md](docs/tier1-subscriber-config-topology.md).
@@ -138,8 +121,6 @@ docker compose -f docker-compose.yml -f docker-compose.image.yml up -d
 - **Subscriber Overview** — active vs provisioned sessions, active-by-POP timeline
   (mass-outage cliff), top flapping subscribers, disconnect reasons, auth-failure
   rate, per-session table.
-- **Config Audit** — last-backup age per router, config-change spikes, most-recent
-  change timestamp, RouterOS versions across the fleet.
 - **WAN/LAN Interfaces** — traffic and up/down state grouped by interface role
   (WAN, LAN, PPP, wireless backhaul), using textbox variables holding per-router
   ifName regexes — check these against `wan_ifname` in

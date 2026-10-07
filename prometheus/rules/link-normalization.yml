@@ -10,14 +10,24 @@ groups:
       - record: link_up
         expr: probe_success{job="link-availability"}
 
+      # Only successful probes count as latency. A failed ICMP probe's
+      # probe_duration_seconds is the blackbox timeout (~5s), not an RTT -
+      # recording it here made a DOWN or lossy link also look like a 5000ms
+      # "Severe Latency" link (HighLatency firing alongside LinkDown /
+      # PacketLoss, and latency graphs spiking to 5s on every lost ping).
+      # A down endpoint now simply has no latency sample; loss is tracked
+      # separately by link_probe_failure_ratio below.
       - record: link_latency_seconds
-        expr: probe_duration_seconds{job="link-availability"}
+        expr: probe_duration_seconds{job="link-availability"} and probe_success{job="link-availability"} == 1
 
       - record: link_probe_failure_ratio
         expr: (1 - avg_over_time(probe_success{job="link-availability"}[5m]))
 
+      # Jitter over successful probes only (built on link_latency_seconds
+      # above), for the same reason - a single 5s timeout in the window
+      # otherwise dominates the stddev and fires HighLatencyVariability.
       - record: link_latency_variability_seconds
-        expr: stddev_over_time(probe_duration_seconds{job="link-availability"}[5m])
+        expr: stddev_over_time(link_latency_seconds[5m])
 
   - name: link-interface-health
     rules:
@@ -46,14 +56,22 @@ groups:
         expr: >
           topk by (link_id, endpoint, site, role, vendor, link_name) (
             1,
-            rate(link_interface_out_octets{job="link-interface-health", ifName!="lo"}[5m]) * 8
+            (
+              rate(link_interface_out_octets{job="link-interface-health", ifName!="lo"}[5m])
+              or
+              rate(link_interface_out_octets_32{job="link-interface-health", ifName!="lo"}[5m])
+            ) * 8
           )
 
       - record: link_rx_bps
         expr: >
           topk by (link_id, endpoint, site, role, vendor, link_name) (
             1,
-            rate(link_interface_in_octets{job="link-interface-health", ifName!="lo"}[5m]) * 8
+            (
+              rate(link_interface_in_octets{job="link-interface-health", ifName!="lo"}[5m])
+              or
+              rate(link_interface_in_octets_32{job="link-interface-health", ifName!="lo"}[5m])
+            ) * 8
           )
 
   - name: link-derived-metrics

@@ -1,5 +1,5 @@
 # promtool unit tests for the Tier-1 (RouterOS API) alert logic:
-# subscriber mass-outage, config drift, backup staleness, POP isolation.
+# subscriber mass-outage, POP isolation.
 #
 # Run:
 #   docker run --rm --entrypoint promtool -v "$PWD/prometheus":/p \
@@ -12,7 +12,6 @@
 
 rule_files:
   - ../subscriber-alerts.yml
-  - ../config-backup.yml
   - ../topology-rollup.yml
 
 evaluation_interval: 1m
@@ -52,70 +51,6 @@ tests:
       - eval_time: 9m
         alertname: SubscriberMassOutagePOP
         exp_alerts: []
-
-  # ------------------------------------------------------------------
-  # RouterConfigChanged fires the cycle a diff lands (routeros_config_changed
-  # flips to 1) and rides keep_firing_for after it clears.
-  # ------------------------------------------------------------------
-  - interval: 1m
-    input_series:
-      - series: 'routeros_config_changed{router="pop1-home"}'
-        values: '0 0 0 1 0 0 0 0'
-      - series: 'routeros_config_export_lines{router="pop1-home"}'
-        values: '412x8'
-    alert_rule_test:
-      - eval_time: 2m
-        alertname: RouterConfigChanged
-        exp_alerts: []
-      - eval_time: 3m
-        alertname: RouterConfigChanged
-        exp_alerts:
-          - exp_labels:
-              severity: warning
-              category: health
-              scope: router
-              alert_type: config-changed
-              router: pop1-home
-            exp_annotations:
-              summary: "🟠 Config changed on pop1-home"
-              description: "pop1-home's /export changed (now 412 lines). If this was not a planned change, review the diff: `git -C <backup-repo> log -p -- pop1-home.rsc`."
-      - eval_time: 10m          # value back to 0 but keep_firing_for: 20m
-        alertname: RouterConfigChanged
-        exp_alerts:
-          - exp_labels:
-              severity: warning
-              category: health
-              scope: router
-              alert_type: config-changed
-              router: pop1-home
-            exp_annotations:
-              summary: "🟠 Config changed on pop1-home"
-              description: "pop1-home's /export changed (now 412 lines). If this was not a planned change, review the diff: `git -C <backup-repo> log -p -- pop1-home.rsc`."
-
-  # ------------------------------------------------------------------
-  # RouterBackupFailing: the backup cycle has returned an error for 1h.
-  # (RouterBackupStale uses a 25h gap that isn't practical to unit-test.)
-  # ------------------------------------------------------------------
-  - interval: 5m
-    input_series:
-      - series: 'routeros_config_backup_success{router="pop2-base"}'
-        values: '0x20'
-    alert_rule_test:
-      - eval_time: 45m
-        alertname: RouterBackupFailing
-        exp_alerts: []
-      - eval_time: 75m
-        alertname: RouterBackupFailing
-        exp_alerts:
-          - exp_labels:
-              severity: warning
-              category: health
-              scope: router
-              alert_type: backup-failing
-              router: pop2-base
-            exp_annotations:
-              summary: "🟠 Config backup failing for pop2-base"
-              description: "The last pop2-base backup cycle returned an error (git commit or /export). Check routeros-exporter logs."
 
   # ------------------------------------------------------------------
   # POPIsolated: every backhaul link_up series for the POP is 0.
