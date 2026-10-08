@@ -1,0 +1,75 @@
+# promtool unit tests for MonitoringVantageLost (vantage.yml).
+rule_files:
+  - ../vantage.yml
+
+evaluation_interval: 15s
+
+tests:
+  # All reference targets unreachable: fires after 30s, ONE alert.
+  - interval: 15s
+    input_series:
+      - series: 'probe_success{job="vantage-points", instance="192.168.10.1"}'
+        values: '1 1 0 0 0 0 0 0'
+      - series: 'probe_success{job="vantage-points", instance="1.1.1.1"}'
+        values: '1 1 0 0 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: MonitoringVantageLost
+        exp_alerts: []
+      - eval_time: 105s
+        alertname: MonitoringVantageLost
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              category: state
+              scope: monitoring
+              alert_type: vantage-lost
+              exporter: server-network
+            exp_annotations:
+              summary: "🔴 No network access from the monitoring server"
+              description: "Every reference target in prometheus/targets/vantage-points.yml is unreachable, so the monitoring server has no network access. If the first-hop target is a POP router, that router may itself be down or unreachable. Link, router, sector and subscriber alerts are held back until the path recovers and for 15 minutes after, so they don't report false outages."
+
+  # One reference target still answers: the server's network is fine, a
+  # single dead reference must NOT trigger it.
+  - interval: 15s
+    input_series:
+      - series: 'probe_success{job="vantage-points", instance="192.168.10.1"}'
+        values: '0x20'
+      - series: 'probe_success{job="vantage-points", instance="1.1.1.1"}'
+        values: '1x20'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: MonitoringVantageLost
+        exp_alerts: []
+
+  # No vantage targets configured at all: feature is off, never fires.
+  - interval: 15s
+    input_series:
+      - series: 'up{job="snmp-exporter", instance="snmp-exporter:9116"}'
+        values: '1x20'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: MonitoringVantageLost
+        exp_alerts: []
+
+  # Path restored: keeps firing (so inhibition continues) for 15m, then resolves.
+  - interval: 15s
+    input_series:
+      - series: 'probe_success{job="vantage-points", instance="192.168.10.1"}'
+        values: '0x8 1x100'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: MonitoringVantageLost
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              category: state
+              scope: monitoring
+              alert_type: vantage-lost
+              exporter: server-network
+            exp_annotations:
+              summary: "🔴 No network access from the monitoring server"
+              description: "Every reference target in prometheus/targets/vantage-points.yml is unreachable, so the monitoring server has no network access. If the first-hop target is a POP router, that router may itself be down or unreachable. Link, router, sector and subscriber alerts are held back until the path recovers and for 15 minutes after, so they don't report false outages."
+      - eval_time: 20m
+        alertname: MonitoringVantageLost
+        exp_alerts: []

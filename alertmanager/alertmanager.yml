@@ -225,6 +225,14 @@ inhibit_rules:
       exporter: routeros-exporter
     target_match_re:
       job: "routeros-api"
+  # The monitoring server losing its OWN network makes every device look
+  # dead. Hold back all per-device alerts (by scope) while it's firing;
+  # MonitoringVantageLost is the one message. ExporterDown (scope:
+  # monitoring) stays visible. (vantage.yml)
+  - source_match:
+      alertname: MonitoringVantageLost
+    target_match_re:
+      scope: "link|router|sector|cpe|pop|subscriber"
   # A link that's fully down doesn't need its degrading/health-tier alerts
   # (WeakSignal, LowLinkQuality, HighLatencyVariability, RisingInterfaceErrors,
   # LinkUpButDegrading) also notifying - they're just noise once you already

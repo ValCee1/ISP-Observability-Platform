@@ -73,6 +73,24 @@ scrape_configs:
       - target_label: __address__
         replacement: blackbox-exporter:9115
 
+  # Reference pings that tell "the server lost its own network" apart from
+  # "everything is down". Targets live in prometheus/targets/vantage-points.yml
+  # (edit that file; no restart needed). See prometheus/rules/vantage.yml.
+  - job_name: "vantage-points"
+    metrics_path: /probe
+    params:
+      module: [icmp]
+    file_sd_configs:
+      - files:
+          - /etc/prometheus/targets/vantage-points.yml
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
   # Vendor-neutral interface stats (oper status, octets, errors) for link
   # endpoints, via the standard IF-MIB. Same for every radio vendor, so one
   # module (`link_interface_health`) covers all of them. `auth` is a
