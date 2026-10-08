@@ -75,7 +75,7 @@ groups:
           description: '{{ $labels.link_name }} is logging interface errors ({{ $value | printf "%.2f" }}/s) - possible cabling, duplex, or hardware issue.'
 
       - alert: PacketLoss
-        expr: link_packet_loss_percent > 5
+        expr: link_packet_loss_percent > 15
         for: 10m
         keep_firing_for: 10m
         labels:
@@ -85,10 +85,10 @@ groups:
           alert_type: packet-loss
         annotations:
           summary: "🟠 Packet Loss"
-          description: '{{ $labels.link_name }} packet loss has been above 5% for 10 minutes (currently {{ $value | printf "%.1f" }}%).'
+          description: '{{ $labels.link_name }} packet loss has been above 15% for 10 minutes (currently {{ $value | printf "%.1f" }}%).'
 
       - alert: PacketLoss
-        expr: link_packet_loss_percent > 20
+        expr: link_packet_loss_percent > 40
         for: 10m
         keep_firing_for: 10m
         labels:
@@ -98,7 +98,7 @@ groups:
           alert_type: packet-loss
         annotations:
           summary: "🔴 Severe Packet Loss"
-          description: '{{ $labels.link_name }} packet loss has been above 20% for 10 minutes (currently {{ $value | printf "%.1f" }}%) - link is up but effectively unusable.'
+          description: '{{ $labels.link_name }} packet loss has been above 40% for 10 minutes (currently {{ $value | printf "%.1f" }}%) - link is up but effectively unusable.'
 
       # Distinct from HighLatencyVariability (jitter/instability) above -
       # this is sustained absolute latency, the case where a link is
@@ -107,7 +107,7 @@ groups:
       # tune per-link once real baseline latency is established (see
       # link-schema-notes.md).
       - alert: HighLatency
-        expr: link_latency_ms > 100
+        expr: link_latency_ms > 200
         for: 10m
         keep_firing_for: 10m
         labels:
@@ -117,7 +117,7 @@ groups:
           alert_type: high-latency
         annotations:
           summary: "🟠 High Latency"
-          description: '{{ $labels.link_name }} latency has been above 100ms for 10 minutes (currently {{ $value | printf "%.1f" }}ms).'
+          description: '{{ $labels.link_name }} latency has been above 200ms for 10 minutes (currently {{ $value | printf "%.1f" }}ms).'
 
       - alert: HighLatency
         expr: link_latency_ms > 500

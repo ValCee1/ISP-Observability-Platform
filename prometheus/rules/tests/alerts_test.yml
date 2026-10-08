@@ -48,14 +48,14 @@ tests:
             exp_annotations: { summary: "🔴 Link DOWN", description: "t-a has been unreachable for 5 minutes." }
 
   # ------------------------------------------------------------------
-  # At 25% loss both PacketLoss tiers evaluate (warning + critical). The
+  # At 45% loss both PacketLoss tiers evaluate (warning + critical). The
   # duplicate is collapsed to one Telegram message by an alertmanager
   # inhibit rule, not here.
   # ------------------------------------------------------------------
   - interval: 1m
     input_series:
       - series: 'link_packet_loss_percent{link_id="LINK-T", link_name="t-a"}'
-        values: '25x20'
+        values: '45x20'
     alert_rule_test:
       - eval_time: 12m
         alertname: PacketLoss
@@ -63,11 +63,11 @@ tests:
           - exp_labels: { severity: warning, category: health, scope: link, alert_type: packet-loss,
                           link_id: LINK-T, link_name: t-a }
             exp_annotations: { summary: "🟠 Packet Loss",
-                               description: "t-a packet loss has been above 5% for 10 minutes (currently 25.0%)." }
+                               description: "t-a packet loss has been above 15% for 10 minutes (currently 45.0%)." }
           - exp_labels: { severity: critical, category: health, scope: link, alert_type: packet-loss,
                           link_id: LINK-T, link_name: t-a }
             exp_annotations: { summary: "🔴 Severe Packet Loss",
-                               description: "t-a packet loss has been above 20% for 10 minutes (currently 25.0%) - link is up but effectively unusable." }
+                               description: "t-a packet loss has been above 40% for 10 minutes (currently 45.0%) - link is up but effectively unusable." }
 
   # ------------------------------------------------------------------
   # SectorWideCPEDegradation fires when >=4 CPEs on a sector are degraded.
