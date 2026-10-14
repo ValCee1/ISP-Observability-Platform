@@ -114,6 +114,14 @@ Baked config is immutable per tag. Two options:
   to the `prometheus` service. Target files reload within 1 min; rule/scrape
   changes need `docker compose restart prometheus`.
 
+## Note: new rules need a new tag
+
+Rules are baked into the image. After adding rule files (e.g. `server-health.yml`,
+`whatsapp-budget.yml`) build and publish a new tag (v1.2+) before using the
+image override, or the new alerts will be missing. The new scrape jobs
+(`node-exporter`, `alertmanager`, `grafana`, `whatsapp-bridge`) are in
+`prometheus.yml`, which is also baked.
+
 ## What is *not* in the image
 
 - Secrets — always injected at run time as Docker secrets.

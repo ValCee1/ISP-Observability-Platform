@@ -1,0 +1,128 @@
+# Monitoring-the-server: is the box running this stack healthy?
+#
+# Why: everything else here watches the NETWORK. If the server runs out of
+# disk (the classic way a Prometheus TSDB dies), memory, or the alert path
+# itself breaks, monitoring silently degrades while the network looks fine.
+# Metrics come from node-exporter (host CPU/RAM/disk, job "node-exporter")
+# plus Prometheus's and Alertmanager's own /metrics.
+#
+# All alerts here carry scope: monitoring and exporter: monitoring-server,
+# so the Telegram template titles them "Monitoring: monitoring-server" and
+# they are NOT held back by the MonitoringVantageLost inhibit rule (a sick
+# server is exactly what you want to hear about while the network is out).
+#
+# Dev-machine caveat: on Docker Desktop (macOS/Windows) node-exporter sees
+# the Linux VM, not the host OS. The rules are right; the numbers only
+# mean "the real server" on a Linux deployment.
+groups:
+  - name: server-health
+    rules:
+      # ---- Disk ---------------------------------------------------------
+      # Real filesystems only; pseudo/overlay mounts always look "full" or
+      # "empty" and would just be noise.
+      - alert: ServerDiskLow
+        expr: |
+          (
+            node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|erofs|iso9660|ramfs|devtmpfs|fuse.*|nsfs|proc|sysfs|cgroup.*|autofs"}
+            / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs|erofs|iso9660|ramfs|devtmpfs|fuse.*|nsfs|proc|sysfs|cgroup.*|autofs"}
+          ) * 100 < 10
+        for: 5m
+        labels:
+          severity: critical
+          category: state
+          scope: monitoring
+          alert_type: disk-low
+          exporter: monitoring-server
+        annotations:
+          summary: "🔴 Server disk almost full"
+          description: 'Filesystem {{ $labels.mountpoint }} has only {{ $value | printf "%.1f" }}% free. Prometheus stops ingesting when its disk fills - free space or extend the volume now.'
+
+      - alert: ServerDiskFillingUp
+        # Linear extrapolation of the last 6h: will it hit zero within 24h?
+        # The `> 10%` guard avoids duplicating ServerDiskLow.
+        expr: |
+          predict_linear(node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|erofs|iso9660|ramfs|devtmpfs|fuse.*|nsfs|proc|sysfs|cgroup.*|autofs"}[6h], 24 * 3600) < 0
+          and
+          (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|erofs|iso9660|ramfs|devtmpfs|fuse.*|nsfs|proc|sysfs|cgroup.*|autofs"}
+           / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs|erofs|iso9660|ramfs|devtmpfs|fuse.*|nsfs|proc|sysfs|cgroup.*|autofs"}) * 100 > 10
+        for: 1h
+        labels:
+          severity: warning
+          category: health
+          scope: monitoring
+          alert_type: disk-filling
+          exporter: monitoring-server
+        annotations:
+          summary: "🟠 Server disk filling up"
+          description: "Filesystem {{ $labels.mountpoint }} is on course to run out of space within 24 hours at its current rate."
+
+      # ---- Memory -------------------------------------------------------
+      - alert: ServerMemoryLow
+        expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100 < 10
+        for: 10m
+        labels:
+          severity: warning
+          category: health
+          scope: monitoring
+          alert_type: memory-low
+          exporter: monitoring-server
+        annotations:
+          summary: "🟠 Server memory low"
+          description: 'Only {{ $value | printf "%.1f" }}% of memory is available for 10 minutes. The OOM killer may start stopping containers.'
+
+      # ---- CPU ----------------------------------------------------------
+      - alert: ServerCpuHigh
+        expr: 100 - (avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90
+        for: 15m
+        labels:
+          severity: warning
+          category: health
+          scope: monitoring
+          alert_type: cpu-high
+          exporter: monitoring-server
+        annotations:
+          summary: "🟠 Server CPU saturated"
+          description: 'Server CPU has averaged {{ $value | printf "%.0f" }}% for 15 minutes. Polling may start missing scrapes.'
+
+      # ---- Clock --------------------------------------------------------
+      # Alert timing, `for:` windows and TSDB writes all assume a sane clock.
+      - alert: ServerClockSkew
+        expr: abs(node_timex_offset_seconds) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          category: health
+          scope: monitoring
+          alert_type: clock-skew
+          exporter: monitoring-server
+        annotations:
+          summary: "🟠 Server clock is off"
+          description: 'System clock is {{ $value | printf "%.2f" }}s away from NTP time. Check time sync - alert timing and graphs depend on it.'
+
+      # ---- The monitoring pipeline itself --------------------------------
+      - alert: PrometheusRuleFailures
+        expr: increase(prometheus_rule_evaluation_failures_total[10m]) > 0
+        labels:
+          severity: critical
+          category: state
+          scope: monitoring
+          alert_type: rule-failures
+          exporter: monitoring-server
+        annotations:
+          summary: "🔴 Prometheus rules are failing"
+          description: "Some alert/recording rules failed to evaluate in the last 10 minutes, so the alerts they define may not fire. Check Prometheus logs and /rules."
+
+      - alert: AlertDeliveryFailing
+        # Alertmanager could not hand a notification to Telegram/WhatsApp.
+        # If Telegram itself is the broken channel this alert won't reach it
+        # either - it is still visible in Grafana and the Alertmanager UI.
+        expr: sum by (integration) (increase(alertmanager_notifications_failed_total[10m])) > 0
+        labels:
+          severity: critical
+          category: state
+          scope: monitoring
+          alert_type: alert-delivery-failing
+          exporter: monitoring-server
+        annotations:
+          summary: "🔴 Alert delivery failing ({{ $labels.integration }})"
+          description: "Alertmanager failed to send {{ $labels.integration }} notifications in the last 10 minutes. People may not be getting alerts - check Alertmanager logs and the channel's credentials."

@@ -23,6 +23,14 @@ groups:
           label_replace(up{job="blackbox-exporter"} == 0, "exporter", "blackbox-exporter", "", "")
           or
           label_replace(up{job="routeros-api"}      == 0, "exporter", "routeros-exporter", "", "")
+          or
+          label_replace(up{job="node-exporter"}     == 0, "exporter", "node-exporter",     "", "")
+          or
+          label_replace(up{job="alertmanager"}      == 0, "exporter", "alertmanager",      "", "")
+          or
+          label_replace(up{job="grafana"}           == 0, "exporter", "grafana",           "", "")
+          or
+          label_replace(up{job="whatsapp-bridge"}   == 0, "exporter", "whatsapp-bridge",   "", "")
         for: 30s
         labels:
           severity: critical

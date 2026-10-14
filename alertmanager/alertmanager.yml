@@ -42,6 +42,25 @@ route:
   repeat_interval: 6h
 
   routes:
+    # WhatsApp copy of every CRITICAL alert. `continue: true` means this
+    # route only ADDS a delivery - matching then carries on to the Telegram
+    # routes below, so Telegram is unchanged. Warnings never come here:
+    # WhatsApp is paid per message, Telegram is free. Cost controls:
+    #   * group_by scope -> a 40-router outage is ONE message per scope
+    #   * repeat_interval 6h (Telegram repeats critical every 2h)
+    #   * send_resolved false (below) - no "back to normal" messages
+    #   * the bridge itself drops anything non-critical and enforces
+    #     daily/monthly caps (whatsapp_bridge/bridge.py)
+    # Inhibit rules apply to this route exactly as to Telegram.
+    - match:
+        severity: critical
+      receiver: whatsapp
+      continue: true
+      group_by: ["scope"]
+      group_wait: 1m
+      group_interval: 10m
+      repeat_interval: 6h
+
     # Sector capacity alerts (category: capacity, from sector-alerts.yml):
     # held back and delivered as a single once-a-day digest in the 08:00
     # Africa/Lagos window. group_by alertname so every over-budget sector
@@ -216,6 +235,16 @@ receivers:
         parse_mode: HTML
         send_resolved: false
         message: *tg_message
+
+  # Critical alerts only, via the local whatsapp-bridge (whatsapp_bridge/),
+  # which formats them as a WhatsApp template message. send_resolved is
+  # false on purpose: each message costs money once live. The bridge starts
+  # in dry_run mode and logs instead of sending until WHATSAPP_MODE=live.
+  - name: whatsapp
+    webhook_configs:
+      - url: http://whatsapp-bridge:8080/alert
+        send_resolved: false
+        max_alerts: 5   # payload cap; the bridge only quotes the first 3 anyway
 
 # Suppress lower-priority alerts about an entity that's already covered by
 # a bigger, currently-firing alert for that SAME entity (`equal:` is the

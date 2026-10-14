@@ -1,0 +1,38 @@
+# WhatsApp is the only paid notification channel here, so its spend is
+# watched like any other resource. The bridge (whatsapp_bridge/bridge.py)
+# enforces hard daily/monthly caps itself; these rules tell a human BEFORE
+# the cap starts silently dropping critical alerts.
+#
+# Delivered via Telegram (free) as warnings: scope monitoring.
+groups:
+  - name: whatsapp-budget
+    rules:
+      - alert: WhatsAppBudgetNearlyUsed
+        expr: |
+          whatsapp_budget_used / whatsapp_budget_cap >= 0.8
+        # No `for:` - budget only ever goes up within a period, so there is
+        # nothing to debounce, and a 15s scrape lag is harmless.
+        labels:
+          severity: warning
+          category: health
+          scope: monitoring
+          alert_type: whatsapp-budget
+          exporter: whatsapp-bridge
+        annotations:
+          summary: "🟠 WhatsApp {{ $labels.period }} budget ≥80% used"
+          description: 'The WhatsApp bridge has used {{ $value | humanizePercentage }} of its {{ $labels.period }} message cap. At 100% further critical WhatsApp alerts are dropped (Telegram is unaffected). Raise the matching WHATSAPP_DAILY_CAP / WHATSAPP_MONTHLY_CAP in .env only if the spend is intended.'
+
+      - alert: WhatsAppSendFailing
+        # Live mode only. Failures do NOT consume budget, but they mean
+        # critical alerts are not reaching WhatsApp (bad token, template
+        # not approved, number not verified...). Check `docker compose logs whatsapp-bridge`.
+        expr: increase(whatsapp_messages_total{result="failed"}[15m]) > 0
+        labels:
+          severity: warning
+          category: health
+          scope: monitoring
+          alert_type: whatsapp-send-failing
+          exporter: whatsapp-bridge
+        annotations:
+          summary: "🟠 WhatsApp sends are failing"
+          description: "The WhatsApp bridge could not send in the last 15 minutes. Critical alerts are still going to Telegram. Check the access token, template approval and recipient numbers (docker compose logs whatsapp-bridge)."

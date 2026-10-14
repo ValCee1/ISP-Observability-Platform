@@ -28,6 +28,28 @@ scrape_configs:
     static_configs:
       - targets: ["blackbox-exporter:9115"]
 
+  # The monitoring SERVER itself (host CPU/RAM/disk/clock via node-exporter)
+  # and the other stack components' own /metrics. Rules: server-health.yml;
+  # ExporterDown covers each of these going silent. Nothing is polled
+  # through them, so no per-device inhibit rules depend on these jobs.
+  - job_name: "node-exporter"
+    static_configs:
+      - targets: ["node-exporter:9100"]
+
+  - job_name: "alertmanager"
+    static_configs:
+      - targets: ["alertmanager:9093"]
+
+  - job_name: "grafana"
+    static_configs:
+      - targets: ["grafana:3000"]
+
+  # WhatsApp bridge: message counts and budget used vs cap (feeds
+  # rules/whatsapp-budget.yml and the Server Health dashboard).
+  - job_name: "whatsapp-bridge"
+    static_configs:
+      - targets: ["whatsapp-bridge:8080"]
+
   # Core router health: CPU, memory, uptime, interface counters/state.
   # Uses the generic `mikrotik` SNMP module (snmp_exporter/snmp.yml).
   # Target list (router IPs + site/role labels) lives in

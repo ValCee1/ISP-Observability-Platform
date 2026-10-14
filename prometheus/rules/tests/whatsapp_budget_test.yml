@@ -1,0 +1,36 @@
+# promtool unit tests for whatsapp-budget.yml.
+rule_files:
+  - ../whatsapp-budget.yml
+
+evaluation_interval: 15s
+
+tests:
+  # 8 of 10 daily messages used: fires. Monthly at 8/100 does not.
+  - interval: 15s
+    input_series:
+      - series: 'whatsapp_budget_used{period="day", instance="whatsapp-bridge:8080"}'
+        values: '0 4 8'
+      - series: 'whatsapp_budget_cap{period="day", instance="whatsapp-bridge:8080"}'
+        values: '10x3'
+      - series: 'whatsapp_budget_used{period="month", instance="whatsapp-bridge:8080"}'
+        values: '8x3'
+      - series: 'whatsapp_budget_cap{period="month", instance="whatsapp-bridge:8080"}'
+        values: '100x3'
+    alert_rule_test:
+      - eval_time: 15s
+        alertname: WhatsAppBudgetNearlyUsed
+        exp_alerts: []
+      - eval_time: 30s
+        alertname: WhatsAppBudgetNearlyUsed
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              category: health
+              scope: monitoring
+              alert_type: whatsapp-budget
+              exporter: whatsapp-bridge
+              period: day
+              instance: "whatsapp-bridge:8080"
+            exp_annotations:
+              summary: "🟠 WhatsApp day budget ≥80% used"
+              description: "The WhatsApp bridge has used 80% of its day message cap. At 100% further critical WhatsApp alerts are dropped (Telegram is unaffected). Raise the matching WHATSAPP_DAILY_CAP / WHATSAPP_MONTHLY_CAP in .env only if the spend is intended."

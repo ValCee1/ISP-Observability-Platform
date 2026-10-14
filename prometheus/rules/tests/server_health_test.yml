@@ -1,0 +1,92 @@
+# promtool unit tests for server-health.yml.
+rule_files:
+  - ../server-health.yml
+
+evaluation_interval: 15s
+
+tests:
+  # Root filesystem at 5% free: ServerDiskLow fires after its 5m window.
+  # A tmpfs at 0% free is pseudo and must be ignored.
+  - interval: 1m
+    input_series:
+      - series: 'node_filesystem_avail_bytes{mountpoint="/", fstype="ext4", instance="node-exporter:9100"}'
+        values: '5x10'
+      - series: 'node_filesystem_size_bytes{mountpoint="/", fstype="ext4", instance="node-exporter:9100"}'
+        values: '100x10'
+      - series: 'node_filesystem_avail_bytes{mountpoint="/run", fstype="tmpfs", instance="node-exporter:9100"}'
+        values: '0x10'
+      - series: 'node_filesystem_size_bytes{mountpoint="/run", fstype="tmpfs", instance="node-exporter:9100"}'
+        values: '100x10'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: ServerDiskLow
+        exp_alerts: []
+      - eval_time: 7m
+        alertname: ServerDiskLow
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              category: state
+              scope: monitoring
+              alert_type: disk-low
+              exporter: monitoring-server
+              mountpoint: "/"
+              fstype: ext4
+              instance: "node-exporter:9100"
+            exp_annotations:
+              summary: "🔴 Server disk almost full"
+              description: "Filesystem / has only 5.0% free. Prometheus stops ingesting when its disk fills - free space or extend the volume now."
+
+  # Memory comfortably available: nothing fires.
+  - interval: 1m
+    input_series:
+      - series: 'node_memory_MemAvailable_bytes{instance="node-exporter:9100"}'
+        values: '50x20'
+      - series: 'node_memory_MemTotal_bytes{instance="node-exporter:9100"}'
+        values: '100x20'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: ServerMemoryLow
+        exp_alerts: []
+
+  # Memory at 5% for 10m+: warning fires.
+  - interval: 1m
+    input_series:
+      - series: 'node_memory_MemAvailable_bytes{instance="node-exporter:9100"}'
+        values: '5x20'
+      - series: 'node_memory_MemTotal_bytes{instance="node-exporter:9100"}'
+        values: '100x20'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: ServerMemoryLow
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              category: health
+              scope: monitoring
+              alert_type: memory-low
+              exporter: monitoring-server
+              instance: "node-exporter:9100"
+            exp_annotations:
+              summary: "🟠 Server memory low"
+              description: "Only 5.0% of memory is available for 10 minutes. The OOM killer may start stopping containers."
+
+  # Alertmanager failing to deliver Telegram messages: fires immediately.
+  - interval: 1m
+    input_series:
+      - series: 'alertmanager_notifications_failed_total{integration="telegram", instance="alertmanager:9093"}'
+        values: '0 0 0 3 6 9 9 9'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: AlertDeliveryFailing
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              category: state
+              scope: monitoring
+              alert_type: alert-delivery-failing
+              exporter: monitoring-server
+              integration: telegram
+            exp_annotations:
+              summary: "🔴 Alert delivery failing (telegram)"
+              description: "Alertmanager failed to send telegram notifications in the last 10 minutes. People may not be getting alerts - check Alertmanager logs and the channel's credentials."

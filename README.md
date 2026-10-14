@@ -25,6 +25,10 @@ Routers        --API---> routeros-exporter -/            -> Alertmanager -> Tele
 - [docs/tier2-anomaly-detection.md](docs/tier2-anomaly-detection.md) —
   baseline-deviation anomaly detection (subscriber counts, router CPU/memory)
   that catches slow bleeds the threshold alerts can't.
+- [docs/server-monitoring.md](docs/server-monitoring.md) — monitoring the
+  server itself (node-exporter, server-health alerts, Server Health dashboard).
+- [docs/whatsapp.md](docs/whatsapp.md) — cost-controlled WhatsApp critical
+  alerts (dry-run by default, hard caps, go-live checklist).
 - [docs/DOCKER.md](docs/DOCKER.md) — building and publishing the
   `isp-observability` Prometheus image (repo config baked in) to a private
   registry.
@@ -53,6 +57,7 @@ Routers        --API---> routeros-exporter -/            -> Alertmanager -> Tele
 - Alertmanager: http://localhost:9093
 - SNMP exporter: http://localhost:9116/metrics
 - Blackbox exporter: http://localhost:9115/metrics
+- Node exporter (host metrics): http://localhost:9100/metrics
 - RouterOS API exporter: http://localhost:9436/metrics (needs
   `routeros_exporter/config.yml` + `secrets/routeros_api_credentials.json` — see
   [docs/tier1-subscriber-config-topology.md](docs/tier1-subscriber-config-topology.md))
@@ -121,6 +126,9 @@ docker compose -f docker-compose.yml -f docker-compose.image.yml up -d
 - **Subscriber Overview** — active vs provisioned sessions, active-by-POP timeline
   (mass-outage cliff), top flapping subscribers, disconnect reasons, auth-failure
   rate, per-session table.
+- **Server Health** — the monitoring server itself and the stack's own health:
+  host CPU/RAM/disk/network/clock, component up/down, notification failures,
+  rule evaluation, WhatsApp budget.
 - **WAN/LAN Interfaces** — traffic and up/down state grouped by interface role
   (WAN, LAN, PPP, wireless backhaul), using textbox variables holding per-router
   ifName regexes — check these against `wan_ifname` in

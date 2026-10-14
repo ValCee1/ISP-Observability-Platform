@@ -93,11 +93,13 @@ flowchart TB
 | snmp-exporter | `prom/snmp-exporter:v0.30.1` | 9116 | `snmp_exporter/snmp.yml` | — |
 | blackbox-exporter | `prom/blackbox-exporter:v0.28.0` | 9115 | `blackbox/blackbox.yml` | — |
 | routeros-exporter | built from `routeros_exporter/` (`v0.1`) | 9436 | `routeros_exporter/config.yml` | `routeros_exporter_data` (generated topology file) |
+| node-exporter | `prom/node-exporter:v1.9.1` | 9100 | host `/` mounted read-only at `/host` | — |
+| whatsapp-bridge | built from `whatsapp_bridge/` | 8080 (internal) | env from `.env` | `whatsapp_bridge_data` (message counters) |
 | grafana | `grafana/grafana:13.2.0` | 3000 | `grafana/provisioning/`, `grafana/dashboards/` | `grafana_data` |
 | alertmanager | `prom/alertmanager:v0.33.1` | 9093 | `alertmanager/alertmanager.yml` | `alertmanager_data` |
 
 Secrets are mounted as files under `/run/secrets/<name>` (never env vars):
-`grafana_admin_password`, `telegram_bot_token`, and `routeros_api_credentials`
+`grafana_admin_password`, `telegram_bot_token`, `whatsapp_access_token`, and `routeros_api_credentials`
 (a JSON map of router name → `{username, password}` for the read-only RouterOS
 API user). All source files live in `secrets/` and are gitignored.
 
@@ -196,7 +198,9 @@ Rule groups, by file:
 | `link-normalization.yml` | `link-availability`, `link-interface-health`, `link-derived-metrics` | raw SNMP/ICMP → `link_*` |
 | `link-alerts.yml` | `link-state`, `link-health`, `link-degrading`, `link-composite-health` | LinkDown, WeakSignal, PacketLoss, LinkUpButDegrading, `link_health_score` |
 | `mikrotik-alerts.yml` | `mikrotik-core` | CoreRouterDown, HighCPU, HighMemory, WANInterfaceDown |
-| `exporter-health.yml` | `exporter-health` | ExporterDown (snmp-exporter / blackbox-exporter / routeros-exporter); Alertmanager inhibits the per-device alerts behind a down exporter |
+| `exporter-health.yml` | `exporter-health` | ExporterDown (snmp / blackbox / routeros exporters, node-exporter, alertmanager, grafana, whatsapp-bridge); Alertmanager inhibits the per-device alerts behind a down exporter |
+| `server-health.yml` | `server-health` | the monitoring server itself: disk, memory, CPU, clock, rule failures, alert-delivery failures — see [server-monitoring.md](server-monitoring.md) |
+| `whatsapp-budget.yml` | `whatsapp-budget` | WhatsApp spend guard: 80 % of cap, send failures — see [whatsapp.md](whatsapp.md) |
 | `ppp-sessions.yml` | `ppp-sessions` | SNMP-derived PPPoE session tracking (fallback path) |
 | `subscriber-sessions.yml` | `subscriber-sessions` | RouterOS-API `subscriber:*` series (active by pop/router/sector, provisioned-offline, reconnects) |
 | `subscriber-alerts.yml` | `subscriber-mass-outage`, `subscriber-stability`, `subscriber-housekeeping` | SubscriberMassOutagePOP/Router, PPPoEAuthFailureSpike, SubscriberChronicFlapping, ProvisionedButOffline |
@@ -274,6 +278,7 @@ Datasource is a single proxied Prometheus (`grafana/provisioning/datasources/`).
 | Sector Detail | `sector-detail.json` | one sector: stats, timeseries, per-CPE table (alignment score, worst-first), per-client signal/SNR, 24 h peak/budget |
 | Capacity Planning | `capacity-planning.json` | 24 h peak / p95 busy-hour / avg for every link, router interface and sector |
 | WAN/LAN Interfaces | `lan-wan-interfaces.json`, `all-interfaces.json` | traffic + up/down grouped by interface role (WAN/LAN/PPP/wireless backhaul) |
+| Server Health | `server-health.json` | the monitoring server + stack: host CPU/RAM/disk/network/clock, component up/down, notification failures, rule evaluation, WhatsApp budget |
 | Subscriber Overview | `subscriber-overview.json` | active vs provisioned sessions, active-by-POP timeline (mass-outage cliff), top flappers, disconnect reasons, auth failures |
 
 Alerting is **Prometheus + Alertmanager only** — Grafana's own alerting engine

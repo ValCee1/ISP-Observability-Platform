@@ -101,6 +101,55 @@ services:
     networks:
       - monitoring
 
+  # Host metrics for the monitoring server itself (CPU, RAM, disk, clock).
+  # The host's root filesystem is mounted read-only at /host so disk/mount
+  # stats describe the HOST, not the container. On a Linux server you may
+  # append `,rslave` to the mount (propagates later host mounts); Docker
+  # Desktop rejects it ("not a shared or slave mount"), so it is omitted.
+  # On Docker Desktop this reports the Linux VM, not macOS.
+  # Alert rules: prometheus/rules/server-health.yml.
+  node-exporter:
+    image: prom/node-exporter:v1.9.1
+    container_name: node-exporter
+    restart: unless-stopped
+    command:
+      - "--path.rootfs=/host"
+      # Container bind-mount artefacts (/etc/hosts, /oldroot...) look like
+      # extra, sometimes read-only/0-free filesystems and would trip the
+      # disk alerts. Only real data mounts are interesting.
+      - "--collector.filesystem.mount-points-exclude=^/(etc|oldroot|run|dev|proc|sys|var/lib/docker)($|/)"
+    volumes:
+      - /:/host:ro
+    ports:
+      - "9100:9100"
+    networks:
+      - monitoring
+
+  # Turns Alertmanager's critical-alert webhooks into WhatsApp Cloud API
+  # template messages (see whatsapp_bridge/ and docs/whatsapp.md). SAFE BY
+  # DEFAULT: WHATSAPP_MODE=dry_run just logs what would be sent. Settings
+  # come from .env (gitignored); the Meta access token is a Docker secret.
+  # Hard caps below bound the worst-case monthly spend.
+  whatsapp-bridge:
+    build:
+      context: ./whatsapp_bridge
+    image: isp-whatsapp-bridge:dev   # local build tag - not published anywhere
+    container_name: whatsapp-bridge
+    restart: unless-stopped
+    environment:
+      - WHATSAPP_MODE=${WHATSAPP_MODE:-dry_run}
+      - WHATSAPP_PHONE_NUMBER_ID=${WHATSAPP_PHONE_NUMBER_ID:-}
+      - WHATSAPP_RECIPIENTS=${WHATSAPP_RECIPIENTS:-}
+      - WHATSAPP_TEMPLATE=${WHATSAPP_TEMPLATE:-isp_critical_alert}
+      - WHATSAPP_DAILY_CAP=${WHATSAPP_DAILY_CAP:-10}
+      - WHATSAPP_MONTHLY_CAP=${WHATSAPP_MONTHLY_CAP:-100}
+    secrets:
+      - whatsapp_access_token
+    volumes:
+      - whatsapp_bridge_data:/var/lib/whatsapp-bridge   # budget counters survive restarts
+    networks:
+      - monitoring
+
   # RouterOS API collector. Covers what SNMP can't: per-subscriber PPP/PPPoE
   # session intelligence (/ppp active + secret + log) and
   # topology auto-discovery (/ip route + neighbour walk). Prometheus scrapes
@@ -134,6 +183,10 @@ secrets:
     file: ./secrets/telegram_bot_token.txt
   routeros_api_credentials:
     file: ./secrets/routeros_api_credentials.json
+  # Meta WhatsApp Cloud API token. Any placeholder text works while the
+  # bridge is in dry_run; the file must exist or `docker compose up` fails.
+  whatsapp_access_token:
+    file: ./secrets/whatsapp_access_token.txt
 
 # Named volumes persist container state across `docker compose down`/`up`.
 # Only removed by an explicit `docker compose down -v`.
@@ -142,6 +195,7 @@ volumes:
   grafana_data:
   alertmanager_data:
   routeros_exporter_data:   # generated topology file
+  whatsapp_bridge_data:     # WhatsApp daily/monthly message counters
 
 networks:
   monitoring:
