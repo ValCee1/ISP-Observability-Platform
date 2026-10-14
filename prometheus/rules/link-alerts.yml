@@ -1,3 +1,12 @@
+# SUSTAINED-DEGRADATION PATTERN (warning-tier health/degrading alerts below).
+# Fires only when the metric is breaching NOW *and* was breaching in >=80% of
+# the last 30m (`sum_over_time((x < bool T)[30m:1m]) >= 24`). Compared with
+# a plain `for: 30m` this (a) is not reset by a single good/failed scrape -
+# the SAF/AirFiber radios drop ~10-25% of scrapes - and (b) still catches a
+# link that is poor most of the time but briefly touches the threshold.
+# `$value` stays the live metric reading. keep_firing_for rides out a
+# short recovery so a link hovering at the threshold is one alert, not a
+# fire/resolve storm. Critical tiers and LinkDown keep their fast timers.
 groups:
   # STATE - the link is down. Critical, page immediately.
   - name: link-state
@@ -20,8 +29,10 @@ groups:
   - name: link-health
     rules:
       - alert: WeakSignal
-        expr: link_signal_dbm < -80
-        for: 10m
+        expr: |
+          link_signal_dbm < -80
+          and sum_over_time((link_signal_dbm < bool -80)[30m:1m]) >= 24
+        keep_firing_for: 10m
         labels:
           severity: warning
           category: health
@@ -29,11 +40,13 @@ groups:
           alert_type: weak-signal
         annotations:
           summary: "🟠 Weak Signal"
-          description: "{{ $labels.link_name }} signal has been below -80 dBm for 10 minutes (currently {{ $value }} dBm)."
+          description: "{{ $labels.link_name }} signal has been below -80 dBm for most of the last 30 minutes (currently {{ $value }} dBm)."
 
       - alert: LowLinkQuality
-        expr: link_quality_percent < 70
-        for: 10m
+        expr: |
+          link_quality_percent < 70
+          and sum_over_time((link_quality_percent < bool 70)[30m:1m]) >= 24
+        keep_firing_for: 10m
         labels:
           severity: warning
           category: health
@@ -41,11 +54,12 @@ groups:
           alert_type: low-quality
         annotations:
           summary: "🟠 Low Link Quality"
-          description: '{{ $labels.link_name }} quality has been below 70% for 10 minutes (currently {{ $value | printf "%.1f" }}%).'
+          description: '{{ $labels.link_name }} quality has been below 70% for most of the last 30 minutes (currently {{ $value | printf "%.1f" }}%).'
 
       - alert: HighLatencyVariability
-        expr: link_latency_variability_seconds > 0.05
-        for: 10m
+        expr: |
+          link_latency_variability_seconds > 0.05
+          and sum_over_time((link_latency_variability_seconds > bool 0.05)[30m:1m]) >= 24
         keep_firing_for: 10m
         labels:
           severity: warning
@@ -54,7 +68,7 @@ groups:
           alert_type: latency-variability
         annotations:
           summary: "🟠 Unstable Latency"
-          description: "{{ $labels.link_name }} latency variability has exceeded 50ms for 10 minutes - link is up but inconsistent."
+          description: "{{ $labels.link_name }} latency variability has exceeded 50ms for most of the last 30 minutes - link is up but inconsistent."
 
       # Aggregated per link endpoint, NOT per interface - a radio logging
       # errors on three interfaces is one problem, one alert.
@@ -63,7 +77,11 @@ groups:
           sum by (link_id, endpoint, site, role, vendor, link_name) (
             rate(link_interface_in_errors[5m]) + rate(link_interface_out_errors[5m])
           ) > 0
-        for: 10m
+          and sum_over_time((
+            sum by (link_id, endpoint, site, role, vendor, link_name) (
+              rate(link_interface_in_errors[5m]) + rate(link_interface_out_errors[5m])
+            ) > bool 0
+          )[30m:1m]) >= 24
         keep_firing_for: 10m
         labels:
           severity: warning
@@ -75,8 +93,9 @@ groups:
           description: '{{ $labels.link_name }} is logging interface errors ({{ $value | printf "%.2f" }}/s) - possible cabling, duplex, or hardware issue.'
 
       - alert: PacketLoss
-        expr: link_packet_loss_percent > 15
-        for: 10m
+        expr: |
+          link_packet_loss_percent > 15
+          and sum_over_time((link_packet_loss_percent > bool 15)[30m:1m]) >= 24
         keep_firing_for: 10m
         labels:
           severity: warning
@@ -85,7 +104,7 @@ groups:
           alert_type: packet-loss
         annotations:
           summary: "🟠 Packet Loss"
-          description: '{{ $labels.link_name }} packet loss has been above 15% for 10 minutes (currently {{ $value | printf "%.1f" }}%).'
+          description: '{{ $labels.link_name }} packet loss has been above 15% for most of the last 30 minutes (currently {{ $value | printf "%.1f" }}%).'
 
       - alert: PacketLoss
         expr: link_packet_loss_percent > 40
@@ -107,8 +126,9 @@ groups:
       # tune per-link once real baseline latency is established (see
       # link-schema-notes.md).
       - alert: HighLatency
-        expr: link_latency_ms > 200
-        for: 10m
+        expr: |
+          link_latency_ms > 200
+          and sum_over_time((link_latency_ms > bool 200)[30m:1m]) >= 24
         keep_firing_for: 10m
         labels:
           severity: warning
@@ -117,7 +137,7 @@ groups:
           alert_type: high-latency
         annotations:
           summary: "🟠 High Latency"
-          description: '{{ $labels.link_name }} latency has been above 200ms for 10 minutes (currently {{ $value | printf "%.1f" }}ms).'
+          description: '{{ $labels.link_name }} latency has been above 200ms for most of the last 30 minutes (currently {{ $value | printf "%.1f" }}ms).'
 
       - alert: HighLatency
         expr: link_latency_ms > 500
@@ -145,7 +165,16 @@ groups:
             or link_quality_percent < 60
             or link_probe_failure_ratio > 0.05
           )
-        for: 10m
+          and on(link_id, endpoint, site, role, vendor, link_name) (
+            sum_over_time((
+              max by (link_id, endpoint, site, role, vendor, link_name) (
+                label_replace(link_signal_dbm < bool -78, "cond", "signal", "", "")
+                or label_replace(link_quality_percent < bool 60, "cond", "quality", "", "")
+                or label_replace(link_probe_failure_ratio > bool 0.05, "cond", "probe", "", "")
+              )
+            )[30m:1m]) >= 24
+          )
+        keep_firing_for: 10m
         labels:
           severity: warning
           category: degrading
@@ -153,4 +182,4 @@ groups:
           alert_type: link-degrading
         annotations:
           summary: "🟡 Link degrading (still up)"
-          description: "{{ $labels.link_name }} is reachable but showing sustained signal/quality/reliability degradation - investigate before it goes down."
+          description: "{{ $labels.link_name }} is reachable but showing signal/quality/reliability degradation for most of the last 30 minutes - investigate before it goes down."

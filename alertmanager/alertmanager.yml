@@ -71,6 +71,7 @@ route:
           repeat_interval: 2h
         - match:
             severity: warning
+          receiver: telegram-warnings
           repeat_interval: 12h
 
     # PTP link alerts (link-alerts.yml) all carry a link_id label shared by
@@ -89,6 +90,7 @@ route:
           repeat_interval: 2h    # a link actually down - keep reminding until it's fixed
         - match:
             severity: warning
+          receiver: telegram-warnings
           repeat_interval: 12h   # degraded-but-up - don't need frequent nagging
 
     # Everything else (router-level alerts from mikrotik-alerts.yml - no
@@ -121,6 +123,7 @@ route:
           repeat_interval: 2h
         - match:
             severity: warning
+          receiver: telegram-warnings
           repeat_interval: 12h
 
     # Router-scope alerts carry scope=router + a `router` label. Group by router.
@@ -143,6 +146,7 @@ route:
           repeat_interval: 2h
         - match:
             severity: warning
+          receiver: telegram-warnings
           repeat_interval: 12h
 
     - match_re:
@@ -156,6 +160,7 @@ route:
           repeat_interval: 2h
         - match:
             severity: warning
+          receiver: telegram-warnings
           repeat_interval: 12h
 
 receivers:
@@ -182,7 +187,7 @@ receivers:
         # under it. Symptoms of a bigger incident are already gone by the
         # time they'd get here (inhibit_rules below), so the list is the
         # real picture, not a storm.
-        message: |
+        message: &tg_message |
           {{- $obj := "" }}{{ if .CommonLabels.exporter }}{{ $obj = printf "Monitoring: %s" .CommonLabels.exporter }}
           {{- else if .CommonLabels.link_id }}{{ $obj = printf "Link %s" .CommonLabels.link_id }}
           {{- else if .CommonLabels.sector }}{{ $obj = printf "Sector %s" .CommonLabels.sector }}
@@ -198,6 +203,19 @@ receivers:
           {{ else }}• ✅ {{ .Annotations.summary }} (was firing {{ .EndsAt.Sub .StartsAt }})
           {{ end }}{{ if .Labels.link_name }}  {{ .Labels.link_name }}: {{ end }}{{ if .Labels.cpe_name }}  {{ .Labels.cpe_name }}: {{ end }}{{ .Annotations.description }}
           {{ end }}
+
+  # Warning-tier alerts (degradation etc.): identical to `telegram` except no
+  # "RESOLVED" message. A warning clearing is not worth a ping; criticals keep
+  # theirs via the `telegram` receiver. Reuses the message template via the
+  # YAML anchor above.
+  - name: telegram-warnings
+    telegram_configs:
+      - bot_token_file: /run/secrets/telegram_bot_token
+        chat_id: -1004387943176
+        api_url: https://api.telegram.org
+        parse_mode: HTML
+        send_resolved: false
+        message: *tg_message
 
 # Suppress lower-priority alerts about an entity that's already covered by
 # a bigger, currently-firing alert for that SAME entity (`equal:` is the

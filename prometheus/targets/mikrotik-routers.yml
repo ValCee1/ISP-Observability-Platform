@@ -44,6 +44,14 @@
     wan_ifname: "wlan1"
 
 - targets:
+    - 192.168.10.29
+  labels:
+    site: "Evang Home"
+    role: "Access Point"
+    router: "Evang-home" # keep in sync with routeros_exporter/config.yml `name`
+    wan_ifname: "ether1"
+
+- targets:
     - 192.168.11.1
   labels:
     site: "Sam Router"
