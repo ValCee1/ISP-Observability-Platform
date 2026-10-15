@@ -52,8 +52,14 @@ route:
     #   * the bridge itself drops anything non-critical and enforces
     #     daily/monthly caps (whatsapp_bridge/bridge.py)
     # Inhibit rules apply to this route exactly as to Telegram.
-    - match:
-        severity: critical
+    #
+    # scope=monitoring (server/exporter down, vantage lost, delivery
+    # failing) is EXCLUDED: those are usually someone unplugging or working
+    # on the monitoring box itself, and when the server has lost its network
+    # WhatsApp could not be sent anyway. They still go to Telegram.
+    - matchers:
+        - severity="critical"
+        - scope!="monitoring"
       receiver: whatsapp
       continue: true
       group_by: ["scope"]

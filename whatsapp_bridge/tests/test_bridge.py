@@ -37,6 +37,14 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(calls, [])
         self.assertEqual(b.counts["ignored"], 1)
 
+    def test_monitoring_scope_is_never_sent(self):
+        calls = []
+        b = bridge.Bridge(cfg(WHATSAPP_MODE="live"), sender=lambda *a: calls.append(a))
+        p = payload(("firing", "critical"))
+        p["alerts"][0]["labels"]["scope"] = "monitoring"
+        b.handle(p)
+        self.assertEqual(calls, [])
+
     def test_live_send_and_daily_cap(self):
         calls = []
         b = bridge.Bridge(cfg(WHATSAPP_MODE="live"), sender=lambda *a: calls.append(a))

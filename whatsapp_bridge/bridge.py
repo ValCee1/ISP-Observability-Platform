@@ -113,8 +113,13 @@ def _object(labels):
 
 
 def critical_firing(payload):
+    # scope=monitoring is excluded here as well as in Alertmanager's route:
+    # a monitoring-box problem is often deliberate maintenance (see
+    # docs/whatsapp.md), so it stays on Telegram only.
     return [a for a in payload.get("alerts", [])
-            if a.get("status") == "firing" and a.get("labels", {}).get("severity") == "critical"]
+            if a.get("status") == "firing"
+            and a.get("labels", {}).get("severity") == "critical"
+            and a.get("labels", {}).get("scope") != "monitoring"]
 
 
 def build_params(alerts):

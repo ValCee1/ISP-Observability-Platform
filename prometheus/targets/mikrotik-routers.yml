@@ -44,7 +44,7 @@
     wan_ifname: "wlan1"
 
 - targets:
-    - 192.168.10.29
+    - 192.168.10.7
   labels:
     site: "Evang Home"
     role: "Access Point"

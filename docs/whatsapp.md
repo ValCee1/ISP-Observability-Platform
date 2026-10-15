@@ -15,6 +15,7 @@ Prometheus -> Alertmanager --(critical only, continue:true)--> whatsapp-bridge -
 |---|---|---|
 | **dry_run by default** | `WHATSAPP_MODE` (`.env`) | nothing leaves the box; messages are logged |
 | Criticals only | Alertmanager route + bridge re-checks | warnings / resolved stay on Telegram (free) |
+| No `scope=monitoring` | Alertmanager route + bridge | server/exporter down, vantage lost, delivery failing stay on Telegram: usually someone is deliberately working on the box, and if the server has no network WhatsApp can't be sent anyway |
 | Grouping | route `group_by: [scope]` | a 40-router outage = one message per recipient |
 | Slow repeat | `repeat_interval: 6h` | vs 2 h on Telegram |
 | Hard daily cap | `WHATSAPP_DAILY_CAP` (default 10) | extra sends dropped, never queued |
