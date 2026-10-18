@@ -1,5 +1,8 @@
 # Installing on another machine
 
+> Start with [SETUP-INPUTS.md](SETUP-INPUTS.md): the full list of secrets and
+> site-specific files a fresh install needs.
+
 The whole platform is a Docker Compose project: **install = get the repo onto
 the machine, fill in the per-site files, `docker compose up -d`.** Nothing is
 installed on the host except Docker.
@@ -15,7 +18,8 @@ RouterOS API TCP 8728).
 git clone https://github.com/ValCee1/ISP-Observability-Platform.git
 cd ISP-Observability-Platform
 
-# 2. per-site files (all gitignored - never commit these)
+# 2. per-site files. `bash scripts/init.sh` creates all the placeholders for
+#    you (see SETUP-INPUTS.md for what goes in each); manual equivalent:
 mkdir -p secrets
 echo 'choose-a-password'      > secrets/grafana_admin_password.txt
 echo '<telegram bot token>'   > secrets/telegram_bot_token.txt

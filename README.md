@@ -25,6 +25,8 @@ Routers        --API---> routeros-exporter -/            -> Alertmanager -> Tele
 - [docs/tier2-anomaly-detection.md](docs/tier2-anomaly-detection.md) —
   baseline-deviation anomaly detection (subscriber counts, router CPU/memory)
   that catches slow bleeds the threshold alerts can't.
+- [docs/SETUP-INPUTS.md](docs/SETUP-INPUTS.md) — **every secret/file/ID you must
+  supply on a fresh install, and where it goes** (`scripts/init.sh` scaffolds them).
 - [docs/INSTALL.md](docs/INSTALL.md) — installing on another Linux machine
   (or Windows via Docker Desktop/WSL2), offline install, upgrades.
 - [docs/server-monitoring.md](docs/server-monitoring.md) — monitoring the

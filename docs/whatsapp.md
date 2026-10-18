@@ -40,6 +40,9 @@ Meta's pricing page before going live; it is not hard-coded anywhere here.
 
 ## Going live (checklist)
 
+Template for `.env`: `.env.example` (copy it; `scripts/init.sh` does this).
+
+
 1. Create a Meta developer app with the WhatsApp product. For development use
    Meta's **free test number**; add your own number(s) as verified recipients.
 2. Create a message template named `isp_critical_alert`, category **Utility**,
