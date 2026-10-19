@@ -4,7 +4,9 @@ A small observability stack for an ISP network: MikroTik core routers, PTP wirel
 backhaul links (AirMAX, AirFiber, SAF), monitored via SNMP (routers + radios) and ICMP
 (link reachability), plus a RouterOS **API** collector for what SNMP can't reach —
 per-subscriber PPP/PPPoE sessions and topology auto-discovery.
-Visualized in Grafana, alerted on Telegram via Alertmanager.
+Visualized in Grafana, alerted on Telegram (and optionally WhatsApp, criticals only) via
+Alertmanager. Hosted locally on one Linux server in the ISP's management network; it
+also monitors itself.
 
 ```
 Routers/Radios --SNMP--> snmp-exporter -----\
@@ -27,6 +29,8 @@ Routers        --API---> routeros-exporter -/            -> Alertmanager -> Tele
   that catches slow bleeds the threshold alerts can't.
 - [docs/SETUP-INPUTS.md](docs/SETUP-INPUTS.md) — **every secret/file/ID you must
   supply on a fresh install, and where it goes** (`scripts/init.sh` scaffolds them).
+- [docs/SECURITY.md](docs/SECURITY.md) — security model: locally hosted, outbound-only,
+  read-only access, why management-network placement adds no attack surface, hardening checklist.
 - [docs/INSTALL.md](docs/INSTALL.md) — installing on another Linux machine
   (or Windows via Docker Desktop/WSL2), offline install, upgrades.
 - [docs/server-monitoring.md](docs/server-monitoring.md) — monitoring the

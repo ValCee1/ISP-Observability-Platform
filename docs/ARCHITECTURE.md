@@ -6,7 +6,15 @@ links (Ubiquiti airMAX, Ubiquiti AirFiber, SAF Integra) and MikroTik PtMP
 sectors with their registered CPEs. It collects metrics over **SNMP** and
 **ICMP**, evaluates recording/alerting rules in Prometheus, visualises them in
 Grafana, and routes de-duplicated incidents to a NOC Telegram group through
-Alertmanager.
+Alertmanager. Critical customer-facing alerts can also go to WhatsApp
+(cost-capped, dry-run by default - [whatsapp.md](whatsapp.md)).
+
+**Hosting:** the whole stack runs in Docker on **one Linux server hosted
+locally** inside the ISP's own management network ([INSTALL.md](INSTALL.md)).
+It only makes outbound connections (Telegram, optionally Meta); nothing is
+exposed to the internet. See [SECURITY.md](SECURITY.md) for why placing it on
+the management network adds no path from customers into the network. The
+server also monitors itself ([server-monitoring.md](server-monitoring.md)).
 
 Everything is configuration-as-code in this repo; nothing is edited only in a
 UI.
@@ -260,6 +268,12 @@ and `prometheus/rules/tests/alerts_test.yml`):
 - **Capacity digest** — `SectorOverClientCapacity` / `SectorOverThroughputBudget`
   never page; they batch into the 08:00 Africa/Lagos message.
 - **`repeat_interval`** 2 h critical / 12 h warning — reminds, doesn't nag.
+- **Warnings** go to a `telegram-warnings` receiver with no "RESOLVED" message
+  (a warning clearing isn't worth a ping).
+- **WhatsApp** gets a copy of customer-facing criticals only (first route,
+  `continue: true`): `scope=monitoring` alerts and all warnings stay on
+  Telegram, grouped by `scope`, repeated every 6 h, via the capped
+  `whatsapp-bridge` ([whatsapp.md](whatsapp.md)).
 
 ---
 
