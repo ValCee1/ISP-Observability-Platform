@@ -42,7 +42,9 @@ from .topology import Edge
 
 
 class Metrics:
+    """All Prometheus metrics this exporter exposes (routeros_*), plus the update_* methods that refresh one router's series each poll."""
     def __init__(self, registry: CollectorRegistry | None = None) -> None:
+        """Create every metric on the given registry (a fresh one if none, which keeps tests isolated)."""
         r = registry or CollectorRegistry()
         self.registry = r
 
@@ -133,6 +135,7 @@ class Metrics:
         raw_log_rows: Iterable[dict] | None = None,
     ) -> None:
         # Clear then re-set the per-session gauges so a vanished session drops.
+        """Refresh PPP session metrics for one router: active sessions, provisioned secrets and disconnect events. Per-session gauges are cleared first so vanished sessions disappear."""
         self._clear_router(self.ppp_active, router)
         self._clear_router(self.ppp_active_uptime, router)
         self._clear_router(self.ppp_caller_id, router)
@@ -178,19 +181,23 @@ class Metrics:
 
     # -- system / topology ----------------------------------------------------
     def update_system(self, router: str, info: SystemInfo) -> None:
+        """Refresh RouterOS version, board and uptime for one router."""
         self._clear_router(self.system_info, router)
         self.system_info.labels(router, info.version, info.board_name, info.architecture).set(1)
         self.system_uptime.labels(router).set(info.uptime_seconds)
 
     def update_topology(self, router: str, edges: list[Edge]) -> None:
+        """Replace this router's topology edges (upstream and neighbour links)."""
         self._clear_router(self.topology_edge, router)
         for e in edges:
             self.topology_edge.labels(router, e.dst, e.type, e.via_interface).set(1)
 
     def set_router_info(self, router: str, site: str, pop: str, role: str) -> None:
+        """Publish the router's static labels (site, pop, role) as an info-style gauge so rules can join on them."""
         self.router_info.labels(router, site, pop, role).set(1)
 
     def update_scrape(self, router: str, ok: bool, duration: float) -> None:
+        """Record whether this router's poll succeeded and how long it took (drives the exporter-health alerts)."""
         self.scrape_success.labels(router).set(1 if ok else 0)
         self.scrape_duration.labels(router).set(duration)
 

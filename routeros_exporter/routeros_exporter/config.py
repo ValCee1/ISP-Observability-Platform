@@ -49,6 +49,7 @@ class RouterConfig:
 
     @property
     def labels(self) -> dict[str, str]:
+        """Label set attached to this router's metrics: router always, plus site/pop/role when set."""
         out = {"router": self.name}
         for key in ("site", "pop", "role"):
             val = getattr(self, key)
@@ -59,6 +60,7 @@ class RouterConfig:
 
 @dataclasses.dataclass(frozen=True)
 class Config:
+    """Whole exporter configuration: the routers to poll plus polling and timeout settings. Built by load()."""
     routers: tuple[RouterConfig, ...]
     listen_port: int = 9436
     # PPP/system metrics refresh - RouterOS API is cheap, but there's no
@@ -80,6 +82,7 @@ class Config:
 
 
 def _load_yaml(path: str) -> dict[str, Any]:
+    """Read the YAML config file; the top level must be a mapping."""
     text = pathlib.Path(path).read_text(encoding="utf-8")
     data = yaml.safe_load(text) or {}
     if not isinstance(data, dict):
@@ -88,6 +91,7 @@ def _load_yaml(path: str) -> dict[str, Any]:
 
 
 def _load_credentials(path: str) -> dict[str, dict[str, str]]:
+    """Read the per-router credentials JSON ({router name: {username, password}}). A missing or empty file gives {} so --check and tests work without secrets."""
     p = pathlib.Path(path)
     if not p.exists():
         # Not fatal at import time - useful for `--check` / unit tests. The
@@ -105,6 +109,7 @@ def load(
     config_path: str | None = None,
     credentials_path: str | None = None,
 ) -> Config:
+    """Build Config from the config and credentials files (argument, then ROUTEROS_EXPORTER_CONFIG / ROUTEROS_CREDENTIALS_FILE, then the default path) and attach each router's login."""
     config_path = (
         config_path
         or os.environ.get("ROUTEROS_EXPORTER_CONFIG")

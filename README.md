@@ -29,6 +29,9 @@ Routers        --API---> routeros-exporter -/            -> Alertmanager -> Tele
   that catches slow bleeds the threshold alerts can't.
 - [docs/SETUP-INPUTS.md](docs/SETUP-INPUTS.md) — **every secret/file/ID you must
   supply on a fresh install, and where it goes** (`scripts/init.sh` scaffolds them).
+- [docs/ISP Network Observability Platform - Operations Manual.docx](<docs/ISP Network Observability Platform - Operations Manual.docx>) — the NOC
+  operations manual (daily routine, alerts, routine changes, troubleshooting, backup, security).
+- [docs/ISP Network Observability Platform Pilot Proposal.pptx](<docs/ISP Network Observability Platform Pilot Proposal.pptx>) — the pilot proposal deck.
 - [docs/SECURITY.md](docs/SECURITY.md) — security model: locally hosted, outbound-only,
   read-only access, why management-network placement adds no attack surface, hardening checklist.
 - [docs/INSTALL.md](docs/INSTALL.md) — installing on another Linux machine

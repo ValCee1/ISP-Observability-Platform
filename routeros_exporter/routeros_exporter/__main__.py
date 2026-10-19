@@ -89,6 +89,7 @@ def poll_router(c: cfg.RouterConfig, conf: cfg.Config, m: Metrics, *, do_topolog
 
 
 def _safe(api, path: str):
+    """Query a RouterOS path; on any RouterOS error return [] so one missing or denied table does not abort the whole poll."""
     try:
         return api.query(path)
     except roc.RouterOSError:
@@ -118,6 +119,7 @@ def _schedule_after_attempt(streak: int, succeeded: bool) -> tuple[bool, int]:
 
 
 def run(conf: cfg.Config) -> None:
+    """Start the /metrics server and poll every configured router forever; each router's success and duration are exported so a dead router is visible."""
     registry = CollectorRegistry()
     m = Metrics(registry)
     router_addresses = {r.name: [r.host] for r in conf.routers}
@@ -152,6 +154,7 @@ def run(conf: cfg.Config) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """CLI entry point: --check validates config and credentials and exits, --once runs a single poll cycle, otherwise run the exporter."""
     ap = argparse.ArgumentParser(prog="routeros_exporter")
     ap.add_argument("--check", action="store_true", help="validate config, exit")
     ap.add_argument("--once", action="store_true", help="one poll cycle to stdout, exit")
