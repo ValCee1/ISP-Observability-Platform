@@ -46,7 +46,7 @@ Template for `.env`: `.env.example` (copy it; `scripts/init.sh` does this).
 1. Create a Meta developer app with the WhatsApp product. For development use
    Meta's **free test number**; add your own number(s) as verified recipients.
 2. Create a message template named `isp_critical_alert`, category **Utility**,
-   language `en`, body: `ISP alert: {{1}}. {{2}}` and wait for approval.
+   language `en`, and wait for approval. Body (Meta rejects a variable at the very start or end of the body): `ISP Network critical alert: {{1}}. Details: {{2}} Check Grafana for the full picture.` Sample values: `3 critical: Link L1, Sector S2` and `Link L1 is down | Sector S2 is down`.
 3. Put the access token in `secrets/whatsapp_access_token.txt` (gitignored).
    Prefer a System User token, not a temporary one.
 4. In `.env` (gitignored):
