@@ -47,6 +47,7 @@ Template for `.env`: `.env.example` (copy it; `scripts/init.sh` does this).
    Meta's **free test number**; add your own number(s) as verified recipients.
 2. Create a message template named `isp_critical_alert`, category **Utility**,
    language `en`, and wait for approval. Body (Meta rejects a variable at the very start or end of the body): `ISP Network critical alert: {{1}}. Details: {{2}} Check Grafana for the full picture.` Sample values: `3 critical: Link L1, Sector S2` and `Link L1 is down | Sector S2 is down`.
+   Add one **Visit website** button, type **Static**, text `Open in Telegram`, URL = the NOC group's invite link (`https://t.me/+...`). A static button lives in the approved template, so the bridge sends nothing extra for it. A link to the exact Telegram message isn't possible: Telegram and WhatsApp are sent in parallel, so the message id doesn't exist yet.
 3. Put the access token in `secrets/whatsapp_access_token.txt` (gitignored).
    Prefer a System User token, not a temporary one.
 4. In `.env` (gitignored):
