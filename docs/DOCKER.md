@@ -31,20 +31,20 @@ The build fails if the bundled config or rules don't parse
 
 ```bash
 # from the repo root
-docker build -t valcee1/isp-observability:v1.2 .
+docker build -t chikere/isp-observability:v1.2 .
 ```
 
 Override the Prometheus base version if needed:
 
 ```bash
-docker build --build-arg PROMETHEUS_VERSION=v3.13.2 -t valcee1/isp-observability:v1.2 .
+docker build --build-arg PROMETHEUS_VERSION=v3.13.2 -t chikere/isp-observability:v1.2 .
 ```
 
 Verify before pushing:
 
 ```bash
-docker run --rm valcee1/isp-observability:v1.2 --version
-docker run --rm --entrypoint promtool valcee1/isp-observability:v1.2 \
+docker run --rm chikere/isp-observability:v1.2 --version
+docker run --rm --entrypoint promtool chikere/isp-observability:v1.2 \
   check config /etc/prometheus/prometheus.yml
 ```
 
@@ -63,13 +63,13 @@ docker run --rm --entrypoint promtool valcee1/isp-observability:v1.2 \
 3. **Tag** (skip if you already built with the final name above):
 
    ```bash
-   docker tag valcee1/isp-observability:v1.2 valcee1/isp-observability:v1.2
+   docker tag chikere/isp-observability:v1.2 chikere/isp-observability:v1.2
    ```
 
 4. **Push:**
 
    ```bash
-   docker push valcee1/isp-observability:v1.2
+   docker push chikere/isp-observability:v1.2
    ```
 
 The repo stays private — anyone pulling it (including other hosts running this
@@ -82,7 +82,7 @@ If your monitoring host is arm64 (or mixed):
 ```bash
 docker buildx create --use --name isp-obs 2>/dev/null || docker buildx use isp-obs
 docker buildx build --platform linux/amd64,linux/arm64 \
-  -t valcee1/isp-observability:v1.2 --push .
+  -t chikere/isp-observability:v1.2 --push .
 ```
 
 ## Run the stack from the image
@@ -99,7 +99,7 @@ services untouched. Secrets (`secrets/grafana_admin_password.txt`,
 Point at another tag or registry without editing files:
 
 ```bash
-ISP_OBS_IMAGE=valcee1/isp-observability:v1.2 \
+ISP_OBS_IMAGE=chikere/isp-observability:v1.2 \
   docker compose -f docker-compose.yml -f docker-compose.image.yml up -d
 ```
 
@@ -107,7 +107,7 @@ ISP_OBS_IMAGE=valcee1/isp-observability:v1.2 \
 
 Baked config is immutable per tag. Two options:
 
-- **New tag** — edit `prometheus/**`, `docker build -t valcee1/isp-observability:v1.2 .`,
+- **New tag** — edit `prometheus/**`, `docker build -t chikere/isp-observability:v1.2 .`,
   push, bump `ISP_OBS_IMAGE`. Preferred.
 - **Hot patch** — bind-mount a single file over the baked path at run time,
   e.g. add `- ./prometheus/targets/mikrotik-sectors.yml:/etc/prometheus/targets/mikrotik-sectors.yml:ro`
