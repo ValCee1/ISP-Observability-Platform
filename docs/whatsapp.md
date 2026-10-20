@@ -68,6 +68,7 @@ Template for `.env`: `.env.example` (copy it; `scripts/init.sh` does this).
 - Start with **one** recipient (the on-call number). Each extra recipient
   multiplies cost.
 - Template variables may not contain newlines; the bridge flattens text.
+- The bridge retries **connection-level** failures to Meta (DNS, TCP, TLS; up to 4 tries, 3 s apart) because a request that never connected cannot double-send. HTTP errors from Meta (bad token, unapproved template, unverified recipient) are never retried; Meta's explanation is logged. The container uses public DNS (1.1.1.1, 8.8.8.8) for this call, and Alertmanager's webhook `timeout` is 90 s to cover the retries. If every attempt times out in the TLS handshake, the problem is the network path from the server to Meta (test from the host with `curl -i https://graph.facebook.com/`), not this configuration.
 - A send failure returns HTTP 502 so Alertmanager retries; failed sends do
   not consume budget. Persistent failure raises `WhatsAppSendFailing` and
   `AlertDeliveryFailing` (integration `webhook`).

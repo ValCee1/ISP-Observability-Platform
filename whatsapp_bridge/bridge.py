@@ -20,6 +20,7 @@ import os
 import re
 import sys
 import threading
+import time
 import urllib.error
 import urllib.request
 from datetime import datetime
@@ -27,6 +28,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from zoneinfo import ZoneInfo
 
 GRAPH_URL = "https://graph.facebook.com/v21.0/{phone_number_id}/messages"
+CONNECT_ATTEMPTS = 4        # tries per message when the network to Meta is flaky
+CONNECT_RETRY_DELAY = 3     # seconds between those tries
 
 
 class Config:
@@ -144,8 +147,22 @@ def graph_send(cfg, to, p1, p2):
     req = urllib.request.Request(
         GRAPH_URL.format(phone_number_id=cfg.phone_number_id), data=json.dumps(body).encode(),
         headers={"Authorization": f"Bearer {cfg.token()}", "Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=15) as r:
-        r.read()
+    # Retry only CONNECTION-level failures (DNS, TCP, TLS handshake): the
+    # request never reached Meta, so a retry cannot double-send. An HTTP
+    # error reply (bad token, template not approved...) is final and is
+    # raised immediately - retrying it would only repeat the rejection.
+    for attempt in range(1, CONNECT_ATTEMPTS + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=15) as r:
+                r.read()
+            return
+        except urllib.error.HTTPError:
+            raise
+        except urllib.error.URLError as e:
+            if attempt == CONNECT_ATTEMPTS:
+                raise
+            print(f"connect to Meta failed ({e.reason}); retry {attempt}/{CONNECT_ATTEMPTS - 1}", file=sys.stderr)
+            time.sleep(CONNECT_RETRY_DELAY)
 
 
 class Bridge:
@@ -189,7 +206,10 @@ class Bridge:
                 sent += 1
             except (urllib.error.URLError, OSError, ValueError) as e:
                 self._count("failed")
-                print(f"send to {to} failed: {e}", file=sys.stderr)
+                # Meta explains rejections in the reply body (template not
+                # approved, recipient not verified...) - log it, never the token.
+                detail = e.read().decode(errors="replace")[:500] if isinstance(e, urllib.error.HTTPError) else ""
+                print(f"send to {to} failed: {e} {detail}", file=sys.stderr)
         if sent:
             self._count("sent", sent)
             self.budget.record(sent)

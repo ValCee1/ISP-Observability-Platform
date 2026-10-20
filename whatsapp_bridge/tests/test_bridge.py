@@ -45,6 +45,38 @@ class BridgeTests(unittest.TestCase):
         b.handle(p)
         self.assertEqual(calls, [])
 
+    def test_connection_errors_are_retried_but_http_errors_are_not(self):
+        import urllib.error
+        calls = {"n": 0}
+
+        class R:
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def read(self): return b""
+
+        def flaky(req, timeout):
+            calls["n"] += 1
+            if calls["n"] < 3:
+                raise urllib.error.URLError("handshake timed out")
+            return R()
+        bridge.CONNECT_RETRY_DELAY = 0
+        orig = bridge.urllib.request.urlopen
+        bridge.urllib.request.urlopen = flaky
+        try:
+            bridge.graph_send(cfg(WHATSAPP_TOKEN_FILE=__file__), "1", "a", "b")
+            self.assertEqual(calls["n"], 3)          # two failures, then success
+
+            def rejected(req, timeout):
+                calls["n"] += 1
+                raise urllib.error.HTTPError("u", 400, "bad", {}, None)
+            calls["n"] = 0
+            bridge.urllib.request.urlopen = rejected
+            with self.assertRaises(urllib.error.HTTPError):
+                bridge.graph_send(cfg(WHATSAPP_TOKEN_FILE=__file__), "1", "a", "b")
+            self.assertEqual(calls["n"], 1)          # no retry on an HTTP error
+        finally:
+            bridge.urllib.request.urlopen = orig
+
     def test_live_send_and_daily_cap(self):
         calls = []
         b = bridge.Bridge(cfg(WHATSAPP_MODE="live"), sender=lambda *a: calls.append(a))

@@ -251,6 +251,7 @@ receivers:
       - url: http://whatsapp-bridge:8080/alert
         send_resolved: false
         max_alerts: 5   # payload cap; the bridge only quotes the first 3 anyway
+        timeout: 90s    # the bridge retries Meta connection failures (up to ~60s) before replying
 
 # Suppress lower-priority alerts about an entity that's already covered by
 # a bigger, currently-firing alert for that SAME entity (`equal:` is the
