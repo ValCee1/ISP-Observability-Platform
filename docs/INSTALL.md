@@ -85,6 +85,43 @@ Prometheus/Alertmanager config reloads on `docker compose restart <service>`;
 target files reload on their own within a minute. Data lives in named volumes
 and survives `down`/`up` (not `down -v`).
 
+## Moving an existing installation to another computer
+
+**Do not copy the whole folder.** It contains things that must not travel:
+`routeros_exporter/.venv` (a Python environment tied to this OS/CPU),
+`__pycache__`, `.claude/`, and local state. Instead move three things
+separately:
+
+1. **The configuration (git).** Commit and `git push` from the old machine,
+   `git clone` on the new one. This carries rules, dashboards, targets,
+   compose files and docs.
+2. **The per-site secrets (NOT in git).** Copy these over an encrypted
+   channel (scp, an encrypted USB stick, a password manager attachment),
+   never email or chat:
+   - `secrets/` (Grafana password, Telegram token, RouterOS credentials,
+     WhatsApp token)
+   - `.env`
+   - `routeros_exporter/config.yml`
+
+   ```bash
+   # from the old machine
+   tar czf site-secrets.tgz secrets .env routeros_exporter/config.yml
+   scp site-secrets.tgz user@new-server:~/
+   # on the new machine, inside the cloned repo
+   tar xzf ~/site-secrets.tgz && chmod 600 secrets/* .env && shred -u ~/site-secrets.tgz
+   ```
+3. **Metric history (optional).** It lives in Docker volumes, not in the
+   folder. Archive and restore the `prometheus_data` volume only if you need
+   the old graphs (Operations Manual, section 7). Skipping it starts history
+   fresh; all configuration and alerts are unaffected.
+
+Then `docker compose up -d --build` on the new machine (images are rebuilt
+for its own CPU architecture, so a Mac-to-Linux or ARM-to-x86 move is fine).
+Before switching, stop the old stack, or at least the WhatsApp bridge, so the
+two machines do not both send alerts, and re-check the firewall and the
+management-network placement ([SECURITY.md](SECURITY.md)). WhatsApp message
+counters restart at zero on the new machine, so re-confirm the caps.
+
 ## 2. Windows
 
 **Yes, via Docker Desktop with the WSL2 backend** (or run the Linux steps

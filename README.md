@@ -27,6 +27,8 @@ Routers        --API---> routeros-exporter -/            -> Alertmanager -> Tele
 - [docs/tier2-anomaly-detection.md](docs/tier2-anomaly-detection.md) —
   baseline-deviation anomaly detection (subscriber counts, router CPU/memory)
   that catches slow bleeds the threshold alerts can't.
+- [docs/GO-LIVE.md](docs/GO-LIVE.md) — production go-live checklist: what to replace,
+  secure, verify and accept before cut-over.
 - [docs/SETUP-INPUTS.md](docs/SETUP-INPUTS.md) — **every secret/file/ID you must
   supply on a fresh install, and where it goes** (`scripts/init.sh` scaffolds them).
 - [docs/ISP Network Observability Platform - Operations Manual.docx](<docs/ISP Network Observability Platform - Operations Manual.docx>) — the NOC
