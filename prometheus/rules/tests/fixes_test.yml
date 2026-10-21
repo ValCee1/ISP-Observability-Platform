@@ -1,0 +1,76 @@
+# Regression tests for the 2026-10-06 end-to-end review fixes. Run:
+#   promtool test rules prometheus/rules/tests/fixes_test.yml
+
+rule_files:
+  - ../link-normalization.yml
+  - ../link-alerts.yml
+  - ../mikrotik-alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  # A DOWN link must not also look like a 5000ms "Severe Latency" link:
+  # failed probes report the blackbox timeout as probe_duration_seconds.
+  - interval: 1m
+    input_series:
+      - series: 'probe_success{job="link-availability", instance="10.0.0.1", link_id="L1", link_name="l1-a", endpoint="a", site="S", role="Backhaul", vendor="t"}'
+        values: '0x20'
+      - series: 'probe_duration_seconds{job="link-availability", instance="10.0.0.1", link_id="L1", link_name="l1-a", endpoint="a", site="S", role="Backhaul", vendor="t"}'
+        values: '5x20'
+    promql_expr_test:
+      - expr: link_latency_seconds
+        eval_time: 15m
+        exp_samples: []
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: HighLatency
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: HighLatencyVariability
+        exp_alerts: []
+
+  # A healthy link still records its real RTT.
+  - interval: 1m
+    input_series:
+      - series: 'probe_success{job="link-availability", instance="10.0.0.2", link_id="L2"}'
+        values: '1x10'
+      - series: 'probe_duration_seconds{job="link-availability", instance="10.0.0.2", link_id="L2"}'
+        values: '0.004x10'
+    promql_expr_test:
+      - expr: link_latency_ms
+        eval_time: 5m
+        exp_samples:
+          - labels: 'link_latency_ms{job="link-availability", instance="10.0.0.2", link_id="L2"}'
+            value: 4
+
+  # WANInterfaceDown follows each router's wan_ifname target label.
+  - interval: 1m
+    input_series:
+      - series: 'up{job="snmp-mikrotik", instance="192.168.10.1", router="pop1-home", wan_ifname="ether1"}'
+        values: '1x10'
+      - series: 'ifOperStatus{job="snmp-mikrotik", instance="192.168.10.1", router="pop1-home", wan_ifname="ether1", ifName="ether1"}'
+        values: '2x10'
+      - series: 'ifOperStatus{job="snmp-mikrotik", instance="192.168.10.1", router="pop1-home", wan_ifname="ether1", ifName="ether5"}'
+        values: '2x10'
+      - series: 'up{job="snmp-mikrotik", instance="192.168.11.1", router="Sam OFT", wan_ifname="chidinma-ppp"}'
+        values: '1x10'
+      - series: 'ifOperStatus{job="snmp-mikrotik", instance="192.168.11.1", router="Sam OFT", wan_ifname="chidinma-ppp", ifName="chidinma-ppp"}'
+        values: '1x10'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: WANInterfaceDown
+        exp_alerts:
+          - exp_labels: { severity: critical, category: state, scope: router, alert_type: wan-down,
+                          job: snmp-mikrotik, instance: 192.168.10.1, router: pop1-home, wan_ifname: ether1, ifName: ether1 }
+            exp_annotations: { summary: "🔴 WAN Interface DOWN", description: "ether1 on 192.168.10.1 has gone down." }
+
+  # The router-scoped WeakSignal safety net no longer duplicates the
+  # link-radio-health WeakSignal (same alertname + labels, other threshold).
+  - interval: 1m
+    input_series:
+      - series: 'link_signal_dbm{job="link-radio-health", instance="10.0.0.3", link_id="L3", link_name="l3-a"}'
+        values: '-77x20'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: WeakSignal
+        exp_alerts: []

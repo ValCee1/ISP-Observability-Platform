@@ -1,0 +1,35 @@
+# Monitoring-the-vantage-point: can the monitoring server itself see out?
+#
+# Why: every check runs FROM the server. When the server's own network
+# drops (CONFIRMED 2026-10-07/08: the lab laptop was offline for ~11h),
+# every link, router and sector looks unreachable at once and the NOC gets
+# a storm of "down" alerts for devices that are fine.
+#
+# MonitoringVantageLost fires instead - ONE alert, only when EVERY target in
+# prometheus/targets/vantage-points.yml is unreachable - and
+# alertmanager/alertmanager.yml inhibits the per-device alerts (matched on
+# `scope`) while it's firing. ExporterDown (scope: monitoring) is not
+# inhibited by it.
+groups:
+  - name: vantage-point
+    rules:
+      - alert: MonitoringVantageLost
+        # No vantage targets configured -> the metric is absent -> no alert,
+        # so an empty vantage-points.yml simply turns the feature off.
+        expr: max(probe_success{job="vantage-points"}) == 0
+        # Shorter than CoreRouterDown (1m) so the inhibiting alert is
+        # already firing when the per-device ones would start.
+        for: 30s
+        # Stay firing (and keep inhibiting) after the path returns: link
+        # alerts such as PacketLoss use 10m windows that still contain the
+        # outage, and would otherwise fire the moment this resolves.
+        keep_firing_for: 15m
+        labels:
+          severity: critical
+          category: state
+          scope: monitoring
+          alert_type: vantage-lost
+          exporter: server-network   # shows as "Monitoring: server-network" in Telegram
+        annotations:
+          summary: "🔴 No network access from the monitoring server"
+          description: "Every reference target in prometheus/targets/vantage-points.yml is unreachable, so the monitoring server has no network access. If the first-hop target is a POP router, that router may itself be down or unreachable. Link, router, sector and subscriber alerts are held back until the path recovers and for 15 minutes after, so they don't report false outages."

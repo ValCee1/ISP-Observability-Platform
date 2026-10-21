@@ -22,7 +22,7 @@ groups:
         expr: sector_up == 0
         for: 3m
         keep_firing_for: 10m
-        labels: { severity: critical, category: state, scope: sector, alert_type: sector-down }
+        labels: { severity: critical, page: "true", category: state, scope: sector, alert_type: sector-down }
         annotations:
           summary: "🔴 Sector AP DOWN"
           description: "Sector {{ $labels.sector }} ({{ $labels.instance }}) has been SNMP-unreachable for 3 minutes."

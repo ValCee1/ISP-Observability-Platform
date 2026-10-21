@@ -18,12 +18,6 @@ Metric surface (all prefixed ``routeros_``):
   ppp_auth_failure_total{router}                      counter
   ppp_connect_total{router,user}                      counter
 
-  config_last_backup_timestamp{router}               gauge (unix seconds)
-  config_last_change_timestamp{router}               gauge
-  config_changed{router}                             1 for the cycle a diff landed
-  config_export_lines{router}                        gauge
-  config_backup_success{router}                      1/0
-
   system_info{router,version,board,architecture}     1
   system_uptime_seconds{router}                      gauge
 
@@ -48,7 +42,9 @@ from .topology import Edge
 
 
 class Metrics:
+    """All Prometheus metrics this exporter exposes (routeros_*), plus the update_* methods that refresh one router's series each poll."""
     def __init__(self, registry: CollectorRegistry | None = None) -> None:
+        """Create every metric on the given registry (a fresh one if none, which keeps tests isolated)."""
         r = registry or CollectorRegistry()
         self.registry = r
 
@@ -88,28 +84,6 @@ class Metrics:
         self.ppp_connect_total = Counter(
             "routeros_ppp_connect_total", "PPP connect events",
             ["router", "user"], registry=r,
-        )
-
-        self.config_last_backup_ts = Gauge(
-            "routeros_config_last_backup_timestamp",
-            "Unix time of the last successful config export", ["router"], registry=r,
-        )
-        self.config_last_change_ts = Gauge(
-            "routeros_config_last_change_timestamp",
-            "Unix time the config text last changed", ["router"], registry=r,
-        )
-        self.config_changed = Gauge(
-            "routeros_config_changed",
-            "1 for the poll cycle in which a config diff was committed",
-            ["router"], registry=r,
-        )
-        self.config_export_lines = Gauge(
-            "routeros_config_export_lines", "Line count of the last /export",
-            ["router"], registry=r,
-        )
-        self.config_backup_success = Gauge(
-            "routeros_config_backup_success", "1 if the last backup cycle succeeded",
-            ["router"], registry=r,
         )
 
         self.router_info = Gauge(
@@ -161,6 +135,7 @@ class Metrics:
         raw_log_rows: Iterable[dict] | None = None,
     ) -> None:
         # Clear then re-set the per-session gauges so a vanished session drops.
+        """Refresh PPP session metrics for one router: active sessions, provisioned secrets and disconnect events. Per-session gauges are cleared first so vanished sessions disappear."""
         self._clear_router(self.ppp_active, router)
         self._clear_router(self.ppp_active_uptime, router)
         self._clear_router(self.ppp_caller_id, router)
@@ -204,32 +179,25 @@ class Metrics:
         if len(seen) > 5000:  # bound memory - keep the newest half
             self._seen_log_ids[router] = set(list(seen)[-2500:])
 
-    # -- config backup -----------------------------------------------------
-    def update_backup(self, result, now: float | None = None) -> None:
-        now = now if now is not None else time.time()
-        self.config_backup_success.labels(result.router).set(1 if result.success else 0)
-        if result.success:
-            self.config_last_backup_ts.labels(result.router).set(now)
-            self.config_export_lines.labels(result.router).set(result.export_lines)
-        self.config_changed.labels(result.router).set(1 if result.changed else 0)
-        if result.changed:
-            self.config_last_change_ts.labels(result.router).set(now)
-
     # -- system / topology ----------------------------------------------------
     def update_system(self, router: str, info: SystemInfo) -> None:
+        """Refresh RouterOS version, board and uptime for one router."""
         self._clear_router(self.system_info, router)
         self.system_info.labels(router, info.version, info.board_name, info.architecture).set(1)
         self.system_uptime.labels(router).set(info.uptime_seconds)
 
     def update_topology(self, router: str, edges: list[Edge]) -> None:
+        """Replace this router's topology edges (upstream and neighbour links)."""
         self._clear_router(self.topology_edge, router)
         for e in edges:
             self.topology_edge.labels(router, e.dst, e.type, e.via_interface).set(1)
 
     def set_router_info(self, router: str, site: str, pop: str, role: str) -> None:
+        """Publish the router's static labels (site, pop, role) as an info-style gauge so rules can join on them."""
         self.router_info.labels(router, site, pop, role).set(1)
 
     def update_scrape(self, router: str, ok: bool, duration: float) -> None:
+        """Record whether this router's poll succeeded and how long it took (drives the exporter-health alerts)."""
         self.scrape_success.labels(router).set(1 if ok else 0)
         self.scrape_duration.labels(router).set(duration)
 

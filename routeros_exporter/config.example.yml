@@ -13,15 +13,6 @@ options:
   listen_port: 9436
   poll_interval_seconds: 30          # PPP + system metrics
   api_timeout_seconds: 30            # routine PPP/system/topology polling
-  backup_timeout_seconds: 90         # config backup's OWN, longer timeout -
-                                      # CONFIRMED 2026-09-14: /export
-                                      # file=... took ~52s on a hAP AC Lite,
-                                      # not a hang, just slow. Kept separate
-                                      # from api_timeout_seconds so a slow
-                                      # backup never delays detecting a
-                                      # genuinely dead router too.
-  backup_interval_seconds: 3600       # config export + git commit
-  backup_repo_path: /var/lib/routeros-exporter/backups
   topology_interval_seconds: 900      # route/neighbour discovery
   topology_output_path: /var/lib/routeros-exporter/topology.generated.yml
   log_lookback: 200                   # /log lines scanned for ppp events
@@ -30,8 +21,6 @@ routers:
   - name: pop1-home            # -> `router` label; keep stable
     host: 192.168.10.1
     port: 8728                  # 8729 + use_tls: true for api-ssl
-    ftp_port: 21                 # config backup fetch - see README's RouterOS
-                                  # user setup (needs api, read, write, ftp)
     site: HOME
     pop: HOME
     role: core-router
@@ -44,7 +33,7 @@ routers:
   #   role: core-router
 
   - name: room-office-repeater
-    host: 192.168.10.19
+    host: 192.168.10.15
     site: room-office
     role: Repeater
     collect_ppp: false         # no PPPoE server here

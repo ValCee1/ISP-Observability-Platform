@@ -28,20 +28,19 @@
 # An all-comment file parses as YAML `null`, not an empty list - file_sd
 # wants a list, so an explicit `[]` keeps this file valid Prometheus config
 # with zero targets rather than relying on null being tolerated.
-[]
+# []
 #
-# - targets: ["10.10.13.1"]
-#   labels:
-#     auth: public_v2
-#     sector: 4B
-#     site: BASE 5
-#     role: sector-ap
-#     pop: BASE
-#
+- targets: ["10.10.13.1"]
+  labels:
+    auth: public_v2
+    sector: 5B
+    site: POP 5
+    role: POP 5 SECTOR 2
+    pop: NKUANTOMA
 # - targets: ["10.10.13.129"]
 #   labels:
 #     auth: public_v2
-#     sector: 4E
-#     site: BASE 4
-#     role: sector-ap
-#     pop: BASE
+#     sector: 5E
+#     site: POP 5
+#     role: POP 5 SECTOR 5
+#     pop: NKUANTOMA

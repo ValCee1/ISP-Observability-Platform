@@ -34,7 +34,7 @@ groups:
         keep_firing_for: 10m
         # scope=pop so this routes + groups with POPIsolated (by `pop`), not
         # with the per-router subscriber alerts.
-        labels: { severity: critical, category: state, scope: pop, alert_type: mass-outage-pop }
+        labels: { severity: critical, page: "true", category: state, scope: pop, alert_type: mass-outage-pop }
         annotations:
           summary: "🔴 Subscriber mass outage at POP {{ $labels.pop }}"
           description: >-
@@ -60,7 +60,7 @@ groups:
           )
         for: 3m
         keep_firing_for: 10m
-        labels: { severity: critical, category: state, scope: subscriber, alert_type: mass-outage-router }
+        labels: { severity: critical, page: "true", category: state, scope: subscriber, alert_type: mass-outage-router }
         annotations:
           summary: "🔴 Subscriber mass outage on {{ $labels.router }}"
           description: >-
@@ -109,7 +109,7 @@ groups:
           summary: "🟠 RouterOS API collector cannot reach {{ $labels.router }}"
           description: >-
             routeros-exporter has failed to poll {{ $labels.router }} for
-            10 min - subscriber session / config-backup / topology data for
+            10 min - subscriber session / topology data for
             this router is stale. SNMP-derived signals are unaffected.
 
   # -------------------------------------------------------------------

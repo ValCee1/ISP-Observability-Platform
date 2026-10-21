@@ -4,7 +4,7 @@ Two inputs, both mounted read-only into the container (same pattern as every
 other service in docker-compose.yml):
 
   * ``ROUTEROS_EXPORTER_CONFIG``  - non-secret settings + the router list
-    (poll intervals, backup repo path, per-router host/port/site/pop labels).
+    (poll intervals, per-router host/port/site/pop labels).
     Committed to the repo as ``routeros_exporter/config.example.yml``.
 
   * ``ROUTEROS_CREDENTIALS_FILE``  - a JSON object mapping router name ->
@@ -38,9 +38,6 @@ class RouterConfig:
     use_tls: bool = False
     username: str = ""         # filled in from the credentials file
     password: str = ""
-    ftp_port: int = 21        # config backup fetch (export_via_api) - see
-                               # routeros_exporter/README.md for the RouterOS
-                               # user policy this needs (api, read, write, ftp)
     # Label passthrough - these land on every metric for this router so the
     # exporter's series line up with the SNMP jobs' `site` / `pop` / `role`.
     site: str = ""
@@ -48,11 +45,11 @@ class RouterConfig:
     role: str = "core-router"
     # Per-router opt-outs (a repeater with no PPPoE server, say).
     collect_ppp: bool = True
-    collect_backup: bool = True
     collect_topology: bool = True
 
     @property
     def labels(self) -> dict[str, str]:
+        """Label set attached to this router's metrics: router always, plus site/pop/role when set."""
         out = {"router": self.name}
         for key in ("site", "pop", "role"):
             val = getattr(self, key)
@@ -63,6 +60,7 @@ class RouterConfig:
 
 @dataclasses.dataclass(frozen=True)
 class Config:
+    """Whole exporter configuration: the routers to poll plus polling and timeout settings. Built by load()."""
     routers: tuple[RouterConfig, ...]
     listen_port: int = 9436
     # PPP/system metrics refresh - RouterOS API is cheap, but there's no
@@ -75,20 +73,8 @@ class Config:
     # wait every 30s cycle. 30s is comfortable headroom for those calls in
     # practice - CONFIRMED 2026-09-14: they were fine even under the
     # previously-hidden 10s default (see client.connect's docstring for
-    # that bug). Config backup is deliberately NOT sized against this value
-    # - see backup_timeout_seconds below.
+    # that bug).
     api_timeout_seconds: float = 30.0
-    # Separate, longer timeout for the config-backup connection only.
-    # CONFIRMED 2026-09-14, live: `/export file=...` took ~52s to complete
-    # on a hAP AC Lite (a modest single-core device) - not a hang, just
-    # slow. Backup gets its OWN connection (see __main__.poll_router) with
-    # this timeout instead of sharing api_timeout_seconds, so a slow backup
-    # never makes routine polling's dead-router detection slower too.
-    backup_timeout_seconds: float = 90.0
-    # Config backup cadence + destination. The repo is a plain `git init`
-    # directory on its own volume; the exporter commits into it.
-    backup_interval_seconds: int = 3600
-    backup_repo_path: str = "/var/lib/routeros-exporter/backups"
     # Topology re-discovery cadence - routing/neighbour tables change rarely.
     topology_interval_seconds: int = 900
     topology_output_path: str = "/var/lib/routeros-exporter/topology.generated.yml"
@@ -96,6 +82,7 @@ class Config:
 
 
 def _load_yaml(path: str) -> dict[str, Any]:
+    """Read the YAML config file; the top level must be a mapping."""
     text = pathlib.Path(path).read_text(encoding="utf-8")
     data = yaml.safe_load(text) or {}
     if not isinstance(data, dict):
@@ -104,6 +91,7 @@ def _load_yaml(path: str) -> dict[str, Any]:
 
 
 def _load_credentials(path: str) -> dict[str, dict[str, str]]:
+    """Read the per-router credentials JSON ({router name: {username, password}}). A missing or empty file gives {} so --check and tests work without secrets."""
     p = pathlib.Path(path)
     if not p.exists():
         # Not fatal at import time - useful for `--check` / unit tests. The
@@ -121,6 +109,7 @@ def load(
     config_path: str | None = None,
     credentials_path: str | None = None,
 ) -> Config:
+    """Build Config from the config and credentials files (argument, then ROUTEROS_EXPORTER_CONFIG / ROUTEROS_CREDENTIALS_FILE, then the default path) and attach each router's login."""
     config_path = (
         config_path
         or os.environ.get("ROUTEROS_EXPORTER_CONFIG")
@@ -147,12 +136,10 @@ def load(
                 use_tls=bool(entry.get("use_tls", False)),
                 username=cred.get("username", entry.get("username", "")),
                 password=cred.get("password", entry.get("password", "")),
-                ftp_port=int(entry.get("ftp_port", 21)),
                 site=entry.get("site", ""),
                 pop=entry.get("pop", ""),
                 role=entry.get("role", "core-router"),
                 collect_ppp=bool(entry.get("collect_ppp", True)),
-                collect_backup=bool(entry.get("collect_backup", True)),
                 collect_topology=bool(entry.get("collect_topology", True)),
             )
         )
@@ -170,11 +157,6 @@ def load(
         # committed config.yml sets this explicitly) but fixed for
         # consistency, 2026-09-14.
         api_timeout_seconds=float(opts.get("api_timeout_seconds", 30.0)),
-        backup_timeout_seconds=float(opts.get("backup_timeout_seconds", 90.0)),
-        backup_interval_seconds=int(opts.get("backup_interval_seconds", 3600)),
-        backup_repo_path=opts.get(
-            "backup_repo_path", "/var/lib/routeros-exporter/backups"
-        ),
         topology_interval_seconds=int(
             opts.get("topology_interval_seconds", 900)
         ),

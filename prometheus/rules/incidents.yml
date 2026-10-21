@@ -21,7 +21,7 @@ groups:
         expr: |
           max by (severity, object, alertname, alert_type, scope, cpe_name) (
             label_replace(label_replace(label_replace(label_replace(label_replace(
-              (time() - ALERTS_FOR_STATE) and ignoring(alertstate) ALERTS{alertstate="firing"},
+              (time() - ALERTS_FOR_STATE{alertname!="LinkDownProlonged"}) and ignoring(alertstate) ALERTS{alertstate="firing", alertname!="LinkDownProlonged"},
               "object", "$1", "pop", "(.+)"),
               "object", "$1", "instance", "(.+)"),
               "object", "$1", "router", "(.+)"),

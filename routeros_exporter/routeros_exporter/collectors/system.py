@@ -1,8 +1,7 @@
 """/system/resource + /system/routerboard -> version / board / uptime.
 
 Feeds ``routeros_system_info`` (a 1-valued info metric carrying version and
-board as labels) and ``routeros_system_uptime_seconds``. The fleet
-version-drift alert (config-backup.yml) keys off the ``version`` label.
+board as labels) and ``routeros_system_uptime_seconds``.
 """
 
 from __future__ import annotations

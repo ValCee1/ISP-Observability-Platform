@@ -48,26 +48,93 @@ tests:
             exp_annotations: { summary: "🔴 Link DOWN", description: "t-a has been unreachable for 5 minutes." }
 
   # ------------------------------------------------------------------
-  # At 25% loss both PacketLoss tiers evaluate (warning + critical). The
+  # At 45% loss both PacketLoss tiers evaluate (warning + critical). The
   # duplicate is collapsed to one Telegram message by an alertmanager
-  # inhibit rule, not here.
+  # inhibit rule, not here. The warning tier is "sustained" (>=24 of the
+  # last 30 one-minute steps in breach), so at 12m only the critical tier
+  # (for: 10m) has fired; the warning joins once 24m of breach has built up.
   # ------------------------------------------------------------------
   - interval: 1m
     input_series:
       - series: 'link_packet_loss_percent{link_id="LINK-T", link_name="t-a"}'
-        values: '25x20'
+        values: '45x40'
     alert_rule_test:
       - eval_time: 12m
+        alertname: PacketLoss
+        exp_alerts:
+          - exp_labels: { severity: critical, category: health, scope: link, alert_type: packet-loss,
+                          link_id: LINK-T, link_name: t-a }
+            exp_annotations: { summary: "🔴 Severe Packet Loss",
+                               description: "t-a packet loss has been above 40% for 10 minutes (currently 45.0%) - link is up but effectively unusable." }
+      - eval_time: 30m
         alertname: PacketLoss
         exp_alerts:
           - exp_labels: { severity: warning, category: health, scope: link, alert_type: packet-loss,
                           link_id: LINK-T, link_name: t-a }
             exp_annotations: { summary: "🟠 Packet Loss",
-                               description: "t-a packet loss has been above 5% for 10 minutes (currently 25.0%)." }
+                               description: "t-a packet loss has been above 15% for most of the last 30 minutes (currently 45.0%)." }
           - exp_labels: { severity: critical, category: health, scope: link, alert_type: packet-loss,
                           link_id: LINK-T, link_name: t-a }
             exp_annotations: { summary: "🔴 Severe Packet Loss",
-                               description: "t-a packet loss has been above 20% for 10 minutes (currently 25.0%) - link is up but effectively unusable." }
+                               description: "t-a packet loss has been above 40% for 10 minutes (currently 45.0%) - link is up but effectively unusable." }
+
+  # ------------------------------------------------------------------
+  # Sustained-degradation warnings (LowLinkQuality used as the example).
+  # (a) A link that is poor for 15m then recovers for 15m never fires.
+  # (b) A link poor for 30m straight fires once ~24m of breach exists, not
+  #     before; it is NOT reset by a 3-sample gap (scrape failures).
+  # ------------------------------------------------------------------
+  - interval: 1m
+    input_series:
+      - series: 'link_quality_percent{link_id="LINK-T", link_name="t-a"}'
+        values: '50x15 95x30'
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: LowLinkQuality
+        exp_alerts: []
+      - eval_time: 40m
+        alertname: LowLinkQuality
+        exp_alerts: []
+  - interval: 1m
+    input_series:
+      - series: 'link_quality_percent{link_id="LINK-T", link_name="t-a"}'
+        #        0-9m     10-12m (scrape gap)  13m-
+        values: '50x10    _ _ _                50x30'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: LowLinkQuality
+        exp_alerts: []                     # <24 breaching steps so far
+      - eval_time: 35m
+        alertname: LowLinkQuality
+        exp_alerts:
+          - exp_labels: { severity: warning, category: health, scope: link, alert_type: low-quality,
+                          link_id: LINK-T, link_name: t-a }
+            exp_annotations: { summary: "🟠 Low Link Quality",
+                               description: "t-a quality has been below 70% for most of the last 30 minutes (currently 50.0%)." }
+
+  # ------------------------------------------------------------------
+  # LinkUpButDegrading: compound (signal OR quality OR probe-failure) rule.
+  # Quiet at 20m, fires by 35m of continuous weak signal while link_up==1.
+  # ------------------------------------------------------------------
+  - interval: 1m
+    input_series:
+      - series: 'link_up{link_id="LINK-T", link_name="t-a", endpoint="a", site="S", role="P2P", vendor="t"}'
+        values: '1x40'
+      - series: 'link_signal_dbm{link_id="LINK-T", link_name="t-a", endpoint="a", site="S", role="P2P", vendor="t"}'
+        values: '-85x40'
+      - series: 'link_quality_percent{link_id="LINK-T", link_name="t-a", endpoint="a", site="S", role="P2P", vendor="t"}'
+        values: '90x40'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: LinkUpButDegrading
+        exp_alerts: []
+      - eval_time: 35m
+        alertname: LinkUpButDegrading
+        exp_alerts:
+          - exp_labels: { severity: warning, category: degrading, scope: link, alert_type: link-degrading,
+                          link_id: LINK-T, link_name: t-a, endpoint: a, site: S, role: P2P, vendor: t }
+            exp_annotations: { summary: "🟡 Link degrading (still up)",
+                               description: "t-a is reachable but showing signal/quality/reliability degradation for most of the last 30 minutes - investigate before it goes down." }
 
   # ------------------------------------------------------------------
   # SectorWideCPEDegradation fires when >=4 CPEs on a sector are degraded.

@@ -41,6 +41,7 @@ import yaml
 
 @dataclasses.dataclass(frozen=True)
 class Edge:
+    """A directed link in the discovered topology: src router to dst upstream router or neighbour."""
     src: str          # router name
     dst: str          # upstream router name / neighbour identity
     type: str         # "upstream" | "neighbor"
@@ -49,6 +50,7 @@ class Edge:
 
 @dataclasses.dataclass(frozen=True)
 class Neighbor:
+    """One row of a router's neighbour (MNDP) table: what it can see on the wire."""
     interface: str
     identity: str
     address: str
@@ -73,6 +75,7 @@ def parse_default_gateways(route_rows: Iterable[dict[str, Any]]) -> list[str]:
 
 
 def parse_neighbors(rows: Iterable[dict[str, Any]]) -> list[Neighbor]:
+    """Convert raw /ip/neighbor rows into Neighbor objects (MACs lower-cased; board falls back to platform)."""
     out: list[Neighbor] = []
     for r in rows:
         out.append(
@@ -88,6 +91,7 @@ def parse_neighbors(rows: Iterable[dict[str, Any]]) -> list[Neighbor]:
 
 
 def running_interfaces(rows: Iterable[dict[str, Any]]) -> dict[str, bool]:
+    """Map interface name to True when RouterOS reports it running."""
     return {
         str(r.get("name", "")): str(r.get("running", "false")).lower() == "true"
         for r in rows
@@ -95,6 +99,7 @@ def running_interfaces(rows: Iterable[dict[str, Any]]) -> dict[str, bool]:
 
 
 def _addr_in_networks(addr: str, networks: list[ipaddress._BaseNetwork]) -> bool:
+    """True if addr parses as an IP inside any of the networks; unparseable text counts as False."""
     try:
         ip = ipaddress.ip_address(addr)
     except ValueError:

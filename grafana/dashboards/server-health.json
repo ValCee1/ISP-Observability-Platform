@@ -1,0 +1,621 @@
+{
+    "title": "Server Health",
+    "uid": "server-health",
+    "schemaVersion": 39,
+    "version": 1,
+    "description": "The monitoring server itself: host CPU/RAM/disk/network/clock and the health of the monitoring stack (Prometheus, Alertmanager, Grafana, exporters). Data from node-exporter plus each component's own /metrics. Alerts: prometheus/rules/server-health.yml.",
+    "editable": true,
+    "timezone": "browser",
+    "time": {
+        "from": "now-6h",
+        "to": "now"
+    },
+    "refresh": "30s",
+    "tags": [
+        "monitoring",
+        "server"
+    ],
+    "panels": [
+        {
+            "id": 1,
+            "type": "row",
+            "title": "SERVER AT A GLANCE",
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 0
+            }
+        },
+        {
+            "id": 2,
+            "type": "stat",
+            "title": "CPU used",
+            "description": "Average CPU busy across all cores. Alert ServerCpuHigh fires above 90% for 15m.",
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 0,
+                "y": 1
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "100 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100",
+                    "refId": "A",
+                    "instant": true
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percent",
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "orange",
+                                "value": 75
+                            },
+                            {
+                                "color": "red",
+                                "value": 90
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "options": {
+                "colorMode": "background",
+                "graphMode": "none",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ]
+                }
+            }
+        },
+        {
+            "id": 3,
+            "type": "stat",
+            "title": "Memory available",
+            "description": "MemAvailable / MemTotal. Alert ServerMemoryLow fires below 10% for 10m.",
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 6,
+                "y": 1
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100",
+                    "refId": "A",
+                    "instant": true
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percent",
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "red",
+                                "value": null
+                            },
+                            {
+                                "color": "orange",
+                                "value": 10
+                            },
+                            {
+                                "color": "green",
+                                "value": 20
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "options": {
+                "colorMode": "background",
+                "graphMode": "none",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ]
+                }
+            }
+        },
+        {
+            "id": 4,
+            "type": "stat",
+            "title": "Disk free (lowest)",
+            "description": "Lowest free-space percentage across real filesystems. ServerDiskLow fires below 10%.",
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 12,
+                "y": 1
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "min((node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay|squashfs|erofs|iso9660|ramfs|devtmpfs|fuse.*|nsfs|proc|sysfs|cgroup.*|autofs\"} / node_filesystem_size_bytes{fstype!~\"tmpfs|overlay|squashfs|erofs|iso9660|ramfs|devtmpfs|fuse.*|nsfs|proc|sysfs|cgroup.*|autofs\"}) * 100)",
+                    "refId": "A",
+                    "instant": true
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percent",
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "red",
+                                "value": null
+                            },
+                            {
+                                "color": "orange",
+                                "value": 10
+                            },
+                            {
+                                "color": "green",
+                                "value": 20
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "options": {
+                "colorMode": "background",
+                "graphMode": "none",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ]
+                }
+            }
+        },
+        {
+            "id": 5,
+            "type": "stat",
+            "title": "Uptime",
+            "description": "Time since the server (or Docker VM) booted.",
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 18,
+                "y": 1
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "time() - node_boot_time_seconds",
+                    "refId": "A",
+                    "instant": true
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "s",
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "options": {
+                "colorMode": "background",
+                "graphMode": "none",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ]
+                }
+            }
+        },
+        {
+            "id": 6,
+            "type": "row",
+            "title": "HOST RESOURCES",
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 5
+            }
+        },
+        {
+            "id": 7,
+            "type": "timeseries",
+            "title": "CPU by mode",
+            "description": "Where CPU time goes. Sustained iowait points at a slow disk; steal at a noisy hypervisor.",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 6
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "sum by (mode) (rate(node_cpu_seconds_total{mode!=\"idle\"}[5m])) / scalar(count(node_cpu_seconds_total{mode=\"idle\"})) * 100",
+                    "legendFormat": "{{mode}}",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percent"
+                },
+                "overrides": []
+            }
+        },
+        {
+            "id": 8,
+            "type": "timeseries",
+            "title": "Memory",
+            "description": "Used vs available. Cache counts as available.",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 6
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes",
+                    "legendFormat": "used",
+                    "refId": "A"
+                },
+                {
+                    "expr": "node_memory_MemAvailable_bytes",
+                    "legendFormat": "available",
+                    "refId": "B"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "bytes"
+                },
+                "overrides": []
+            }
+        },
+        {
+            "id": 9,
+            "type": "timeseries",
+            "title": "Disk free %",
+            "description": "Per real filesystem. Watch the slope, not just the level - ServerDiskFillingUp extrapolates this.",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 14
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "(node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay|squashfs|erofs|iso9660|ramfs|devtmpfs|fuse.*|nsfs|proc|sysfs|cgroup.*|autofs\"} / node_filesystem_size_bytes{fstype!~\"tmpfs|overlay|squashfs|erofs|iso9660|ramfs|devtmpfs|fuse.*|nsfs|proc|sysfs|cgroup.*|autofs\"}) * 100",
+                    "legendFormat": "{{mountpoint}}",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percent"
+                },
+                "overrides": []
+            }
+        },
+        {
+            "id": 10,
+            "type": "timeseries",
+            "title": "Network throughput",
+            "description": "Host NIC traffic, loopback and container veth interfaces excluded.",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 14
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "sum(rate(node_network_receive_bytes_total{device!~\"lo|veth.*|br-.*|docker.*\"}[5m])) * 8",
+                    "legendFormat": "in",
+                    "refId": "A"
+                },
+                {
+                    "expr": "sum(rate(node_network_transmit_bytes_total{device!~\"lo|veth.*|br-.*|docker.*\"}[5m])) * 8",
+                    "legendFormat": "out",
+                    "refId": "B"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "bps"
+                },
+                "overrides": []
+            }
+        },
+        {
+            "id": 11,
+            "type": "timeseries",
+            "title": "Load average",
+            "description": "1/5/15-minute load. Compare against core count.",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 22
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "node_load1",
+                    "legendFormat": "1m",
+                    "refId": "A"
+                },
+                {
+                    "expr": "node_load5",
+                    "legendFormat": "5m",
+                    "refId": "B"
+                },
+                {
+                    "expr": "node_load15",
+                    "legendFormat": "15m",
+                    "refId": "C"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short"
+                },
+                "overrides": []
+            }
+        },
+        {
+            "id": 12,
+            "type": "timeseries",
+            "title": "Clock offset",
+            "description": "Seconds off NTP. ServerClockSkew fires above 0.5s for 10m.",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 22
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "node_timex_offset_seconds",
+                    "legendFormat": "offset",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "s"
+                },
+                "overrides": []
+            }
+        },
+        {
+            "id": 13,
+            "type": "row",
+            "title": "MONITORING STACK",
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 30
+            }
+        },
+        {
+            "id": 14,
+            "type": "table",
+            "title": "Component status",
+            "description": "up{} for every stack component. 1 = scraped OK, 0 = down (ExporterDown fires after 30s).",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 31
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "min by (job) (up{job=~\"prometheus|node-exporter|alertmanager|grafana|whatsapp-bridge|snmp-exporter|blackbox-exporter|routeros-api\"})",
+                    "refId": "A",
+                    "instant": true,
+                    "format": "table"
+                }
+            ],
+            "transformations": [
+                {
+                    "id": "organize",
+                    "options": {
+                        "excludeByName": {
+                            "Time": true
+                        },
+                        "renameByName": {
+                            "job": "Component",
+                            "Value": "Up"
+                        }
+                    }
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "mappings": [
+                        {
+                            "type": "value",
+                            "options": {
+                                "0": {
+                                    "text": "DOWN",
+                                    "color": "red"
+                                },
+                                "1": {
+                                    "text": "UP",
+                                    "color": "green"
+                                }
+                            }
+                        }
+                    ],
+                    "color": {
+                        "mode": "thresholds"
+                    }
+                },
+                "overrides": []
+            }
+        },
+        {
+            "id": 15,
+            "type": "timeseries",
+            "title": "Alert notifications",
+            "description": "Alertmanager notifications sent vs failed, per integration. Any failed line above zero means people may not be getting alerts (AlertDeliveryFailing).",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 31
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "sum by (integration) (rate(alertmanager_notifications_total[10m]))",
+                    "legendFormat": "{{integration}} sent",
+                    "refId": "A"
+                },
+                {
+                    "expr": "sum by (integration) (rate(alertmanager_notifications_failed_total[10m]))",
+                    "legendFormat": "{{integration}} FAILED",
+                    "refId": "B"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "ops"
+                },
+                "overrides": []
+            }
+        },
+        {
+            "id": 16,
+            "type": "timeseries",
+            "title": "WhatsApp budget",
+            "description": "Messages used vs hard cap (dry-run sends count too, so caps behave as they will live). 80% of a cap raises WhatsAppBudgetNearlyUsed.",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 47
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "whatsapp_budget_used{period=\"day\"}",
+                    "legendFormat": "used today",
+                    "refId": "A"
+                },
+                {
+                    "expr": "whatsapp_budget_cap{period=\"day\"}",
+                    "legendFormat": "daily cap",
+                    "refId": "B"
+                },
+                {
+                    "expr": "whatsapp_budget_used{period=\"month\"}",
+                    "legendFormat": "used this month",
+                    "refId": "C"
+                },
+                {
+                    "expr": "whatsapp_budget_cap{period=\"month\"}",
+                    "legendFormat": "monthly cap",
+                    "refId": "D"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short"
+                },
+                "overrides": []
+            }
+        },
+        {
+            "id": 17,
+            "type": "timeseries",
+            "title": "Prometheus ingest & storage",
+            "description": "Samples ingested per second and TSDB size on disk. Size trend feeds the disk-filling alert.",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 39
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "rate(prometheus_tsdb_head_samples_appended_total[5m])",
+                    "legendFormat": "samples/s",
+                    "refId": "A"
+                },
+                {
+                    "expr": "prometheus_tsdb_storage_blocks_bytes",
+                    "legendFormat": "TSDB blocks bytes",
+                    "refId": "B"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short"
+                },
+                "overrides": []
+            }
+        },
+        {
+            "id": 18,
+            "type": "timeseries",
+            "title": "Rule evaluation",
+            "description": "Evaluation time per rule group and failures. Failures > 0 means some alerts may not be firing (PrometheusRuleFailures).",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 39
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "max by (rule_group) (prometheus_rule_group_last_duration_seconds)",
+                    "legendFormat": "{{rule_group}}",
+                    "refId": "A"
+                },
+                {
+                    "expr": "sum(rate(prometheus_rule_evaluation_failures_total[5m]))",
+                    "legendFormat": "FAILURES",
+                    "refId": "B"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "s"
+                },
+                "overrides": []
+            }
+        }
+    ]
+}
