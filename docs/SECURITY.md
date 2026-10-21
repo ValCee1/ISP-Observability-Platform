@@ -61,7 +61,10 @@ frequency-migration features, which needed write access, were removed.
    secrets (never environment variables, never in git): Grafana admin
    password, Telegram bot token, RouterOS API credentials, WhatsApp token.
    `chmod 600`, owned by the service account. Change the Grafana default
-   password (`scripts/init.sh` writes a placeholder you must replace).
+   password (`scripts/init.sh` writes a placeholder you must replace) **before
+   the first start**: Grafana reads the secret file only when it creates its
+   database, so editing the file later does not change an existing password
+   (use `grafana cli admin reset-admin-password` or the UI; see SETUP-INPUTS.md).
    Rotate any token that has been pasted into chat or email.
 5. **Grafana.** Disable anonymous access (default is off), use a strong
    admin password, and give NOC staff Viewer accounts only.

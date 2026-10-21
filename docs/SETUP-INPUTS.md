@@ -19,6 +19,18 @@ first: it creates every missing file below from the repo's examples
 | `routeros_api_credentials.json` | `{"<router name>": {"username","password"}}` per router, names exactly as in `routeros_exporter/config.yml` | a **read-only** RouterOS user: `/user add name=prom-ro group=read password=...` |
 | `whatsapp_access_token.txt` | Meta access token; leave the placeholder while in dry-run | Meta, see [whatsapp.md](whatsapp.md) |
 
+**Changing the Grafana password later:** `grafana_admin_password.txt` is only
+read when Grafana first creates its database (first start, empty `grafana_data`
+volume). Editing the file afterwards does **not** change the existing admin
+password, so the old one keeps working. To apply a new password to a running
+install, either change it in Grafana (profile > Change password) or run:
+
+```bash
+docker compose exec grafana grafana cli admin reset-admin-password '<new-password>'
+```
+and keep the file in step with it. On a brand-new install, set the file
+before the first `docker compose up`.
+
 No trailing newline issues: the stack trims whitespace, but avoid BOMs on Windows.
 
 ## B. `.env` (repo root, gitignored; template `.env.example`)
