@@ -1,0 +1,41 @@
+# promtool unit tests for the WhatsApp "page tier": only outages that are
+# NOT a short weather fade should reach the phone (page="true").
+rule_files:
+  - ../link-alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  # A 20-minute weather fade: LinkDown (Telegram tier) fires, but
+  # LinkDownProlonged (page tier, for: 30m) never does -> no WhatsApp.
+  - interval: 1m
+    input_series:
+      - series: 'link_up{link_id="LINK-W", link_name="w-a", endpoint="a", site="S", role="P2P", vendor="t"}'
+        values: '1x5 0x20 1x30'
+    alert_rule_test:
+      - eval_time: 20m          # 15m into the fade
+        alertname: LinkDown
+        exp_alerts:
+          - exp_labels: { severity: critical, category: state, scope: link, alert_type: link-down, link_id: LINK-W, link_name: w-a, endpoint: a, site: S, role: P2P, vendor: t }
+            exp_annotations: { summary: "🔴 Link DOWN", description: "w-a has been unreachable for 5 minutes." }
+      - eval_time: 24m          # still down (fade ends at 25m)
+        alertname: LinkDownProlonged
+        exp_alerts: []
+      - eval_time: 45m          # fade long over, nothing pending
+        alertname: LinkDownProlonged
+        exp_alerts: []
+
+  # A real failure: down 50 minutes. The page tier fires once 30m have passed.
+  - interval: 1m
+    input_series:
+      - series: 'link_up{link_id="LINK-R", link_name="r-a", endpoint="a", site="S", role="P2P", vendor="t"}'
+        values: '1x5 0x50'
+    alert_rule_test:
+      - eval_time: 30m          # 25m down - not yet
+        alertname: LinkDownProlonged
+        exp_alerts: []
+      - eval_time: 40m          # 35m down - pages
+        alertname: LinkDownProlonged
+        exp_alerts:
+          - exp_labels: { severity: critical, page: "true", category: state, scope: link, alert_type: link-down-prolonged, link_id: LINK-R, link_name: r-a, endpoint: a, site: S, role: P2P, vendor: t }
+            exp_annotations: { summary: "🔴 Link DOWN 30+ min", description: "r-a has been unreachable for 30 minutes - not a short weather fade." }

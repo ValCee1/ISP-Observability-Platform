@@ -270,9 +270,11 @@ and `prometheus/rules/tests/alerts_test.yml`):
 - **`repeat_interval`** 2 h critical / 12 h warning — reminds, doesn't nag.
 - **Warnings** go to a `telegram-warnings` receiver with no "RESOLVED" message
   (a warning clearing isn't worth a ping).
-- **WhatsApp** gets a copy of customer-facing criticals only (first route,
-  `continue: true`): `scope=monitoring` alerts and all warnings stay on
-  Telegram, grouped by `scope`, repeated every 6 h, via the capped
+- **WhatsApp** gets a copy of *phone-worthy* criticals only (rules labelled
+  `page: "true"`; first route, `continue: true`). A link down for 5 min goes to
+  Telegram (`LinkDown`); only one still down at 30 min (`LinkDownProlonged`)
+  pages, so weather fades don't. `scope=monitoring` alerts and all warnings
+  stay on Telegram, grouped by `scope`, repeated every 6 h, via the capped
   `whatsapp-bridge` ([whatsapp.md](whatsapp.md)).
 
 ---

@@ -14,7 +14,8 @@ Prometheus -> Alertmanager --(critical only, continue:true)--> whatsapp-bridge -
 | Control | Where | Effect |
 |---|---|---|
 | **dry_run by default** | `WHATSAPP_MODE` (`.env`) | nothing leaves the box; messages are logged |
-| Criticals only | Alertmanager route + bridge re-checks | warnings / resolved stay on Telegram (free) |
+| Phone-worthy criticals only (`page="true"`) | Alertmanager route + bridge re-checks severity | warnings, resolved notices and ordinary criticals stay on Telegram (free). Page-tier alerts: `LinkDownProlonged` (link down 30+ min), `CoreRouterDown`, `SectorDown`, `SubscriberMassOutagePOP/Router` |
+| Weather-proof link paging | `LinkDownProlonged` `for: 30m` | a link down 5 min notifies Telegram only; WhatsApp fires only if it is still down after 30 min, so a typical weather fade (<~20 min) never wakes anyone. Tune `for:` in `link-alerts.yml` |
 | No `scope=monitoring` | Alertmanager route + bridge | server/exporter down, vantage lost, delivery failing stay on Telegram: usually someone is deliberately working on the box, and if the server has no network WhatsApp can't be sent anyway |
 | Grouping | route `group_by: [scope]` | a 40-router outage = one message per recipient |
 | Slow repeat | `repeat_interval: 6h` | vs 2 h on Telegram |
@@ -39,6 +40,8 @@ Meta's pricing page before going live; it is not hard-coded anywhere here.
 - `prometheus/rules/whatsapp-budget.yml` — `WhatsAppBudgetNearlyUsed`, `WhatsAppSendFailing`.
 
 ## Going live (checklist)
+
+Which alerts page: add `page: "true"` to a rule's labels to make it WhatsApp-worthy (and remove it to demote it). Everything else stays on Telegram.
 
 Template for `.env`: `.env.example` (copy it; `scripts/init.sh` does this).
 

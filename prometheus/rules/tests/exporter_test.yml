@@ -43,6 +43,7 @@ tests:
               category: state
               scope: router
               alert_type: router-down
+              page: "true"
               job: snmp-mikrotik
               instance: 192.168.10.1
             exp_annotations:

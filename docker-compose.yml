@@ -117,7 +117,7 @@ services:
       # Container bind-mount artefacts (/etc/hosts, /oldroot...) look like
       # extra, sometimes read-only/0-free filesystems and would trip the
       # disk alerts. Only real data mounts are interesting.
-      - "--collector.filesystem.mount-points-exclude=^/(etc|oldroot|run|dev|proc|sys|var/lib/docker)($|/)"
+      - "--collector.filesystem.mount-points-exclude=^/(etc|oldroot|run|dev|proc|sys|var/lib/docker|host_mnt)($|/)"
     volumes:
       - /:/host:ro
     ports:

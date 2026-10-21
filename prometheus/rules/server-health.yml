@@ -23,8 +23,8 @@ groups:
       - alert: ServerDiskLow
         expr: |
           (
-            node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|erofs|iso9660|ramfs|devtmpfs|fuse.*|nsfs|proc|sysfs|cgroup.*|autofs"}
-            / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs|erofs|iso9660|ramfs|devtmpfs|fuse.*|nsfs|proc|sysfs|cgroup.*|autofs"}
+            node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|erofs|iso9660|virtiofs|9p|ramfs|devtmpfs|fuse.*|nsfs|proc|sysfs|cgroup.*|autofs"}
+            / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs|erofs|iso9660|virtiofs|9p|ramfs|devtmpfs|fuse.*|nsfs|proc|sysfs|cgroup.*|autofs"}
           ) * 100 < 10
         for: 5m
         labels:
@@ -41,10 +41,10 @@ groups:
         # Linear extrapolation of the last 6h: will it hit zero within 24h?
         # The `> 10%` guard avoids duplicating ServerDiskLow.
         expr: |
-          predict_linear(node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|erofs|iso9660|ramfs|devtmpfs|fuse.*|nsfs|proc|sysfs|cgroup.*|autofs"}[6h], 24 * 3600) < 0
+          predict_linear(node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|erofs|iso9660|virtiofs|9p|ramfs|devtmpfs|fuse.*|nsfs|proc|sysfs|cgroup.*|autofs"}[6h], 24 * 3600) < 0
           and
-          (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|erofs|iso9660|ramfs|devtmpfs|fuse.*|nsfs|proc|sysfs|cgroup.*|autofs"}
-           / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs|erofs|iso9660|ramfs|devtmpfs|fuse.*|nsfs|proc|sysfs|cgroup.*|autofs"}) * 100 > 10
+          (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|erofs|iso9660|virtiofs|9p|ramfs|devtmpfs|fuse.*|nsfs|proc|sysfs|cgroup.*|autofs"}
+           / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs|erofs|iso9660|virtiofs|9p|ramfs|devtmpfs|fuse.*|nsfs|proc|sysfs|cgroup.*|autofs"}) * 100 > 10
         for: 1h
         labels:
           severity: warning

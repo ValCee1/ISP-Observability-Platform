@@ -42,7 +42,10 @@ route:
   repeat_interval: 6h
 
   routes:
-    # WhatsApp copy of every CRITICAL alert. `continue: true` means this
+    # WhatsApp copy of every PHONE-WORTHY critical (label page="true" in the
+    # rule: LinkDownProlonged, CoreRouterDown, SectorDown, subscriber mass
+    # outages). Other criticals (e.g. a link down for only 5 minutes, which
+    # may be weather) go to Telegram alone. `continue: true` means this
     # route only ADDS a delivery - matching then carries on to the Telegram
     # routes below, so Telegram is unchanged. Warnings never come here:
     # WhatsApp is paid per message, Telegram is free. Cost controls:
@@ -59,6 +62,7 @@ route:
     # WhatsApp could not be sent anyway. They still go to Telegram.
     - matchers:
         - severity="critical"
+        - page="true"
         - scope!="monitoring"
       receiver: whatsapp
       continue: true

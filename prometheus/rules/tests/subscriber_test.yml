@@ -37,6 +37,7 @@ tests:
               category: state
               scope: pop
               alert_type: mass-outage-pop
+              page: "true"
               pop: BASE
             exp_annotations:
               summary: "🔴 Subscriber mass outage at POP BASE"
