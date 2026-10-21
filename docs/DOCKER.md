@@ -17,7 +17,7 @@ The build fails if the bundled config or rules don't parse
 
 > **Image name.** Docker image references can't contain spaces or uppercase, so
 > the repository is `isp-observability` (not "isp observability"). Full
-> reference: `<dockerhub-namespace>/isp-observability:v1.2`.
+> reference: `<dockerhub-namespace>/isp-observability:v1.3`.
 
 ## Files
 
@@ -31,20 +31,20 @@ The build fails if the bundled config or rules don't parse
 
 ```bash
 # from the repo root
-docker build -t chikere/isp-observability:v1.2 .
+docker build -t chikere/isp-observability:v1.3 .
 ```
 
 Override the Prometheus base version if needed:
 
 ```bash
-docker build --build-arg PROMETHEUS_VERSION=v3.13.2 -t chikere/isp-observability:v1.2 .
+docker build --build-arg PROMETHEUS_VERSION=v3.13.2 -t chikere/isp-observability:v1.3 .
 ```
 
 Verify before pushing:
 
 ```bash
-docker run --rm chikere/isp-observability:v1.2 --version
-docker run --rm --entrypoint promtool chikere/isp-observability:v1.2 \
+docker run --rm chikere/isp-observability:v1.3 --version
+docker run --rm --entrypoint promtool chikere/isp-observability:v1.3 \
   check config /etc/prometheus/prometheus.yml
 ```
 
@@ -63,13 +63,13 @@ docker run --rm --entrypoint promtool chikere/isp-observability:v1.2 \
 3. **Tag** (skip if you already built with the final name above):
 
    ```bash
-   docker tag chikere/isp-observability:v1.2 chikere/isp-observability:v1.2
+   docker tag chikere/isp-observability:v1.3 chikere/isp-observability:v1.3
    ```
 
 4. **Push:**
 
    ```bash
-   docker push chikere/isp-observability:v1.2
+   docker push chikere/isp-observability:v1.3
    ```
 
 The repo stays private — anyone pulling it (including other hosts running this
@@ -82,7 +82,7 @@ If your monitoring host is arm64 (or mixed):
 ```bash
 docker buildx create --use --name isp-obs 2>/dev/null || docker buildx use isp-obs
 docker buildx build --platform linux/amd64,linux/arm64 \
-  -t chikere/isp-observability:v1.2 --push .
+  -t chikere/isp-observability:v1.3 --push .
 ```
 
 ## Run the stack from the image
@@ -99,7 +99,7 @@ services untouched. Secrets (`secrets/grafana_admin_password.txt`,
 Point at another tag or registry without editing files:
 
 ```bash
-ISP_OBS_IMAGE=chikere/isp-observability:v1.2 \
+ISP_OBS_IMAGE=chikere/isp-observability:v1.3 \
   docker compose -f docker-compose.yml -f docker-compose.image.yml up -d
 ```
 
@@ -107,7 +107,7 @@ ISP_OBS_IMAGE=chikere/isp-observability:v1.2 \
 
 Baked config is immutable per tag. Two options:
 
-- **New tag** — edit `prometheus/**`, `docker build -t chikere/isp-observability:v1.2 .`,
+- **New tag** — edit `prometheus/**`, `docker build -t chikere/isp-observability:v1.3 .`,
   push, bump `ISP_OBS_IMAGE`. Preferred.
 - **Hot patch** — bind-mount a single file over the baked path at run time,
   e.g. add `- ./prometheus/targets/mikrotik-sectors.yml:/etc/prometheus/targets/mikrotik-sectors.yml:ro`
@@ -116,8 +116,8 @@ Baked config is immutable per tag. Two options:
 
 ## Note: new rules need a new tag
 
-Rules are baked into the image. **v1.2** includes `server-health.yml`,
-`whatsapp-budget.yml` and the new scrape jobs. After any further rule change
+Rules are baked into the image. **v1.3** includes `server-health.yml`,
+`whatsapp-budget.yml`, the page-tier (`LinkDownProlonged`) rules and the new scrape jobs. After any further rule change
 build and publish a new tag before using the image override, or the new alerts
 will be missing. The new scrape jobs
 (`node-exporter`, `alertmanager`, `grafana`, `whatsapp-bridge`) are in
