@@ -31,8 +31,11 @@ Routers        --API---> routeros-exporter -/            -> Alertmanager -> Tele
   secure, verify and accept before cut-over.
 - [docs/SETUP-INPUTS.md](docs/SETUP-INPUTS.md) — **every secret/file/ID you must
   supply on a fresh install, and where it goes** (`scripts/init.sh` scaffolds them).
-- [docs/ISP Network Observability Platform - Operations Manual.docx](<docs/ISP Network Observability Platform - Operations Manual.docx>) — the NOC
-  operations manual (daily routine, alerts, routine changes, troubleshooting, backup, security).
+- [docs/ISP Network Observability Platform - Operations Manual.docx](<docs/ISP Network Observability Platform - Operations Manual.docx>) — engineer
+  edition (internal): daily routine, alerts, routine changes incl. SNMPv3, troubleshooting, backup,
+  security, command cheat sheet, go-live status, server sizing.
+- [docs/ISP Network Observability Platform - Management Overview.docx](<docs/ISP Network Observability Platform - Management Overview.docx>) — for
+  management: what is monitored, alerting, security, costs, rollout status. No install or backend detail.
 - [docs/ISP Network Observability Platform Pilot Proposal.pptx](<docs/ISP Network Observability Platform Pilot Proposal.pptx>) — the pilot proposal deck.
 - [docs/SECURITY.md](docs/SECURITY.md) — security model: locally hosted, outbound-only,
   read-only access, why management-network placement adds no attack surface, hardening checklist.

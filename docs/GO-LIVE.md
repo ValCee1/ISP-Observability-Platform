@@ -28,9 +28,17 @@ credentials** that only the ISP can supply. Work top to bottom; tick each box.
 - [ ] `prometheus/topology.yml` - POP/dependency layout.
 - [ ] `snmp_exporter/snmp.yml` - SNMP communities (and the same on devices,
       restricted to the server's IP).
-- [ ] SNMPv3 where devices support it: users in `secrets/snmp_auths.yml`,
-      `auth: <name>` on each target - [snmpv3.md](snmpv3.md).
-- [ ] Sector management routes in place (proposal deck: "one route on each side").
+- [ ] SNMPv3 only (ISP policy): users in `secrets/snmp_auths.yml`, `auth: <name>`
+      on each target, v2c removed from the device - [snmpv3.md](snmpv3.md).
+      AirFiber has no v3: management decides ping-only, a documented
+      exception, or replacement.
+- [ ] Sector routes, POP by POP: a NARROW route on each sector (monitoring
+      subnet only, no default route) and the matching route on the POP
+      router; then remove the POP masquerade rule. No routing protocols on
+      sectors. Sector services (`/ip service`) limited to management ranges.
+- [ ] Each POP router drops customer-to-management traffic, so sector/router
+      management IPs stay unreachable from the customer side; test from a
+      customer address (SECURITY.md checklist).
 
 ## C. Secrets and identities
 
