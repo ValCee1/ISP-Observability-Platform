@@ -1,3 +1,7 @@
+# CHANGING THE TELEGRAM GROUP: edit the ONE `chat_id: &noc_chat_id ...` line
+# in the `telegram` receiver below (search for noc_chat_id); the warnings
+# receiver reuses it. Then `docker compose restart alertmanager`.
+# How to find a group's id: docs/SETUP-INPUTS.md section D.
 global:
   resolve_timeout: 5m
 
@@ -42,6 +46,53 @@ route:
   repeat_interval: 6h
 
   routes:
+    # Dead-man's switch (prometheus/rules/deadman.yml, docs/deadman.md).
+    # Watchdog always fires; re-sending it every minute to an outside
+    # heartbeat service means that service alerts YOU when the pings stop -
+    # i.e. when Prometheus, Alertmanager, the server or its internet dies,
+    # which nothing inside this stack can report. FIRST route and no
+    # `continue`, so Watchdog never reaches Telegram/WhatsApp.
+    # OFF by default (receiver deadman-off drops it): a placeholder URL
+    # would fail every minute and trip AlertDeliveryFailing. To switch on,
+    # put the ping URL in secrets/deadman_url.txt and change the receiver
+    # below to `deadman`.
+    - matchers:
+        - alertname="Watchdog"
+      receiver: deadman-off
+      group_by: ["alertname"]
+      group_wait: 0s
+      group_interval: 1m
+      repeat_interval: 1m
+
+    # WhatsApp copy of every PHONE-WORTHY critical (label page="true" in the
+    # rule: LinkDownProlonged, CoreRouterDown, SectorDown, subscriber mass
+    # outages). Other criticals (e.g. a link down for only 5 minutes, which
+    # may be weather) go to Telegram alone. `continue: true` means this
+    # route only ADDS a delivery - matching then carries on to the Telegram
+    # routes below, so Telegram is unchanged. Warnings never come here:
+    # WhatsApp is paid per message, Telegram is free. Cost controls:
+    #   * group_by scope -> a 40-router outage is ONE message per scope
+    #   * repeat_interval 6h (Telegram repeats critical every 2h)
+    #   * send_resolved false (below) - no "back to normal" messages
+    #   * the bridge itself drops anything non-critical and enforces
+    #     daily/monthly caps (whatsapp_bridge/bridge.py)
+    # Inhibit rules apply to this route exactly as to Telegram.
+    #
+    # scope=monitoring (server/exporter down, vantage lost, delivery
+    # failing) is EXCLUDED: those are usually someone unplugging or working
+    # on the monitoring box itself, and when the server has lost its network
+    # WhatsApp could not be sent anyway. They still go to Telegram.
+    - matchers:
+        - severity="critical"
+        - page="true"
+        - scope!="monitoring"
+      receiver: whatsapp
+      continue: true
+      group_by: ["scope"]
+      group_wait: 1m
+      group_interval: 10m
+      repeat_interval: 6h
+
     # Sector capacity alerts (category: capacity, from sector-alerts.yml):
     # held back and delivered as a single once-a-day digest in the 08:00
     # Africa/Lagos window. group_by alertname so every over-budget sector
@@ -71,6 +122,7 @@ route:
           repeat_interval: 2h
         - match:
             severity: warning
+          receiver: telegram-warnings
           repeat_interval: 12h
 
     # PTP link alerts (link-alerts.yml) all carry a link_id label shared by
@@ -89,6 +141,7 @@ route:
           repeat_interval: 2h    # a link actually down - keep reminding until it's fixed
         - match:
             severity: warning
+          receiver: telegram-warnings
           repeat_interval: 12h   # degraded-but-up - don't need frequent nagging
 
     # Everything else (router-level alerts from mikrotik-alerts.yml - no
@@ -121,10 +174,18 @@ route:
           repeat_interval: 2h
         - match:
             severity: warning
+          receiver: telegram-warnings
           repeat_interval: 12h
 
-    # Router-scope config-backup alerts (config-backup.yml) carry scope=router
-    # + a `router` label but no `instance`. Group by router.
+    # Router-scope alerts carry scope=router + a `router` label. Group by router.
+    # ExporterDown (exporter-health.yml): one group per exporter.
+    - match:
+        scope: monitoring
+      group_by: ["exporter"]
+      group_wait: 30s
+      group_interval: 10m
+      repeat_interval: 2h
+
     - match:
         scope: router
       group_by: ["router"]
@@ -136,6 +197,7 @@ route:
           repeat_interval: 2h
         - match:
             severity: warning
+          receiver: telegram-warnings
           repeat_interval: 12h
 
     - match_re:
@@ -149,13 +211,21 @@ route:
           repeat_interval: 2h
         - match:
             severity: warning
+          receiver: telegram-warnings
           repeat_interval: 12h
 
 receivers:
+  # Dead-man's switch receivers (see the Watchdog route above).
+  - name: deadman-off   # no integrations: Watchdog is dropped
+  - name: deadman
+    webhook_configs:
+      - url_file: /run/secrets/deadman_url
+        send_resolved: false
+
   - name: telegram
     telegram_configs:
       - bot_token_file: /run/secrets/telegram_bot_token
-        chat_id: -1004387943176 # This is the alert group ID
+        chat_id: &noc_chat_id -1004387943176 # NOC Telegram group id - the ONLY place to change it
         api_url: https://api.telegram.org
         parse_mode: HTML
         send_resolved: true   # also sends a "resolved" message when the alert clears
@@ -175,8 +245,9 @@ receivers:
         # under it. Symptoms of a bigger incident are already gone by the
         # time they'd get here (inhibit_rules below), so the list is the
         # real picture, not a storm.
-        message: |
-          {{- $obj := "" }}{{ if .CommonLabels.link_id }}{{ $obj = printf "Link %s" .CommonLabels.link_id }}
+        message: &tg_message |
+          {{- $obj := "" }}{{ if .CommonLabels.exporter }}{{ $obj = printf "Monitoring: %s" .CommonLabels.exporter }}
+          {{- else if .CommonLabels.link_id }}{{ $obj = printf "Link %s" .CommonLabels.link_id }}
           {{- else if .CommonLabels.sector }}{{ $obj = printf "Sector %s" .CommonLabels.sector }}
           {{- else if .CommonLabels.instance }}{{ $obj = printf "Router %s" .CommonLabels.instance }}
           {{- else if .CommonLabels.router }}{{ $obj = printf "Router %s" .CommonLabels.router }}
@@ -191,6 +262,30 @@ receivers:
           {{ end }}{{ if .Labels.link_name }}  {{ .Labels.link_name }}: {{ end }}{{ if .Labels.cpe_name }}  {{ .Labels.cpe_name }}: {{ end }}{{ .Annotations.description }}
           {{ end }}
 
+  # Warning-tier alerts (degradation etc.): identical to `telegram` except no
+  # "RESOLVED" message. A warning clearing is not worth a ping; criticals keep
+  # theirs via the `telegram` receiver. Reuses the message template via the
+  # YAML anchor above.
+  - name: telegram-warnings
+    telegram_configs:
+      - bot_token_file: /run/secrets/telegram_bot_token
+        chat_id: *noc_chat_id   # same group as `telegram` above - change it there
+        api_url: https://api.telegram.org
+        parse_mode: HTML
+        send_resolved: false
+        message: *tg_message
+
+  # Critical alerts only, via the local whatsapp-bridge (whatsapp_bridge/),
+  # which formats them as a WhatsApp template message. send_resolved is
+  # false on purpose: each message costs money once live. The bridge starts
+  # in dry_run mode and logs instead of sending until WHATSAPP_MODE=live.
+  - name: whatsapp
+    webhook_configs:
+      - url: http://whatsapp-bridge:8080/alert
+        send_resolved: false
+        max_alerts: 5   # payload cap; the bridge only quotes the first 3 anyway
+        timeout: 90s    # the bridge retries Meta connection failures (up to ~60s) before replying
+
 # Suppress lower-priority alerts about an entity that's already covered by
 # a bigger, currently-firing alert for that SAME entity (`equal:` is the
 # join key - both source and target alert must share that label value).
@@ -199,6 +294,32 @@ receivers:
 # as separate messages, you get LinkDown, and the other two are inhibited
 # for as long as LinkDown keeps firing.
 inhibit_rules:
+  # An exporter being down makes every device behind it look dead. Hold back
+  # the per-device alerts from the jobs it feeds; ExporterDown is the one
+  # message. (exporter-health.yml)
+  - source_match:
+      alertname: ExporterDown
+      exporter: snmp-exporter
+    target_match_re:
+      job: "snmp-mikrotik|snmp-sectors|link-interface-health|link-radio-health"
+  - source_match:
+      alertname: ExporterDown
+      exporter: blackbox-exporter
+    target_match_re:
+      job: "link-availability"
+  - source_match:
+      alertname: ExporterDown
+      exporter: routeros-exporter
+    target_match_re:
+      job: "routeros-api"
+  # The monitoring server losing its OWN network makes every device look
+  # dead. Hold back all per-device alerts (by scope) while it's firing;
+  # MonitoringVantageLost is the one message. ExporterDown (scope:
+  # monitoring) stays visible. (vantage.yml)
+  - source_match:
+      alertname: MonitoringVantageLost
+    target_match_re:
+      scope: "link|router|sector|cpe|pop|subscriber"
   # A link that's fully down doesn't need its degrading/health-tier alerts
   # (WeakSignal, LowLinkQuality, HighLatencyVariability, RisingInterfaceErrors,
   # LinkUpButDegrading) also notifying - they're just noise once you already
@@ -286,7 +407,7 @@ inhibit_rules:
   # POPIsolated (topology-rollup.yml) is the single root-cause incident when
   # every backhaul into a POP is down. Everything else about that POP - its
   # sectors, its backhaul link health/degrading alerts, its subscriber
-  # mass-outage / flapping / auth alerts, its config-backup staleness - is
+  # mass-outage / flapping / auth alerts - is
   # downstream of it. `equal: [pop]` scopes the suppression to that POP.
   - source_match:
       alertname: POPIsolated

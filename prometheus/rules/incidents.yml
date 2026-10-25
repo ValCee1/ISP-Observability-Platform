@@ -11,7 +11,8 @@
 # board deliberately still shows a link's packet-loss / error rows while
 # the link is DOWN, as context. It only collapses the pure duplicates:
 # the two-tier warning+critical alerts (PacketLoss 5%/20%, HighLatency
-# 100/500ms) where showing both is noise, not information.
+# 100/500ms) where showing both is noise, not information. Watchdog
+# (deadman.yml) always fires by design and is never an incident.
 
 groups:
   - name: incidents
@@ -21,7 +22,7 @@ groups:
         expr: |
           max by (severity, object, alertname, alert_type, scope, cpe_name) (
             label_replace(label_replace(label_replace(label_replace(label_replace(
-              (time() - ALERTS_FOR_STATE) and ignoring(alertstate) ALERTS{alertstate="firing"},
+              (time() - ALERTS_FOR_STATE{alertname!~"LinkDownProlonged|Watchdog"}) and ignoring(alertstate) ALERTS{alertstate="firing", alertname!~"LinkDownProlonged|Watchdog"},
               "object", "$1", "pop", "(.+)"),
               "object", "$1", "instance", "(.+)"),
               "object", "$1", "router", "(.+)"),

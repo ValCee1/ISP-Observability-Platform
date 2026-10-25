@@ -11,8 +11,6 @@ API paths used, all read-only:
   /ip/route/print          default route + nexthops  (topology)
   /ip/neighbor/print       MNDP/LLDP neighbours       (topology)
   /interface/print         running interfaces         (topology)
-  /export                  full config text           (backup) - run via a
-                           command channel, not /print
 
 A dedicated RouterOS user in the "read" group is enough for all of the above
 except nothing here needs write. See routeros_exporter/README.md for the
@@ -26,6 +24,7 @@ from typing import Any, Iterator, Protocol
 
 
 class RouterOSError(RuntimeError):
+    """Any failure talking to a router (missing credentials, connect failure, failed query). Callers treat it as 'router unreachable this cycle'."""
     pass
 
 
@@ -53,6 +52,7 @@ class LibRouterOSClient:
         use_tls: bool = False,
         timeout: float = 10.0,
     ) -> None:
+        """Store connection settings; the connection itself opens lazily on first use. Raises RouterOSError if username or password is missing."""
         if not username or not password:
             raise RouterOSError(
                 f"{host}: no API credentials - check the credentials file "
@@ -79,6 +79,7 @@ class LibRouterOSClient:
         self._api = None
 
     def _connect(self):
+        """Open the API connection on first use and reuse it afterwards; any failure becomes RouterOSError."""
         if self._api is None:
             import librouteros
 
@@ -89,6 +90,7 @@ class LibRouterOSClient:
         return self._api
 
     def query(self, path: str, **where: Any) -> list[dict[str, Any]]:
+        """Read a table (e.g. 'ppp/active'), optionally filtered by field=value."""
         api = self._connect()
         try:
             resource = api.path(*_split(path))
@@ -99,6 +101,7 @@ class LibRouterOSClient:
             raise RouterOSError(f"{self._host}: query {path} failed: {exc}") from exc
 
     def command(self, path: str, **params: Any) -> list[dict[str, Any]]:
+        """Run an API command (e.g. 'ping') and return its result rows."""
         api = self._connect()
         try:
             return list(api(_cmd(path), **params))
@@ -106,6 +109,7 @@ class LibRouterOSClient:
             raise RouterOSError(f"{self._host}: command {path} failed: {exc}") from exc
 
     def close(self) -> None:
+        """Close the connection if open; safe to call more than once."""
         if self._api is not None:
             with contextlib.suppress(Exception):
                 self._api.close()
@@ -130,10 +134,12 @@ def _split(path: str) -> list[str]:
 
 
 def _cmd(path: str) -> str:
+    """Turn a path like 'ppp/active' into the API command form '/ppp/active'."""
     return "/" + path.strip("/") + ("" if path.startswith("/") else "")
 
 
 def _where(resource, where: dict[str, Any]):
+    """Build librouteros filter expressions from a {field: value} dict (all conditions must match)."""
     from librouteros.query import Key  # local import keeps module import light
 
     return [Key(k) == v for k, v in where.items()]
@@ -146,11 +152,7 @@ def connect(router, *, timeout: float = 10.0) -> Iterator[APIClient]:
     BUG, CONFIRMED 2026-09-14: this never accepted a `timeout` at all until
     now, so every caller silently got LibRouterOSClient's 10s default no
     matter what `Config.api_timeout_seconds` was set to - the config option
-    was a complete no-op. That's why `/export file=...` kept failing at a
-    consistent-ish mark: it was hitting the hidden 10s default, not the 30s
-    the config claimed. A direct test bypassing this bug (passing timeout
-    explicitly to librouteros) is what revealed the real duration (~52s on
-    a hAP AC Lite) - see routeros_exporter/README.md.
+    was a complete no-op.
     """
     cli = LibRouterOSClient(
         host=router.host,

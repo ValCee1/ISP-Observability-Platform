@@ -3,8 +3,10 @@
 A small observability stack for an ISP network: MikroTik core routers, PTP wireless
 backhaul links (AirMAX, AirFiber, SAF), monitored via SNMP (routers + radios) and ICMP
 (link reachability), plus a RouterOS **API** collector for what SNMP can't reach —
-per-subscriber PPP/PPPoE sessions, config backup + drift, topology auto-discovery.
-Visualized in Grafana, alerted on Telegram via Alertmanager.
+per-subscriber PPP/PPPoE sessions and topology auto-discovery.
+Visualized in Grafana, alerted on Telegram (and optionally WhatsApp, criticals only) via
+Alertmanager. Hosted locally on one Linux server in the ISP's management network; it
+also monitors itself.
 
 ```
 Routers/Radios --SNMP--> snmp-exporter -----\
@@ -18,21 +20,37 @@ Routers        --API---> routeros-exporter -/            -> Alertmanager -> Tele
   layout, monitored topology, metric-normalization and alert pipelines, with
   diagrams.
 - [docs/tier1-subscriber-config-topology.md](docs/tier1-subscriber-config-topology.md)
-  — the RouterOS API layer: subscriber intelligence, config backup + drift,
+  — the RouterOS API layer: subscriber intelligence,
   topology auto-discovery + POP-isolation rollup.
 - [routeros_exporter/README.md](routeros_exporter/README.md) — the API collector
   itself (metrics, the read-only RouterOS user, `UNVERIFIED` list).
 - [docs/tier2-anomaly-detection.md](docs/tier2-anomaly-detection.md) —
   baseline-deviation anomaly detection (subscriber counts, router CPU/memory)
   that catches slow bleeds the threshold alerts can't.
+- [docs/GO-LIVE.md](docs/GO-LIVE.md) — production go-live checklist: what to replace,
+  secure, verify and accept before cut-over.
+- [docs/SETUP-INPUTS.md](docs/SETUP-INPUTS.md) — **every secret/file/ID you must
+  supply on a fresh install, and where it goes** (`scripts/init.sh` scaffolds them).
+- [docs/ISP Network Observability Platform - Operations Manual.docx](<docs/ISP Network Observability Platform - Operations Manual.docx>) — the NOC
+  operations manual (daily routine, alerts, routine changes, troubleshooting, backup, security).
+- [docs/ISP Network Observability Platform Pilot Proposal.pptx](<docs/ISP Network Observability Platform Pilot Proposal.pptx>) — the pilot proposal deck.
+- [docs/SECURITY.md](docs/SECURITY.md) — security model: locally hosted, outbound-only,
+  read-only access, why management-network placement adds no attack surface, hardening checklist.
+- [docs/deadman.md](docs/deadman.md) — dead-man's switch: an outside heartbeat
+  check that alerts when the whole stack goes silent.
+- [docs/snmpv3.md](docs/snmpv3.md) — moving devices from SNMPv2c to encrypted
+  SNMPv3 one at a time (credentials in a gitignored secret).
+- [docs/INSTALL.md](docs/INSTALL.md) — installing on another Linux machine
+  (or Windows via Docker Desktop/WSL2), offline install, upgrades.
+- [docs/server-monitoring.md](docs/server-monitoring.md) — monitoring the
+  server itself (node-exporter, server-health alerts, Server Health dashboard).
+- [docs/whatsapp.md](docs/whatsapp.md) — cost-controlled WhatsApp critical
+  alerts (dry-run by default, hard caps, go-live checklist).
 - [docs/DOCKER.md](docs/DOCKER.md) — building and publishing the
   `isp-observability` Prometheus image (repo config baked in) to a private
   registry.
 - [docs/failure-drills.md](docs/failure-drills.md) — end-to-end failure runbook
   (detect → alert → explain → recover → no storm).
-- [docs/feature-packaging.md](docs/feature-packaging.md) — picking which
-  optional features a deployment ships (`features.yml` +
-  `scripts/apply_features.py`), for an ISP that only wants a subset.
 
 ## Running the stack
 
@@ -45,30 +63,18 @@ Routers        --API---> routeros-exporter -/            -> Alertmanager -> Tele
      even if you're not using the API collector yet.
    - `routeros_exporter/config.yml` — the router list for the API collector
      (`cp routeros_exporter/config.example.yml routeros_exporter/config.yml`).
-2. Choose which optional features to run — `cp features.example.yml
-   features.yml`, edit it, then:
-
-   ```bash
-   routeros_exporter/.venv/bin/python scripts/apply_features.py
-   ```
-
-   (Skipping this step is fine too — the script falls back to
-   `features.example.yml`'s defaults, which is everything except anomaly
-   detection. See [docs/feature-packaging.md](docs/feature-packaging.md).)
-3. Start everything:
+2. Start everything:
 
    ```bash
    docker compose up -d
    ```
-
-   Compose only starts the RouterOS API collector if step 2 enabled a
-   feature that needs it — see `COMPOSE_PROFILES` in the generated `.env`.
 
 - Grafana: http://localhost:3000 (user: `admin`, password from the secret file above)
 - Prometheus: http://localhost:9090
 - Alertmanager: http://localhost:9093
 - SNMP exporter: http://localhost:9116/metrics
 - Blackbox exporter: http://localhost:9115/metrics
+- Node exporter (host metrics): http://localhost:9100/metrics
 - RouterOS API exporter: http://localhost:9436/metrics (needs
   `routeros_exporter/config.yml` + `secrets/routeros_api_credentials.json` — see
   [docs/tier1-subscriber-config-topology.md](docs/tier1-subscriber-config-topology.md))
@@ -96,11 +102,10 @@ docker compose -f docker-compose.yml -f docker-compose.image.yml up -d
   (clients / Mbps) live in `prometheus/rules/sector-thresholds.yml`. See
   `sector-normalization.yml` for the derived `sector_*` / `sector:*` series
   (RF throughput, per-CPE chain imbalance / drift, alignment score, 24h rollups).
-- **Subscribers + config + topology** (`routeros_exporter/`, job `routeros-api`): the
+- **Subscribers + topology** (`routeros_exporter/`, job `routeros-api`): the
   RouterOS API collector. Per-subscriber PPP/PPPoE sessions from `/ppp/active` +
   `/ppp/secret` + `/log` (caller-id, real uptime, disconnect reason,
-  provisioned-vs-online, mass-outage detection); config backup + drift (`/export`
-  committed to a git repo, `routeros_config_changed` on every diff); topology
+  provisioned-vs-online, mass-outage detection); topology
   auto-discovery (`/ip/route` + `/ip/neighbor`) that finally activates the `pop`
   dependency-inhibition machinery. Details:
   [docs/tier1-subscriber-config-topology.md](docs/tier1-subscriber-config-topology.md).
@@ -138,8 +143,9 @@ docker compose -f docker-compose.yml -f docker-compose.image.yml up -d
 - **Subscriber Overview** — active vs provisioned sessions, active-by-POP timeline
   (mass-outage cliff), top flapping subscribers, disconnect reasons, auth-failure
   rate, per-session table.
-- **Config Audit** — last-backup age per router, config-change spikes, most-recent
-  change timestamp, RouterOS versions across the fleet.
+- **Server Health** — the monitoring server itself and the stack's own health:
+  host CPU/RAM/disk/network/clock, component up/down, notification failures,
+  rule evaluation, WhatsApp budget.
 - **WAN/LAN Interfaces** — traffic and up/down state grouped by interface role
   (WAN, LAN, PPP, wireless backhaul), using textbox variables holding per-router
   ifName regexes — check these against `wan_ifname` in

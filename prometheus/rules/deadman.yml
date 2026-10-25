@@ -1,0 +1,20 @@
+# Dead-man's switch. Watchdog is ALWAYS firing on purpose: Alertmanager
+# re-sends it every minute to an outside heartbeat service (alertmanager.yml
+# Watchdog route), and that service alerts the NOC when the pings STOP.
+# That covers what no rule inside this stack can: Prometheus, Alertmanager,
+# Docker, the server or its internet uplink being dead. docs/deadman.md.
+#
+# Never routed to Telegram/WhatsApp, and excluded from the NOC incident
+# board (incidents.yml).
+
+groups:
+  - name: deadman
+    rules:
+      - alert: Watchdog
+        expr: vector(1)
+        labels:
+          severity: none
+          scope: deadman
+        annotations:
+          summary: "Watchdog - the alert pipeline is alive"
+          description: "Always firing by design. If the outside heartbeat service stops receiving this, the monitoring stack (or its internet) is down."

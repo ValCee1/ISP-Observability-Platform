@@ -1,4 +1,7 @@
-# Tier 1 — subscriber intelligence, config backup, topology auto-discovery
+# Tier 1 — subscriber intelligence and topology auto-discovery
+
+> Config backup (originally section 2) was removed 2026-10-07 to keep the
+> stack purely about monitoring; see git history for the old design.
 
 This is the first layer that takes the platform past a generic SNMP poller
 (the "why not just run PRTG" question). It adds one component,
@@ -14,24 +17,20 @@ that could only be confirmed on live hardware are marked
 
 `prometheus/rules/ppp-sessions.yml` and `prometheus/topology.yml` already
 spell it out: RouterOS SNMP has no `/ppp active`, no PPPoE caller-id, no
-disconnect reason, and no config export; the topology file is hand-kept and
+disconnect reason; the topology file is hand-kept and
 its POP inhibit rules were inert. The API gives all of it.
 
 ```mermaid
 flowchart LR
     subgraph routers["MikroTik core routers"]
         A["/ppp/active · /ppp/secret · /log"]
-        B["/export"]
         C["/ip/route · /ip/neighbor · /interface"]
     end
     RE["routeros-exporter :9436"]
-    GIT["backup git repo\n(routeros_exporter_data volume)"]
     P["Prometheus\njob: routeros-api"]
 
     A -->|API| RE
-    B -->|API| RE
     C -->|API| RE
-    RE -->|commit on change| GIT
     RE -->|routeros_* metrics| P
 ```
 
@@ -68,49 +67,7 @@ table. The `caller_id ↔ cpe_mac` join in `subscriber-sessions.yml` only
 resolves where those match. Router- and POP-level rollups (what mass-outage
 detection uses) don't depend on it.
 
-## 2. Config backup + drift
-
-The exporter pulls `/export` from every router each cycle, strips the
-volatile timestamp header, and commits it to a git repo on the
-`routeros_exporter_data` volume when it changed. Restore:
-`git -C <repo> show <rev>:<router>.rsc`.
-
-Metrics: `routeros_config_changed`, `routeros_config_last_backup_timestamp`,
-`routeros_config_last_change_timestamp`, `routeros_config_export_lines`,
-`routeros_config_backup_success`.
-
-Alerts (`prometheus/rules/config-backup.yml`): `RouterConfigChanged`
-(warning, on every diff), `RouterBackupStale` (critical, >25h),
-`RouterBackupFailing` (warning), `RouterOSVersionDrift` (info).
-
-> **Resolved 2026-09-14** (was a known gap as of 2026-09-12): with a
-> read-only API user, `/export` never succeeded on this RouterOS 6.x fleet
-> - a bare `/export` hangs instead of returning, and the only variant that
-> replies (`/export file=<name>`) needs `write` to create the file, which
-> RouterOS 6.x's API then can't read back anyway (only FTP can). Fixed by
-> widening the monitoring credential to a custom group scoped to exactly
-> `api, read, write, ftp` and fetching the export over FTP -
-> `export_via_api` now does `/export file=...` then an FTP RETR + delete.
-> Getting there took chasing what looked like a hardware ceiling on the
-> test router (a hAP AC Lite): `/export file=...` kept hanging even with
-> `write` granted, right up until CONFIRMED 2026-09-14 that `client.connect`
-> had a real bug (it ignored the configured timeout entirely, always using
-> librouteros's 10s default) - the export genuinely just takes ~52s on this
-> device, and FTP needed to actually be enabled too. With both fixed,
-> confirmed working end-to-end: a real 110-line export committed to git.
-> **The backup content itself turned out to be sensitive** - RouterOS 6.x's
-> `/export` does not mask passwords by default (a live export had a WiFi
-> PSK in plain text); treat the backup repo like `secrets/`. Also confirmed
-> live: retrying a failed attempt every cycle was aggressive enough to
-> break the router's routine polling too, so a backoff was added
-> (`__main__.py`'s `BACKOFF_AFTER_FAILURES`) - after 2 misses it settles to
-> one gentle attempt an hour. PPP/system/topology collection was never
-> affected either way (isolated per-collector in `__main__.poll_router`).
-> Details + the RouterOS commands to run: `routeros_exporter/README.md`.
-
-Dashboard: **Config Audit** (`grafana/dashboards/config-audit.json`).
-
-## 3. Topology auto-discovery + dependency-aware alerting
+## 2. Topology auto-discovery + dependency-aware alerting
 
 `routeros_exporter/topology.py` derives the POP → backhaul → router →
 sector tree from `/ip/route` (default gateway = upstream), `/ip/neighbor`
@@ -148,13 +105,3 @@ docker compose restart prometheus                                         # pick
 Automated remediation / self-healing (Tier 3, still fully out of scope),
 the anomaly-detection + LLM incident-summary layer (Tier 2), billing-system
 provisioning integration.
-
-**Sector frequency migration started 2026-09-16** as a scoped-down,
-human-gated exception to "later tier": `routeros_exporter`'s `freq_migration`
-CLI (see its README section) scans a sector's RF environment, prepares
-every connected CPE with a short migration scan-list, then changes the
-sector frequency and reports who reconnected - with an explicit approval
-gate before each of those three steps, never automatic. This is
-deliberately not the fuller "controller verifies CPE identity post-move,
-retries CPE-by-CPE" design considered first; that's still available to
-revisit if the simpler version proves insufficient in practice.

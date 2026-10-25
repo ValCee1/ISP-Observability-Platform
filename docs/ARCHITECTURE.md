@@ -6,7 +6,15 @@ links (Ubiquiti airMAX, Ubiquiti AirFiber, SAF Integra) and MikroTik PtMP
 sectors with their registered CPEs. It collects metrics over **SNMP** and
 **ICMP**, evaluates recording/alerting rules in Prometheus, visualises them in
 Grafana, and routes de-duplicated incidents to a NOC Telegram group through
-Alertmanager.
+Alertmanager. Critical customer-facing alerts can also go to WhatsApp
+(cost-capped, dry-run by default - [whatsapp.md](whatsapp.md)).
+
+**Hosting:** the whole stack runs in Docker on **one Linux server hosted
+locally** inside the ISP's own management network ([INSTALL.md](INSTALL.md)).
+It only makes outbound connections (Telegram, optionally Meta); nothing is
+exposed to the internet. See [SECURITY.md](SECURITY.md) for why placing it on
+the management network adds no path from customers into the network. The
+server also monitors itself ([server-monitoring.md](server-monitoring.md)).
 
 Everything is configuration-as-code in this repo; nothing is edited only in a
 UI.
@@ -33,14 +41,12 @@ flowchart LR
     AM["Alertmanager :9093<br/>route / group / inhibit"]
     G["Grafana :3000<br/>provisioned dashboards"]
     TG["NOC Telegram group"]
-    GIT["config-backup git repo<br/>(routeros_exporter_data)"]
 
     R -- SNMP --> SNMP
     L -- SNMP --> SNMP
     S -- SNMP --> SNMP
     L -- ICMP --> BB
-    R -- "RouterOS API<br/>/ppp · /export · /ip route" --> RE
-    RE -- "commit on change" --> GIT
+    R -- "RouterOS API<br/>/ppp · /ip route" --> RE
 
     SNMP -- "HTTP /snmp scrape" --> P
     BB   -- "HTTP /probe scrape" --> P
@@ -92,21 +98,23 @@ flowchart TB
 | Service | Image | Host port | Config (read-only mounts) | State |
 |---|---|---|---|---|
 | prometheus | `prom/prometheus:v3.13.2` | 9090 | `prometheus/prometheus.yml`, `prometheus/rules/`, `prometheus/targets/` | `prometheus_data` (TSDB) |
-| snmp-exporter | `prom/snmp-exporter:v0.30.1` | 9116 | `snmp_exporter/snmp.yml` | — |
+| snmp-exporter | `prom/snmp-exporter:v0.30.1` | 9116 | `snmp_exporter/snmp.yml` | `snmp_auths` (SNMPv3 users) |
 | blackbox-exporter | `prom/blackbox-exporter:v0.28.0` | 9115 | `blackbox/blackbox.yml` | — |
-| routeros-exporter | built from `routeros_exporter/` (`v0.1`) | 9436 | `routeros_exporter/config.yml` | `routeros_exporter_data` (config-backup git repo) |
+| routeros-exporter | built from `routeros_exporter/` (`v0.1`) | 9436 | `routeros_exporter/config.yml` | `routeros_exporter_data` (generated topology file) |
+| node-exporter | `prom/node-exporter:v1.9.1` | 9100 | host `/` mounted read-only at `/host` | — |
+| whatsapp-bridge | built from `whatsapp_bridge/` | 8080 (internal) | env from `.env` | `whatsapp_bridge_data` (message counters) |
 | grafana | `grafana/grafana:13.2.0` | 3000 | `grafana/provisioning/`, `grafana/dashboards/` | `grafana_data` |
 | alertmanager | `prom/alertmanager:v0.33.1` | 9093 | `alertmanager/alertmanager.yml` | `alertmanager_data` |
 
 Secrets are mounted as files under `/run/secrets/<name>` (never env vars):
-`grafana_admin_password`, `telegram_bot_token`, and `routeros_api_credentials`
+`grafana_admin_password`, `telegram_bot_token`, `whatsapp_access_token`, and `routeros_api_credentials`
 (a JSON map of router name → `{username, password}` for the read-only RouterOS
 API user). All source files live in `secrets/` and are gitignored.
 
 Unlike the SNMP/ICMP exporters, **routeros-exporter is not a proxy target** — it
 walks the routers itself over the RouterOS API and exposes `routeros_*` metrics
 directly (job `routeros-api`, a plain `static_configs` scrape). It covers what
-SNMP cannot: per-subscriber PPP/PPPoE sessions, config backup + drift, topology
+SNMP cannot: per-subscriber PPP/PPPoE sessions and topology
 auto-discovery. See
 [tier1-subscriber-config-topology.md](tier1-subscriber-config-topology.md).
 
@@ -198,10 +206,13 @@ Rule groups, by file:
 | `link-normalization.yml` | `link-availability`, `link-interface-health`, `link-derived-metrics` | raw SNMP/ICMP → `link_*` |
 | `link-alerts.yml` | `link-state`, `link-health`, `link-degrading`, `link-composite-health` | LinkDown, WeakSignal, PacketLoss, LinkUpButDegrading, `link_health_score` |
 | `mikrotik-alerts.yml` | `mikrotik-core` | CoreRouterDown, HighCPU, HighMemory, WANInterfaceDown |
+| `exporter-health.yml` | `exporter-health` | ExporterDown (snmp / blackbox / routeros exporters, node-exporter, alertmanager, grafana, whatsapp-bridge); Alertmanager inhibits the per-device alerts behind a down exporter |
+| `server-health.yml` | `server-health` | the monitoring server itself: disk, memory, CPU, clock, rule failures, alert-delivery failures — see [server-monitoring.md](server-monitoring.md) |
+| `deadman.yml` | `deadman` | Watchdog (always firing) → outside heartbeat check; alerts when the whole stack goes silent — see [deadman.md](deadman.md) |
+| `whatsapp-budget.yml` | `whatsapp-budget` | WhatsApp spend guard: 80 % of cap, send failures — see [whatsapp.md](whatsapp.md) |
 | `ppp-sessions.yml` | `ppp-sessions` | SNMP-derived PPPoE session tracking (fallback path) |
 | `subscriber-sessions.yml` | `subscriber-sessions` | RouterOS-API `subscriber:*` series (active by pop/router/sector, provisioned-offline, reconnects) |
 | `subscriber-alerts.yml` | `subscriber-mass-outage`, `subscriber-stability`, `subscriber-housekeeping` | SubscriberMassOutagePOP/Router, PPPoEAuthFailureSpike, SubscriberChronicFlapping, ProvisionedButOffline |
-| `config-backup.yml` | `config-backup` | RouterConfigChanged, RouterBackupStale/Failing, RouterOSVersionDrift |
 | `topology-rollup.yml` | `topology-rollup`, `topology-alerts` | `topology:pop:isolated`, POPIsolated (root-cause rollup) |
 | `anomaly-detection.yml` | `subscriber-anomaly`, `router-resource-anomaly`, `anomaly-alerts` | 1h-vs-6h baseline deviation - SubscriberCountAnomalyLow{POP,Router}, Router{CPU,Memory}AnomalyHigh |
 | `sector-normalization.yml` | `sector-availability`, `sector-aggregates`, `sector-cpe`, `sector-cpe-derived`, `sector-24h`, `sector-hourly`, `sector-hour-of-day` | `sector_*` / `sector:*` derived series |
@@ -258,6 +269,14 @@ and `prometheus/rules/tests/alerts_test.yml`):
 - **Capacity digest** — `SectorOverClientCapacity` / `SectorOverThroughputBudget`
   never page; they batch into the 08:00 Africa/Lagos message.
 - **`repeat_interval`** 2 h critical / 12 h warning — reminds, doesn't nag.
+- **Warnings** go to a `telegram-warnings` receiver with no "RESOLVED" message
+  (a warning clearing isn't worth a ping).
+- **WhatsApp** gets a copy of *phone-worthy* criticals only (rules labelled
+  `page: "true"`; first route, `continue: true`). A link down for 5 min goes to
+  Telegram (`LinkDown`); only one still down at 30 min (`LinkDownProlonged`)
+  pages, so weather fades don't. `scope=monitoring` alerts and all warnings
+  stay on Telegram, grouped by `scope`, repeated every 6 h, via the capped
+  `whatsapp-bridge` ([whatsapp.md](whatsapp.md)).
 
 ---
 
@@ -276,8 +295,8 @@ Datasource is a single proxied Prometheus (`grafana/provisioning/datasources/`).
 | Sector Detail | `sector-detail.json` | one sector: stats, timeseries, per-CPE table (alignment score, worst-first), per-client signal/SNR, 24 h peak/budget |
 | Capacity Planning | `capacity-planning.json` | 24 h peak / p95 busy-hour / avg for every link, router interface and sector |
 | WAN/LAN Interfaces | `lan-wan-interfaces.json`, `all-interfaces.json` | traffic + up/down grouped by interface role (WAN/LAN/PPP/wireless backhaul) |
+| Server Health | `server-health.json` | the monitoring server + stack: host CPU/RAM/disk/network/clock, component up/down, notification failures, rule evaluation, WhatsApp budget |
 | Subscriber Overview | `subscriber-overview.json` | active vs provisioned sessions, active-by-POP timeline (mass-outage cliff), top flappers, disconnect reasons, auth failures |
-| Config Audit | `config-audit.json` | last-backup age per router, config-change spikes, RouterOS versions across the fleet |
 
 Alerting is **Prometheus + Alertmanager only** — Grafana's own alerting engine
 is unused (`grafana/provisioning/alerting/.gitkeep`).

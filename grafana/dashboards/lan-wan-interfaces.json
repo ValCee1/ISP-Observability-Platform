@@ -25,12 +25,13 @@
             {
                 "name": "wan",
                 "type": "textbox",
-                "label": "WAN / Backhaul regex",
+                "label": "Extra WAN regex (optional)",
                 "current": {
-                    "value": "chiemerie-ppp",
-                    "text": "chiemerie-ppp"
+                    "value": "",
+                    "text": ""
                 },
-                "query": "chiemerie-ppp"
+                "query": "",
+                "description": "WAN panels always show each router's own WAN, taken from the wan_ifname label in prometheus/targets/mikrotik-routers.yml. Type a regex here only to ADD more interfaces (e.g. a backup uplink)."
             },
             {
                 "name": "lan",
@@ -89,11 +90,11 @@
             "datasource": "Prometheus",
             "targets": [
                 {
-                    "expr": "rate(ifHCInOctets{instance=~\"$instance\", ifName=~\"$wan\"}[5m]) * 8",
+                    "expr": "(rate(ifHCInOctets{job=\"snmp-mikrotik\", instance=~\"$instance\"}[5m]) * 8 and on (instance, ifName) label_replace(up{job=\"snmp-mikrotik\", instance=~\"$instance\"}, \"ifName\", \"$1\", \"wan_ifname\", \"(.+)\")) or rate(ifHCInOctets{job=\"snmp-mikrotik\", instance=~\"$instance\", ifName=~\"$wan\"}[5m]) * 8",
                     "legendFormat": "{{instance}} - {{ifName}} in"
                 },
                 {
-                    "expr": "rate(ifHCOutOctets{instance=~\"$instance\", ifName=~\"$wan\"}[5m]) * 8",
+                    "expr": "(rate(ifHCOutOctets{job=\"snmp-mikrotik\", instance=~\"$instance\"}[5m]) * 8 and on (instance, ifName) label_replace(up{job=\"snmp-mikrotik\", instance=~\"$instance\"}, \"ifName\", \"$1\", \"wan_ifname\", \"(.+)\")) or rate(ifHCOutOctets{job=\"snmp-mikrotik\", instance=~\"$instance\", ifName=~\"$wan\"}[5m]) * 8",
                     "legendFormat": "{{instance}} - {{ifName}} out"
                 }
             ],
@@ -116,7 +117,7 @@
             "datasource": "Prometheus",
             "targets": [
                 {
-                    "expr": "ifOperStatus{instance=~\"$instance\", ifName=~\"$wan\"}",
+                    "expr": "(ifOperStatus{job=\"snmp-mikrotik\", instance=~\"$instance\"} and on (instance, ifName) label_replace(up{job=\"snmp-mikrotik\", instance=~\"$instance\"}, \"ifName\", \"$1\", \"wan_ifname\", \"(.+)\")) or ifOperStatus{job=\"snmp-mikrotik\", instance=~\"$instance\", ifName=~\"$wan\"}",
                     "legendFormat": "{{instance}} - {{ifName}}"
                 }
             ],

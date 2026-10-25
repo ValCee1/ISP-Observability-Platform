@@ -71,19 +71,6 @@ routeros-exporter polling a router behind BASE.
 | Recover | Backhaul back → `topology:pop:isolated` clears → sessions re-establish → everything resolves together. |
 | Storm check | 1 message, not ~10. |
 
-## Drill 3c — Unplanned config change
-
-**Break it:** on a polled router, `/ip firewall filter add chain=forward
-action=drop` (or any real change). Wait one `backup_interval_seconds`.
-
-| Stage | Expect |
-|---|---|
-| Detect | routeros-exporter commits the new `/export`; `routeros_config_changed{router}` → 1 for that cycle; `routeros_config_last_change_timestamp` updates. |
-| Alert | **`RouterConfigChanged`** (warning, `scope: router`), `keep_firing_for: 20m`. |
-| Telegram | One message: `🟠 Router <name> — degraded` → "config changed (now N lines)… review the diff". |
-| Investigate | `git -C <backup-repo> log -p -- <router>.rsc` shows exactly what changed and when. |
-| Recover | Revert the change (or accept it); next cycle `routeros_config_changed` → 0, alert resolves after `keep_firing_for`. |
-
 ## Drill 4 — Widespread CPE degradation (derived intelligence)
 
 **Break it:** hard to fake cleanly — wait for weather, or nudge the sector

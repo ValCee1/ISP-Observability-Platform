@@ -2,6 +2,19 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
+# How much history to keep (default would be 15 days - too short for the
+# Capacity Planning dashboard and month-over-month trends). Whichever limit
+# is hit first wins: 90 days, or 20GB on disk, oldest data dropped first.
+# The size cap keeps a busy estate from filling the server's disk (the
+# disk-space alerts in rules/server-health.yml still watch the host).
+# Set here rather than as --storage.tsdb.retention.* flags (deprecated in
+# Prometheus 3) so the baked image carries it too.
+storage:
+  tsdb:
+    retention:
+      time: 90d
+      size: 20GB
+
 # Each SNMP/ICMP job below follows the same "proxy scrape" pattern: the
 # real target device's address is moved into __param_target, and
 # __address__ is rewritten to point at the exporter container
@@ -16,12 +29,51 @@ scrape_configs:
     static_configs:
       - targets: ["localhost:9090"]
 
+  # The exporters' OWN /metrics endpoints (not the devices behind them).
+  # up{job="snmp-exporter"} / up{job="blackbox-exporter"} == 0 means the
+  # exporter itself is down - ExporterDown (rules/exporter-health.yml) fires
+  # once and Alertmanager holds back the per-device alerts it would cause.
+  - job_name: "snmp-exporter"
+    static_configs:
+      - targets: ["snmp-exporter:9116"]
+
+  - job_name: "blackbox-exporter"
+    static_configs:
+      - targets: ["blackbox-exporter:9115"]
+
+  # The monitoring SERVER itself (host CPU/RAM/disk/clock via node-exporter)
+  # and the other stack components' own /metrics. Rules: server-health.yml;
+  # ExporterDown covers each of these going silent. Nothing is polled
+  # through them, so no per-device inhibit rules depend on these jobs.
+  - job_name: "node-exporter"
+    static_configs:
+      - targets: ["node-exporter:9100"]
+
+  - job_name: "alertmanager"
+    static_configs:
+      - targets: ["alertmanager:9093"]
+
+  - job_name: "grafana"
+    static_configs:
+      - targets: ["grafana:3000"]
+
+  # WhatsApp bridge: message counts and budget used vs cap (feeds
+  # rules/whatsapp-budget.yml and the Server Health dashboard).
+  - job_name: "whatsapp-bridge"
+    static_configs:
+      - targets: ["whatsapp-bridge:8080"]
+
   # Core router health: CPU, memory, uptime, interface counters/state.
   # Uses the generic `mikrotik` SNMP module (snmp_exporter/snmp.yml).
   # Target list (router IPs + site/role labels) lives in
   # prometheus/targets/mikrotik-routers.yml, reloaded every 1m without a
   # Prometheus restart.
   - job_name: "snmp-mikrotik"
+    # Remote routers (Sam OFT / Sam Hotspot over SSTP) take 4-10s to walk;
+    # the 10s global timeout made them flap and fire false CoreRouterDown.
+    # Same headroom as the link/sector jobs.
+    scrape_interval: 30s
+    scrape_timeout: 25s
     metrics_path: /snmp
     params:
       module: [mikrotik]
@@ -36,6 +88,11 @@ scrape_configs:
         target_label: instance
       - target_label: __address__
         replacement: snmp-exporter:9116
+      # Optional per-router `auth` label (e.g. mikrotik_v3 for SNMPv3). A
+      # router without one sends an empty auth, which snmp-exporter treats
+      # as its default `public_v2`.
+      - source_labels: [auth]
+        target_label: __param_auth
 
   # PTP link reachability via ICMP ping (ping success + RTT), independent
   # of SNMP - still tells you a link is down even if its SNMP agent has
@@ -48,6 +105,24 @@ scrape_configs:
     file_sd_configs:
       - files:
           - /etc/prometheus/targets/links.yml
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # Reference pings that tell "the server lost its own network" apart from
+  # "everything is down". Targets live in prometheus/targets/vantage-points.yml
+  # (edit that file; no restart needed). See prometheus/rules/vantage.yml.
+  - job_name: "vantage-points"
+    metrics_path: /probe
+    params:
+      module: [icmp]
+    file_sd_configs:
+      - files:
+          - /etc/prometheus/targets/vantage-points.yml
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
@@ -164,7 +239,7 @@ scrape_configs:
   # above - it walks the routers itself over the RouterOS API and exposes
   # routeros_* metrics directly on :9436. Covers what SNMP can't: per-
   # subscriber PPP/PPPoE sessions (caller-id -> sector, disconnect reason,
-  # provisioned-vs-online), config backup + drift, topology auto-discovery.
+  # provisioned-vs-online) and topology auto-discovery.
   # Each series is self-labelled router/site/pop/role from the exporter's own
   # config file, so no target labels are set here.
   - job_name: "routeros-api"

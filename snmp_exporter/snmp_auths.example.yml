@@ -1,0 +1,57 @@
+# SNMPv3 credentials - TEMPLATE. Copy to secrets/snmp_auths.yml (gitignored;
+# `bash scripts/init.sh` does it) and fill in real values there, never here.
+#
+# snmp-exporter loads this file IN ADDITION to snmp_exporter/snmp.yml (two
+# --config.file flags in docker-compose.yml), so these names are selectable
+# exactly like the v2c ones: set `auth: <name>` on a target in
+# prometheus/targets/*.yml. Names must not repeat a name already in
+# snmp.yml's `auths:` - a duplicate stops snmp-exporter from starting.
+#
+# Unused entries are harmless (nothing is sent until a target selects one),
+# but replace the CHANGE-ME values before pointing a target at them.
+# Passwords: at least 8 characters (RFC 3414; devices reject shorter ones).
+#
+# Field reference (snmp_exporter): security_level noAuthNoPriv | authNoPriv |
+# authPriv; auth_protocol MD5 | SHA | SHA224 | SHA256 | SHA384 | SHA512;
+# priv_protocol DES | AES | AES192 | AES256 | AES192C | AES256C.
+# Spell them exactly like that: the device UI's "SHA1" is `SHA` here and
+# "AES-256" is `AES256` - any other spelling stops snmp-exporter at startup.
+# Device-side setup per vendor: docs/snmpv3.md.
+auths:
+  # MikroTik routers and sectors (RouterOS v6 and v7). The RouterOS
+  # "community" name is the v3 username. SHA = SHA1, AES = AES-128 - the
+  # combination every RouterOS version supports. CONFIRMED 2026-10-25 on
+  # pop1-home.
+  mikrotik_v3:
+    version: 3
+    security_level: authPriv
+    username: monitoring
+    auth_protocol: SHA
+    password: CHANGE-ME-auth-password
+    priv_protocol: AES
+    priv_password: CHANGE-ME-priv-password
+
+  # Ubiquiti airMAX. UNVERIFIED - needs live device: confirm the auth/priv
+  # algorithms the firmware offers (airOS UI: Services > SNMP Agent).
+  # AirFiber has NO SNMPv3 (CONFIRMED 2026-10-25) - AirFiber targets stay
+  # on their v2c community in snmp.yml.
+  ubiquiti_v3:
+    version: 3
+    security_level: authPriv
+    username: monitoring
+    auth_protocol: SHA
+    password: CHANGE-ME-auth-password
+    priv_protocol: AES
+    priv_password: CHANGE-ME-priv-password
+
+  # SAF radios. CONFIRMED 2026-10-25 on the POP1-POP7 pair with SHA-256 auth
+  # and AES-256 privacy (`AES256`, not `AES256C`) - match the radio's own
+  # SNMPv3 user settings.
+  saf_v3:
+    version: 3
+    security_level: authPriv
+    username: monitoring
+    auth_protocol: SHA256
+    password: CHANGE-ME-auth-password
+    priv_protocol: AES256
+    priv_password: CHANGE-ME-priv-password

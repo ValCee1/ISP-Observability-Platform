@@ -3,7 +3,7 @@
     "description": "The front door. Active Incidents first (what's wrong, for how long), then link/router/sector counts, then per-object health tables. Every row links through to the detail view.",
     "uid": "noc-overview",
     "schemaVersion": 39,
-    "version": 11,
+    "version": 12,
     "editable": true,
     "timezone": "browser",
     "time": { "from": "now-1h", "to": "now" },
@@ -88,7 +88,7 @@
             "id": 14, "type": "stat", "title": "Routers Down",
             "gridPos": { "h": 4, "w": 4, "x": 8, "y": 11 }, "datasource": "Prometheus",
             "targets": [ { "expr": "count(up{job=\"snmp-mikrotik\"} == 0) or vector(0)", "instant": true } ],
-            "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "red" }, "noValue": "0" } }
+            "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "red" }, "noValue": "0", "links": [ { "title": "Open MikroTik Fleet Overview (which routers)", "url": "/d/mikrotik-fleet-overview/mikrotik-fleet-overview", "targetBlank": false } ] } }
         },
         {
             "id": 15, "type": "stat", "title": "Sectors Down",
@@ -154,13 +154,288 @@
             }
         },
 
-        { "id": 21, "type": "row", "title": "SECTORS", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 } },
+        { "id": 22, "type": "row", "title": "ROUTERS", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 } },
+        {
+            "id": 41,
+            "type": "table",
+            "title": "All Routers",
+            "description": "One row per router, down routers first. Status reflects SNMP reachability. Click a router for its full diagnostics on MikroTik Router Detail.",
+            "gridPos": {
+                "h": 8,
+                "w": 24,
+                "x": 0,
+                "y": 26
+            },
+            "datasource": "Prometheus",
+            "options": {
+                "sortBy": [
+                    {
+                        "displayName": "Status",
+                        "desc": false
+                    }
+                ]
+            },
+            "targets": [
+                {
+                    "expr": "max by (instance, site, role) (up{job=\"snmp-mikrotik\"})",
+                    "refId": "Status",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "max by (instance, site, role) (sysUpTime) / 100",
+                    "refId": "Uptime",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "sum by (instance, site, role) (hrProcessorLoad)",
+                    "refId": "CPU",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "sum by (instance, site, role) (100 * (hrStorageUsed{hrStorageDescr=~\".*[Mm]emory.*\"} / hrStorageSize{hrStorageDescr=~\".*[Mm]emory.*\"}))",
+                    "refId": "Mem",
+                    "instant": true,
+                    "format": "table"
+                }
+            ],
+            "transformations": [
+                {
+                    "id": "merge",
+                    "options": {}
+                },
+                {
+                    "id": "organize",
+                    "options": {
+                        "excludeByName": {
+                            "Time": true,
+                            "Time 1": true,
+                            "Time 2": true,
+                            "Time 3": true,
+                            "Time 4": true,
+                            "__name__": true,
+                            "job": true,
+                            "wan_ifname": true
+                        },
+                        "indexByName": {
+                            "site": 0,
+                            "role": 1,
+                            "instance": 2,
+                            "Value #Status": 3,
+                            "Value #Uptime": 4,
+                            "Value #CPU": 5,
+                            "Value #Mem": 6
+                        },
+                        "renameByName": {
+                            "instance": "Router",
+                            "site": "Site",
+                            "role": "Role",
+                            "Value #Status": "Status",
+                            "Value #Uptime": "Uptime",
+                            "Value #CPU": "CPU %",
+                            "Value #Mem": "Memory %"
+                        }
+                    }
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    }
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Router"
+                        },
+                        "properties": [
+                            {
+                                "id": "links",
+                                "value": [
+                                    {
+                                        "title": "View router details",
+                                        "url": "/d/mikrotik-router-overview/mikrotik-router-detail?var-instance=${__data.fields.Router}",
+                                        "targetBlank": false
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Status"
+                        },
+                        "properties": [
+                            {
+                                "id": "mappings",
+                                "value": [
+                                    {
+                                        "type": "value",
+                                        "options": {
+                                            "1": {
+                                                "text": "UP",
+                                                "color": "green",
+                                                "index": 0
+                                            },
+                                            "0": {
+                                                "text": "DOWN",
+                                                "color": "red",
+                                                "index": 1
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "type": "special",
+                                        "options": {
+                                            "match": "null+nan",
+                                            "result": {
+                                                "text": "NO DATA",
+                                                "color": "white",
+                                                "index": 2
+                                            }
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "type": "color-background",
+                                    "mode": "gradient"
+                                }
+                            },
+                            {
+                                "id": "noValue",
+                                "value": "NO DATA"
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Uptime"
+                        },
+                        "properties": [
+                            {
+                                "id": "unit",
+                                "value": "s"
+                            },
+                            {
+                                "id": "noValue",
+                                "value": "N/A"
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "CPU %"
+                        },
+                        "properties": [
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        {
+                                            "value": null,
+                                            "color": "white"
+                                        },
+                                        {
+                                            "value": 0,
+                                            "color": "green"
+                                        },
+                                        {
+                                            "value": 70,
+                                            "color": "orange"
+                                        },
+                                        {
+                                            "value": 90,
+                                            "color": "red"
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "type": "color-background",
+                                    "mode": "gradient"
+                                }
+                            },
+                            {
+                                "id": "unit",
+                                "value": "percent"
+                            },
+                            {
+                                "id": "noValue",
+                                "value": "N/A"
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Memory %"
+                        },
+                        "properties": [
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        {
+                                            "value": null,
+                                            "color": "white"
+                                        },
+                                        {
+                                            "value": 0,
+                                            "color": "green"
+                                        },
+                                        {
+                                            "value": 75,
+                                            "color": "orange"
+                                        },
+                                        {
+                                            "value": 90,
+                                            "color": "red"
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "type": "color-background",
+                                    "mode": "gradient"
+                                }
+                            },
+                            {
+                                "id": "unit",
+                                "value": "percent"
+                            },
+                            {
+                                "id": "noValue",
+                                "value": "N/A"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+
+        { "id": 21, "type": "row", "title": "SECTORS", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 34 } },
         {
             "id": 2,
             "type": "table",
             "title": "All Sectors",
             "description": "One row per sector. Degraded CPEs = count below alignment score 60. Backhaul % is ether1 against its negotiated port speed. Click a row for Sector Detail.",
-            "gridPos": { "h": 9, "w": 24, "x": 0, "y": 26 },
+            "gridPos": { "h": 9, "w": 24, "x": 0, "y": 35 },
             "datasource": "Prometheus",
             "options": { "sortBy": [ { "displayName": "Degraded CPEs", "desc": true } ] },
             "targets": [
