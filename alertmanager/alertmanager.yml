@@ -1,3 +1,7 @@
+# CHANGING THE TELEGRAM GROUP: edit the ONE `chat_id: &noc_chat_id ...` line
+# in the `telegram` receiver below (search for noc_chat_id); the warnings
+# receiver reuses it. Then `docker compose restart alertmanager`.
+# How to find a group's id: docs/SETUP-INPUTS.md section D.
 global:
   resolve_timeout: 5m
 
@@ -221,7 +225,7 @@ receivers:
   - name: telegram
     telegram_configs:
       - bot_token_file: /run/secrets/telegram_bot_token
-        chat_id: -1004387943176 # This is the alert group ID
+        chat_id: &noc_chat_id -1004387943176 # NOC Telegram group id - the ONLY place to change it
         api_url: https://api.telegram.org
         parse_mode: HTML
         send_resolved: true   # also sends a "resolved" message when the alert clears
@@ -265,7 +269,7 @@ receivers:
   - name: telegram-warnings
     telegram_configs:
       - bot_token_file: /run/secrets/telegram_bot_token
-        chat_id: -1004387943176
+        chat_id: *noc_chat_id   # same group as `telegram` above - change it there
         api_url: https://api.telegram.org
         parse_mode: HTML
         send_resolved: false

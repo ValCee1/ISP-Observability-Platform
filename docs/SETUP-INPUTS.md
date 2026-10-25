@@ -64,9 +64,23 @@ Router names must match in four places: `mikrotik-routers.yml` (`router:`),
 
 ## D. Alert delivery (tracked file - **EDIT**)
 
-`alertmanager/alertmanager.yml` → the `telegram` and `telegram-warnings`
-receivers: set `chat_id` to your NOC group's id (add the bot to the group;
-group ids are negative, e.g. `-100...`). Both receivers need the same id.
+**Changing the Telegram group (any time):**
+
+1. Add the bot to the new group (and make it able to post there).
+2. Find the group's id: send any message in the group, then open
+   `https://api.telegram.org/bot<bot-token>/getUpdates` in a browser and read
+   `"chat":{"id":...}`. Group ids are negative, e.g. `-100...`.
+3. In `alertmanager/alertmanager.yml`, search for `noc_chat_id` and replace the
+   number on that one line (`chat_id: &noc_chat_id -100...`). The warnings
+   receiver reuses it automatically.
+4. Apply and check:
+   ```bash
+   docker run --rm -v "$PWD/alertmanager:/a" --entrypoint amtool prom/alertmanager:v0.33.1 check-config /a/alertmanager.yml
+   docker compose restart alertmanager
+   ```
+
+**Changing the bot** (new token): put it in `secrets/telegram_bot_token.txt`
+(one line), then `docker compose restart alertmanager`.
 
 ## E. On the devices themselves
 

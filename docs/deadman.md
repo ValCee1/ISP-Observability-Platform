@@ -11,6 +11,13 @@ alerts simply stop. The dead-man's switch turns that silence into an alert.
 - The heartbeat service expects a ping every few minutes and alerts you
   (email, Telegram, SMS - its own channels) when the pings stop.
 
+**Not the gateway check.** `prometheus/targets/vantage-points.yml` (the POP
+router / default gateway) answers "can the server still see the network?"
+from *inside* the stack. The heartbeat is the opposite direction: an
+*outside* service noticing that the server itself has gone quiet. A dead
+server cannot ping its gateway or send that alert, so only something outside
+can catch it.
+
 It is **off by default**: until a real URL is set, Watchdog goes to the
 `deadman-off` receiver and is dropped. (A placeholder URL would fail every
 minute and set off `AlertDeliveryFailing`.)

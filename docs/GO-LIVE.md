@@ -80,7 +80,7 @@ docker compose up -d --build && docker compose ps
 
 - [ ] Backups: git remote for config; encrypted copy of `secrets/` and `.env`;
       optional volume archive ([Operations Manual](<ISP Network Observability Platform - Operations Manual.docx>) section 7).
-- [ ] Image: publish a tag that includes the current rules (v1.3+) before using
+- [ ] Image: publish a tag that includes the current rules (v1.4+) before using
       `docker-compose.image.yml` ([DOCKER.md](DOCKER.md)).
 - [ ] A named owner for tuning and upgrades; NOC trained on the Operations Manual.
 - [ ] Dead-man's switch on: healthchecks.io check, URL in

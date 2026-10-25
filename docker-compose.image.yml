@@ -10,13 +10,13 @@
 #   docker compose -f docker-compose.yml -f docker-compose.image.yml build prometheus
 #
 # Point at a different tag / registry:
-#   ISP_OBS_IMAGE=youruser/isp-observability:v1.3 docker compose \
+#   ISP_OBS_IMAGE=youruser/isp-observability:v1.4 docker compose \
 #     -f docker-compose.yml -f docker-compose.image.yml up -d
 #
 # Requires Docker Compose >= 2.24.4 for the `!override` directive.
 services:
   prometheus:
-    image: ${ISP_OBS_IMAGE:-chikere/isp-observability:v1.3}
+    image: ${ISP_OBS_IMAGE:-chikere/isp-observability:v1.4}
     build:
       context: .
       args:
