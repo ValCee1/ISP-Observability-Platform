@@ -88,6 +88,13 @@ services:
     secrets:
       - telegram_bot_token
       - deadman_url
+    # Public resolvers for the outbound calls (Telegram, the dead-man
+    # heartbeat): the LAN/router resolver intermittently fails, which would
+    # drop alerts and make the heartbeat look dead. Same fix as
+    # whatsapp-bridge; container names still resolve via Docker's own DNS.
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     ports:
       - "9093:9093"
     networks:

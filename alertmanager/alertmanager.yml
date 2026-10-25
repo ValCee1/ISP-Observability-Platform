@@ -52,13 +52,13 @@ route:
     # i.e. when Prometheus, Alertmanager, the server or its internet dies,
     # which nothing inside this stack can report. FIRST route and no
     # `continue`, so Watchdog never reaches Telegram/WhatsApp.
-    # OFF by default (receiver deadman-off drops it): a placeholder URL
-    # would fail every minute and trip AlertDeliveryFailing. To switch on,
-    # put the ping URL in secrets/deadman_url.txt and change the receiver
-    # below to `deadman`.
+    # ON since 2026-10-25 (healthchecks.io check, URL in
+    # secrets/deadman_url.txt). To switch off - e.g. a fresh install that
+    # has no check yet, where the placeholder URL would fail every minute
+    # and trip AlertDeliveryFailing - set the receiver to `deadman-off`.
     - matchers:
         - alertname="Watchdog"
-      receiver: deadman-off
+      receiver: deadman
       group_by: ["alertname"]
       group_wait: 0s
       group_interval: 1m
