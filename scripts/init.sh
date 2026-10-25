@@ -16,10 +16,18 @@ mk() { # mk <dest> <source-or-literal-text> [mode]
 
 # Secrets: compose refuses to start if a secret file is missing, so create
 # obvious placeholders. grafana's is a real (weak) default - CHANGE IT.
-mk secrets/grafana_admin_password.txt   "change-me-now"
-mk secrets/telegram_bot_token.txt       "PUT-TELEGRAM-BOT-TOKEN-HERE"
-mk secrets/whatsapp_access_token.txt    "dry-run-placeholder"
-mk secrets/routeros_api_credentials.json routeros_exporter/routeros_api_credentials.example.json
+# Modes: on native Linux a compose secret is a bind mount that keeps the host
+# file's owner and mode, and the containers read it as non-root users
+# (nobody, grafana, exporter) - a 600 file is unreadable to them. So the
+# FILES are 644 and the secrets/ DIRECTORY is 700, which keeps other host
+# users out. (Docker Desktop ignores modes, so 600 only fails on Linux.)
+mkdir -p secrets && chmod 700 secrets
+mk secrets/grafana_admin_password.txt   "change-me-now" 644
+mk secrets/telegram_bot_token.txt       "PUT-TELEGRAM-BOT-TOKEN-HERE" 644
+mk secrets/whatsapp_access_token.txt    "dry-run-placeholder" 644
+mk secrets/routeros_api_credentials.json routeros_exporter/routeros_api_credentials.example.json 644
+mk secrets/snmp_auths.yml               snmp_exporter/snmp_auths.example.yml 644
+mk secrets/deadman_url.txt              "https://hc-ping.com/PUT-YOUR-CHECK-UUID-HERE" 644
 mk routeros_exporter/config.yml         routeros_exporter/config.example.yml 644
 mk .env                                 .env.example 600
 

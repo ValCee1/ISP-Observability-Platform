@@ -33,7 +33,7 @@ below are what keep that host from becoming the weak point.
 | Channel | Direction | Access level | Notes |
 |---|---|---|---|
 | ICMP ping (blackbox) | server → devices | none (reachability only) | |
-| SNMP (snmp-exporter) | server → devices, UDP 161 | **read-only** community | SNMPv2c is cleartext: restrict the community to the server's IP on every device; use SNMPv3 where the device supports it |
+| SNMP (snmp-exporter) | server → devices, UDP 161 | **read-only** community or SNMPv3 user | SNMPv2c is cleartext: restrict the community to the server's IP on every device. SNMPv3 `authPriv` (supported, [snmpv3.md](snmpv3.md)) authenticates and encrypts; use it where the device supports it |
 | RouterOS API (routeros-exporter) | server → routers, TCP 8728 (8729 with `use_tls`) | **read-only** RouterOS group (`/user add group=read`) | the exporter only reads `/ppp`, `/ip route`, neighbours; it cannot change config. Prefer `use_tls: true` where certificates exist |
 | Telegram | server → internet, HTTPS | send-only bot | |
 | WhatsApp (Meta Cloud API) | server → internet, HTTPS | send-only template messages | optional; capped; dry-run by default |
@@ -47,11 +47,11 @@ frequency-migration features, which needed write access, were removed.
    network only. Do not give it a leg in the customer network, and do not
    enable IP forwarding on it.
 2. **Firewall the published ports.** `docker-compose.yml` publishes
-   3000 (Grafana), 9090 (Prometheus), 9093 (Alertmanager), 9100
-   (node-exporter), 9116, 9115, 9436 on all interfaces. Allow only the
-   NOC/management workstations to reach 3000 (and 9090/9093 if needed);
-   block the exporter ports (9100/9115/9116/9436) from everything except
-   localhost. Docker bypasses simple `ufw` rules for published ports; put
+   3000 (Grafana), 9090 (Prometheus) and 9093 (Alertmanager) on all
+   interfaces. Allow only the NOC/management workstations to reach 3000
+   (and 9090/9093 if needed). The exporter ports (9100/9115/9116/9436) are
+   bound to `127.0.0.1` only - Prometheus reaches them over the internal
+   Docker network, so they are not reachable from the LAN at all. Docker bypasses simple `ufw` rules for published ports; put
    the restriction in the `DOCKER-USER` iptables chain, or bind a port to a
    specific address (`"10.0.0.5:3000:3000"`) in the compose file.
 3. **Device-side limits.** On each router/sector: SNMP allowed only from the
@@ -59,8 +59,10 @@ frequency-migration features, which needed write access, were removed.
    the server's IP; the monitoring user is in the `read` group.
 4. **Secrets.** All credentials are files under `secrets/` mounted as Docker
    secrets (never environment variables, never in git): Grafana admin
-   password, Telegram bot token, RouterOS API credentials, WhatsApp token.
-   `chmod 600`, owned by the service account. Change the Grafana default
+   password, Telegram bot token, RouterOS API credentials, WhatsApp token,
+   SNMPv3 users. Folder `secrets/` is `chmod 700` (only the service account
+   can open it); the files inside are `644` because the containers read them
+   as non-root users and a Linux bind mount keeps the host mode. Change the Grafana default
    password (`scripts/init.sh` writes a placeholder you must replace) **before
    the first start**: Grafana reads the secret file only when it creates its
    database, so editing the file later does not change an existing password
@@ -88,7 +90,7 @@ frequency-migration features, which needed write access, were removed.
       9093, 9100, 9116, 9115, 9436 are **closed**; 3000 only from the NOC.
 - [ ] `snmpwalk` from another host with the community is refused.
 - [ ] The RouterOS user is in group `read`; a write attempt with it fails.
-- [ ] `git status` shows no secrets; `secrets/` perms are `600`.
+- [ ] `git status` shows no secrets; `secrets/` folder is `700`, files `644`.
 - [ ] Grafana default password changed.
 
 ## Residual risks (honest list)
@@ -96,7 +98,8 @@ frequency-migration features, which needed write access, were removed.
 - A compromised monitoring server exposes the read-only credentials and a
   map of the network. It cannot change devices, but it can read their
   state. Hence firewalling and host hardening above.
-- SNMPv2c communities travel in cleartext on the management network.
+- SNMPv2c communities travel in cleartext on the management network on
+  any device not yet moved to SNMPv3 (some radios support only v1/v2c).
 - The exporter's TLS mode currently skips certificate verification
   (RouterOS commonly uses self-signed certs); it encrypts but does not
   authenticate the router.

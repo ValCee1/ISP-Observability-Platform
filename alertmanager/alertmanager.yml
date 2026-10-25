@@ -42,6 +42,24 @@ route:
   repeat_interval: 6h
 
   routes:
+    # Dead-man's switch (prometheus/rules/deadman.yml, docs/deadman.md).
+    # Watchdog always fires; re-sending it every minute to an outside
+    # heartbeat service means that service alerts YOU when the pings stop -
+    # i.e. when Prometheus, Alertmanager, the server or its internet dies,
+    # which nothing inside this stack can report. FIRST route and no
+    # `continue`, so Watchdog never reaches Telegram/WhatsApp.
+    # OFF by default (receiver deadman-off drops it): a placeholder URL
+    # would fail every minute and trip AlertDeliveryFailing. To switch on,
+    # put the ping URL in secrets/deadman_url.txt and change the receiver
+    # below to `deadman`.
+    - matchers:
+        - alertname="Watchdog"
+      receiver: deadman-off
+      group_by: ["alertname"]
+      group_wait: 0s
+      group_interval: 1m
+      repeat_interval: 1m
+
     # WhatsApp copy of every PHONE-WORTHY critical (label page="true" in the
     # rule: LinkDownProlonged, CoreRouterDown, SectorDown, subscriber mass
     # outages). Other criticals (e.g. a link down for only 5 minutes, which
@@ -193,6 +211,13 @@ route:
           repeat_interval: 12h
 
 receivers:
+  # Dead-man's switch receivers (see the Watchdog route above).
+  - name: deadman-off   # no integrations: Watchdog is dropped
+  - name: deadman
+    webhook_configs:
+      - url_file: /run/secrets/deadman_url
+        send_resolved: false
+
   - name: telegram
     telegram_configs:
       - bot_token_file: /run/secrets/telegram_bot_token

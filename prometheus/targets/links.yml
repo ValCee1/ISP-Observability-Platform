@@ -55,7 +55,7 @@
   labels:
     {
       module: ubiquiti_airfiber_link,
-      auth: public_v2,
+      auth: public_v2, # AirFiber firmware has no SNMPv3 - stays v2c
       link_name: POP6-POP2,
       link_id: POP6-POP2,
       pop: POP2,
@@ -68,7 +68,7 @@
   labels:
     {
       module: ubiquiti_airfiber_link,
-      auth: public_v2,
+      auth: public_v2, # AirFiber firmware has no SNMPv3 - stays v2c
       link_name: POP6-POP2,
       link_id: POP6-POP2,
       pop: POP6,
@@ -83,7 +83,7 @@
   labels:
     {
       module: saf_link,
-      auth: saf_v2,
+      auth: saf_v3, # SNMPv3 (CONFIRMED 2026-10-25), secrets/snmp_auths.yml
       link_name: POP1-POP7-RADIO1,
       link_id: POP1-POP7,
       pop: POP7,
@@ -96,7 +96,7 @@
   labels:
     {
       module: saf_link,
-      auth: saf_v2,
+      auth: saf_v3, # SNMPv3 (CONFIRMED 2026-10-25), secrets/snmp_auths.yml
       link_name: POP1-POP7-RADIO2,
       link_id: POP1-POP7,
       pop: POP7,

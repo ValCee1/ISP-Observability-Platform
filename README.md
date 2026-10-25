@@ -36,6 +36,10 @@ Routers        --API---> routeros-exporter -/            -> Alertmanager -> Tele
 - [docs/ISP Network Observability Platform Pilot Proposal.pptx](<docs/ISP Network Observability Platform Pilot Proposal.pptx>) — the pilot proposal deck.
 - [docs/SECURITY.md](docs/SECURITY.md) — security model: locally hosted, outbound-only,
   read-only access, why management-network placement adds no attack surface, hardening checklist.
+- [docs/deadman.md](docs/deadman.md) — dead-man's switch: an outside heartbeat
+  check that alerts when the whole stack goes silent.
+- [docs/snmpv3.md](docs/snmpv3.md) — moving devices from SNMPv2c to encrypted
+  SNMPv3 one at a time (credentials in a gitignored secret).
 - [docs/INSTALL.md](docs/INSTALL.md) — installing on another Linux machine
   (or Windows via Docker Desktop/WSL2), offline install, upgrades.
 - [docs/server-monitoring.md](docs/server-monitoring.md) — monitoring the

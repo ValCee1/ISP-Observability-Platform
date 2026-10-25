@@ -1,0 +1,36 @@
+# promtool unit tests for the dead-man's switch (deadman.yml) and its
+# exclusion from the NOC incident board (incidents.yml).
+rule_files:
+  - ../deadman.yml
+  - ../incidents.yml
+
+evaluation_interval: 15s
+
+tests:
+  # Watchdog fires immediately and keeps firing, with no input series at all.
+  - interval: 15s
+    input_series: []
+    alert_rule_test:
+      - eval_time: 0s
+        alertname: Watchdog
+        exp_alerts:
+          - exp_labels:
+              severity: none
+              scope: deadman
+            exp_annotations:
+              summary: "Watchdog - the alert pipeline is alive"
+              description: "Always firing by design. If the outside heartbeat service stops receiving this, the monitoring stack (or its internet) is down."
+      - eval_time: 6h
+        alertname: Watchdog
+        exp_alerts:
+          - exp_labels:
+              severity: none
+              scope: deadman
+            exp_annotations:
+              summary: "Watchdog - the alert pipeline is alive"
+              description: "Always firing by design. If the outside heartbeat service stops receiving this, the monitoring stack (or its internet) is down."
+    # ...but never shows up as an incident.
+    promql_expr_test:
+      - expr: incident:active_seconds
+        eval_time: 5m
+        exp_samples: []

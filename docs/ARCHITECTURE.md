@@ -98,7 +98,7 @@ flowchart TB
 | Service | Image | Host port | Config (read-only mounts) | State |
 |---|---|---|---|---|
 | prometheus | `prom/prometheus:v3.13.2` | 9090 | `prometheus/prometheus.yml`, `prometheus/rules/`, `prometheus/targets/` | `prometheus_data` (TSDB) |
-| snmp-exporter | `prom/snmp-exporter:v0.30.1` | 9116 | `snmp_exporter/snmp.yml` | — |
+| snmp-exporter | `prom/snmp-exporter:v0.30.1` | 9116 | `snmp_exporter/snmp.yml` | `snmp_auths` (SNMPv3 users) |
 | blackbox-exporter | `prom/blackbox-exporter:v0.28.0` | 9115 | `blackbox/blackbox.yml` | — |
 | routeros-exporter | built from `routeros_exporter/` (`v0.1`) | 9436 | `routeros_exporter/config.yml` | `routeros_exporter_data` (generated topology file) |
 | node-exporter | `prom/node-exporter:v1.9.1` | 9100 | host `/` mounted read-only at `/host` | — |
@@ -208,6 +208,7 @@ Rule groups, by file:
 | `mikrotik-alerts.yml` | `mikrotik-core` | CoreRouterDown, HighCPU, HighMemory, WANInterfaceDown |
 | `exporter-health.yml` | `exporter-health` | ExporterDown (snmp / blackbox / routeros exporters, node-exporter, alertmanager, grafana, whatsapp-bridge); Alertmanager inhibits the per-device alerts behind a down exporter |
 | `server-health.yml` | `server-health` | the monitoring server itself: disk, memory, CPU, clock, rule failures, alert-delivery failures — see [server-monitoring.md](server-monitoring.md) |
+| `deadman.yml` | `deadman` | Watchdog (always firing) → outside heartbeat check; alerts when the whole stack goes silent — see [deadman.md](deadman.md) |
 | `whatsapp-budget.yml` | `whatsapp-budget` | WhatsApp spend guard: 80 % of cap, send failures — see [whatsapp.md](whatsapp.md) |
 | `ppp-sessions.yml` | `ppp-sessions` | SNMP-derived PPPoE session tracking (fallback path) |
 | `subscriber-sessions.yml` | `subscriber-sessions` | RouterOS-API `subscriber:*` series (active by pop/router/sector, provisioned-offline, reconnects) |

@@ -4,6 +4,11 @@
 # the `auth`/`module` labels in prometheus/targets/*.yml (see
 # prometheus.yml's relabel_configs for how those become the __param_*
 # query params the exporter reads).
+#
+# Only v1/v2c communities live here. SNMPv3 auths (usernames + passwords)
+# are in secrets/snmp_auths.yml, loaded as a second config file - see
+# snmp_exporter/snmp_auths.example.yml and docs/snmpv3.md. Auth names must
+# be unique across both files.
 auths:
   public_v2:
     community: monitoring

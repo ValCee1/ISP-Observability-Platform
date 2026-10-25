@@ -4,6 +4,10 @@
 # `site`/`role` are free-form labels attached to every metric from this
 # router - used by dashboards to group/filter by location or function.
 #
+# `auth` (optional) picks the SNMP credential set: omit it for the default
+# v2c `public_v2`, or set e.g. `auth: "mikrotik_v3"` for SNMPv3 (defined in
+# secrets/snmp_auths.yml - see docs/snmpv3.md).
+#
 # `router` (added 2026-09-12) is the same stable id used as the `name` in
 # routeros_exporter/config.yml for this box. It exists purely so
 # Alertmanager can `equal: [router]` a SNMP-side alert (CoreRouterDown,
@@ -33,6 +37,7 @@
     role: "core-router"
     pop: "HOME"
     router: "pop1-home" # keep in sync with routeros_exporter/config.yml `name`
+    auth: "mikrotik_v3" # SNMPv3 (CONFIRMED 2026-10-25); v2c is off on this router
     wan_ifname: "ether1"
 
 - targets:

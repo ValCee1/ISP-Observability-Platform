@@ -2,6 +2,19 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
+# How much history to keep (default would be 15 days - too short for the
+# Capacity Planning dashboard and month-over-month trends). Whichever limit
+# is hit first wins: 90 days, or 20GB on disk, oldest data dropped first.
+# The size cap keeps a busy estate from filling the server's disk (the
+# disk-space alerts in rules/server-health.yml still watch the host).
+# Set here rather than as --storage.tsdb.retention.* flags (deprecated in
+# Prometheus 3) so the baked image carries it too.
+storage:
+  tsdb:
+    retention:
+      time: 90d
+      size: 20GB
+
 # Each SNMP/ICMP job below follows the same "proxy scrape" pattern: the
 # real target device's address is moved into __param_target, and
 # __address__ is rewritten to point at the exporter container
@@ -75,6 +88,11 @@ scrape_configs:
         target_label: instance
       - target_label: __address__
         replacement: snmp-exporter:9116
+      # Optional per-router `auth` label (e.g. mikrotik_v3 for SNMPv3). A
+      # router without one sends an empty auth, which snmp-exporter treats
+      # as its default `public_v2`.
+      - source_labels: [auth]
+        target_label: __param_auth
 
   # PTP link reachability via ICMP ping (ping success + RTT), independent
   # of SNMP - still tells you a link is down even if its SNMP agent has

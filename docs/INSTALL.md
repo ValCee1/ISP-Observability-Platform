@@ -25,8 +25,12 @@ echo 'choose-a-password'      > secrets/grafana_admin_password.txt
 echo '<telegram bot token>'   > secrets/telegram_bot_token.txt
 echo 'dry-run-placeholder'    > secrets/whatsapp_access_token.txt   # real token only at go-live
 cp routeros_exporter/routeros_api_credentials.example.json secrets/routeros_api_credentials.json
+cp snmp_exporter/snmp_auths.example.yml secrets/snmp_auths.yml      # SNMPv3 users (docs/snmpv3.md)
 cp routeros_exporter/config.example.yml routeros_exporter/config.yml
-chmod 600 secrets/*
+# Files 644, folder 700: containers read secrets as non-root users, and on
+# Linux a 600 file owned by you is unreadable to them (Alertmanager would
+# lose its Telegram token). The 700 folder keeps other host users out.
+chmod 700 secrets && chmod 644 secrets/*
 
 # 3. describe the estate
 $EDITOR prometheus/targets/mikrotik-routers.yml   # routers
@@ -51,9 +55,10 @@ Grafana http://<server>:3000 (user `admin`), Prometheus :9090, Alertmanager :909
 itself is enabled at boot (`sudo systemctl enable docker`), so the stack
 returns after a reboot with no extra unit file.
 
-**Firewall:** these ports are published on all interfaces by default. On a
-server restrict 3000/9090/9093/9100 to your management network, or bind them
-to `127.0.0.1` in `docker-compose.yml` and put a reverse proxy in front.
+**Firewall:** 3000/9090/9093 are published on all interfaces. On a server
+restrict them to your management network, or bind them to `127.0.0.1` in
+`docker-compose.yml` and put a reverse proxy in front. The exporter ports
+(9100/9115/9116/9436) are already bound to `127.0.0.1`.
 
 **node-exporter on Linux:** you may append `,rslave` to its `/:/host:ro`
 mount so mounts made later are seen; not needed for a normal server.
@@ -99,7 +104,7 @@ separately:
    channel (scp, an encrypted USB stick, a password manager attachment),
    never email or chat:
    - `secrets/` (Grafana password, Telegram token, RouterOS credentials,
-     WhatsApp token)
+     WhatsApp token, SNMPv3 users)
    - `.env`
    - `routeros_exporter/config.yml`
 
@@ -108,7 +113,7 @@ separately:
    tar czf site-secrets.tgz secrets .env routeros_exporter/config.yml
    scp site-secrets.tgz user@new-server:~/
    # on the new machine, inside the cloned repo
-   tar xzf ~/site-secrets.tgz && chmod 600 secrets/* .env && shred -u ~/site-secrets.tgz
+   tar xzf ~/site-secrets.tgz && chmod 700 secrets && chmod 644 secrets/* && chmod 600 .env && shred -u ~/site-secrets.tgz
    ```
 3. **Metric history (optional).** It lives in Docker volumes, not in the
    folder. Archive and restore the `prometheus_data` volume only if you need
