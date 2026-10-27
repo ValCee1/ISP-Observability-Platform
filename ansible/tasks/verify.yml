@@ -60,7 +60,7 @@
         content: |
           commit: {{ release_commit }}
           ref: {{ release_ref }}
-          deployed: {{ ansible_date_time.iso8601 }}
+          deployed: {{ ansible_facts['date_time']['iso8601'] }}
           by: {{ deployed_by }}
         dest: "{{ app_dir }}/DEPLOYED_VERSION"
         mode: "0644"
@@ -68,7 +68,7 @@
     - name: Append to the deploy history
       ansible.builtin.lineinfile:
         path: "{{ app_dir }}/.deploy-history"
-        line: "{{ ansible_date_time.iso8601 }} {{ release_commit }} {{ release_ref }} {{ deployed_by }}"
+        line: "{{ ansible_facts['date_time']['iso8601'] }} {{ release_commit }} {{ release_ref }} {{ deployed_by }}"
         create: true
         mode: "0644"
 

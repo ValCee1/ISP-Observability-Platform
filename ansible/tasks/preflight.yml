@@ -10,19 +10,19 @@
 - name: Ubuntu server
   ansible.builtin.assert:
     that:
-      - ansible_distribution == "Ubuntu"
-      - ansible_distribution_version is version("22.04", ">=")
+      - ansible_facts['distribution'] == "Ubuntu"
+      - ansible_facts['distribution_version'] is version("22.04", ">=")
     fail_msg: >-
-      Expected Ubuntu 24.04 LTS, found {{ ansible_distribution }}
-      {{ ansible_distribution_version }}.
+      Expected Ubuntu 24.04 LTS, found {{ ansible_facts['distribution'] }}
+      {{ ansible_facts['distribution_version'] }}.
     quiet: true
 
 - name: Recommend Ubuntu 24.04
   ansible.builtin.debug:
     msg: >-
-      Ubuntu {{ ansible_distribution_version }}: 24.04 LTS is the tested
+      Ubuntu {{ ansible_facts['distribution_version'] }}: 24.04 LTS is the tested
       release (22.04 leaves standard support in April 2027).
-  when: ansible_distribution_version != "24.04"
+  when: ansible_facts['distribution_version'] != "24.04"
 
 - name: Firewall ranges set (refusing to guess)
   ansible.builtin.assert:
