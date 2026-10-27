@@ -46,6 +46,10 @@ frequency-migration features, which needed write access, were removed.
 1. **Network placement.** Give the server an address on the management
    network only. Do not give it a leg in the customer network, and do not
    enable IP forwarding on it.
+   If the server plugs directly into a POP router, use a management-only
+   port or VLAN on that router, never the customer bridge. Sectors still
+   need a route to and from the POP router before the server can reach them
+   (see [GO-LIVE.md](GO-LIVE.md)).
 2. **Firewall the published ports.** `docker-compose.yml` publishes
    3000 (Grafana), 9090 (Prometheus) and 9093 (Alertmanager) on all
    interfaces. Allow only the NOC/management workstations to reach 3000

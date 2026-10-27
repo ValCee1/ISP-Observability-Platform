@@ -21,7 +21,7 @@ credentials** that only the ISP can supply. Work top to bottom; tick each box.
 - [ ] `prometheus/targets/links.yml` - real PTP links (lab links such as
       `litebeam-a` must go).
 - [ ] `prometheus/targets/vantage-points.yml` - the production server's
-      default gateway (the file still says `lab-gateway`) and optionally a
+      default gateway, i.e. the POP router it plugs into (the file still says `lab-gateway`) and optionally a
       public IP such as 1.1.1.1.
 - [ ] `routeros_exporter/config.yml` + `secrets/routeros_api_credentials.json`
       - routers and their **read-only** API users (names identical everywhere).
@@ -32,9 +32,13 @@ credentials** that only the ISP can supply. Work top to bottom; tick each box.
       on each target, v2c removed from the device - [snmpv3.md](snmpv3.md).
       AirFiber has no v3: management decides ping-only, a documented
       exception, or replacement.
-- [ ] Sector routes, POP by POP: a NARROW route on each sector (monitoring
-      subnet only, no default route) and the matching route on the POP
-      router; then remove the POP masquerade rule. No routing protocols on
+- [ ] Sector routes, POP by POP. The server plugs directly into its POP
+      router (one hop); the POP routers already reach each other over the
+      backhaul, so no inter-POP routing is needed. A NARROW route on each sector (monitoring subnet
+      only, no default route) and, unless the sector range is already on a
+      POP router interface, the matching route on the POP router; if the
+      server has a second NIC or another default gateway, a static route on
+      the server too. Then remove the POP masquerade rule. No routing protocols on
       sectors. Sector services (`/ip service`) limited to management ranges.
 - [ ] Each POP router drops customer-to-management traffic, so sector/router
       management IPs stay unreachable from the customer side; test from a
