@@ -1,0 +1,37 @@
+# Host ports: ufw. Docker-published ports: the DOCKER-USER chain (Docker's NAT
+# bypasses ufw). docs/ANSIBLE.md#firewall
+- name: ufw allows SSH from the SSH ranges
+  community.general.ufw:
+    rule: allow
+    proto: tcp
+    port: "{{ ssh_connection.stdout.split()[3] }}"   # the port this session uses
+    src: "{{ item }}"
+    comment: isp-obs ssh
+  loop: "{{ firewall_ssh_cidrs }}"
+
+- name: ufw denies other incoming traffic and is enabled
+  community.general.ufw:
+    state: enabled
+    default: deny
+    direction: incoming
+
+- name: DOCKER-USER rules script
+  ansible.builtin.template:
+    src: isp-obs-firewall.sh.j2
+    dest: /usr/local/sbin/isp-obs-firewall
+    mode: "0755"
+  register: fw_script
+
+- name: DOCKER-USER rules unit (re-applied whenever Docker starts)
+  ansible.builtin.copy:
+    src: templates/isp-obs-firewall.service
+    dest: /etc/systemd/system/isp-obs-firewall.service
+    mode: "0644"
+  register: fw_unit
+
+- name: DOCKER-USER rules loaded
+  ansible.builtin.systemd_service:
+    name: isp-obs-firewall
+    enabled: true
+    daemon_reload: "{{ fw_unit is changed }}"
+    state: "{{ 'restarted' if (fw_script is changed or fw_unit is changed) else 'started' }}"

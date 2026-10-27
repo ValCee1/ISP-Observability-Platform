@@ -1,0 +1,62 @@
+# Staging is a full copy of what the live folder should become, including the
+# per-site files. It is checked (validate.yml) and then synced (apply.yml).
+# check_mode: false - staging is not live, and --check needs it for its preview.
+- name: Copy the release to the server
+  ansible.builtin.copy:
+    src: "{{ release_archive }}"
+    dest: "{{ release_tmp }}"
+    mode: "0600"
+  check_mode: false
+
+- name: Empty staging folder
+  ansible.builtin.file:
+    path: "{{ staging_dir }}"
+    state: "{{ item }}"
+    mode: "0700"
+  loop: [absent, directory]
+  check_mode: false
+
+- name: Unpack the release
+  ansible.builtin.unarchive:
+    src: "{{ release_tmp }}"
+    dest: "{{ staging_dir }}"
+    remote_src: true
+  check_mode: false
+
+- name: secrets/ folder (700 - other host users stay out)
+  ansible.builtin.file:
+    path: "{{ staging_dir }}/secrets"
+    state: directory
+    mode: "0700"
+  check_mode: false
+
+- name: Secret files (644 - the containers read them as non-root users)
+  ansible.builtin.copy:
+    content: "{{ item.content }}"
+    dest: "{{ staging_dir }}/secrets/{{ item.file }}"
+    mode: "0644"
+  loop:
+    - { file: grafana_admin_password.txt, content: "{{ grafana_admin_password }}" }
+    - { file: telegram_bot_token.txt, content: "{{ telegram_bot_token }}" }
+    - { file: whatsapp_access_token.txt, content: "{{ whatsapp_access_token }}" }
+    - { file: deadman_url.txt, content: "{{ deadman_url }}" }
+    - { file: routeros_api_credentials.json, content: "{{ routeros_api_credentials }}" }
+    - { file: snmp_auths.yml, content: "{{ snmp_auths }}" }
+  loop_control:
+    label: "{{ item.file }}"
+  no_log: true
+  check_mode: false
+
+- name: routeros_exporter/config.yml
+  ansible.builtin.copy:
+    content: "{{ routeros_exporter_config }}"
+    dest: "{{ staging_dir }}/routeros_exporter/config.yml"
+    mode: "0644"
+  check_mode: false
+
+- name: .env (WhatsApp settings, Compose project name)
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ staging_dir }}/.env"
+    mode: "0600"
+  check_mode: false

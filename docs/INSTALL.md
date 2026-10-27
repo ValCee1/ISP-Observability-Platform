@@ -1,5 +1,10 @@
 # Installing on another machine
 
+> **Production Linux server: use [ANSIBLE.md](ANSIBLE.md).** One command
+> from your laptop prepares Ubuntu 24.04, writes the secrets from an
+> encrypted vault, checks everything and starts the stack. This page is the
+> manual route (and Windows), for when Ansible is not an option.
+>
 > Start with [SETUP-INPUTS.md](SETUP-INPUTS.md): the full list of secrets and
 > site-specific files a fresh install needs.
 
@@ -83,14 +88,24 @@ identical sites; remember rule changes need a new tag.
 
 ### Upgrading
 
+With Ansible: `scripts/deploy.sh` ([ANSIBLE.md](ANSIBLE.md)); it reloads or
+restarts only what changed. By hand:
+
 ```bash
 git pull && docker compose up -d --build
 ```
-Prometheus/Alertmanager config reloads on `docker compose restart <service>`;
-target files reload on their own within a minute. Data lives in named volumes
-and survives `down`/`up` (not `down -v`).
+`docker compose up` does **not** notice an edited config file, so after a
+config change run `docker compose restart <service>` (Prometheus,
+Alertmanager, exporters) or the change never takes effect. Target files
+reload on their own within a minute. Data lives in named volumes and
+survives `down`/`up` (not `down -v`).
 
 ## Moving an existing installation to another computer
+
+**With Ansible** there is nothing to copy: point `ansible/inventory.ini` at
+the new server and run `scripts/deploy.sh` ([ANSIBLE.md](ANSIBLE.md),
+"Moving or rebuilding the server"). Only metric history (step 3 below) is
+optional extra work. The rest of this section is the manual route.
 
 **Do not copy the whole folder.** It contains things that must not travel:
 `routeros_exporter/.venv` (a Python environment tied to this OS/CPU),

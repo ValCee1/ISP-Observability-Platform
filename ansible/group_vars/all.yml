@@ -1,0 +1,34 @@
+# Defaults for every deploy. Per-site values and secrets override these in
+# ansible/secrets.yml (vault). Docs: docs/ANSIBLE.md
+
+# Live install folder on the server. Its staging twin is <app_dir>-staging.
+app_dir: /opt/isp-observability
+
+# Docker Compose project name = prefix of the named volumes (metric history).
+# Keep it stable. An existing manual install used its folder name (e.g.
+# isp-observability-platform); set that here to keep its volumes.
+compose_project: isp-observability
+
+# WhatsApp bridge (.env). dry_run = log only, nothing sent. docs/whatsapp.md
+whatsapp_mode: dry_run
+whatsapp_phone_number_id: ""
+whatsapp_recipients: ""
+whatsapp_template: isp_critical_alert
+whatsapp_daily_cap: 10
+whatsapp_monthly_cap: 100
+
+# Firewall source ranges (CIDR lists). Set them in secrets.yml; the playbook
+# refuses to run with ssh/engineer ranges empty rather than guess.
+firewall_ssh_cidrs: []        # who may SSH to the server
+firewall_engineer_cidrs: []   # Grafana + Prometheus (9090) + Alertmanager (9093)
+firewall_noc_cidrs: []        # Grafana (3000) only
+
+# Lab deploys only: accept CHANGE-ME / PUT-...-HERE placeholder secrets.
+allow_placeholder_secrets: false
+
+# Set by scripts/deploy.sh - not meant to be edited.
+release_archive: ""
+release_commit: ""
+release_ref: ""
+deployed_by: ""
+os_updates: false

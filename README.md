@@ -43,7 +43,11 @@ Routers        --API---> routeros-exporter -/            -> Alertmanager -> Tele
   check that alerts when the whole stack goes silent.
 - [docs/snmpv3.md](docs/snmpv3.md) — moving devices from SNMPv2c to encrypted
   SNMPv3 one at a time (credentials in a gitignored secret).
-- [docs/INSTALL.md](docs/INSTALL.md) — installing on another Linux machine
+- [docs/ANSIBLE.md](docs/ANSIBLE.md) — **production deploys**: one command
+  (`scripts/deploy.sh`) prepares an Ubuntu 24.04 server, writes secrets from an
+  encrypted Ansible vault, checks everything, and reloads only what changed;
+  previews, rollback, OS updates.
+- [docs/INSTALL.md](docs/INSTALL.md) — manual install on another Linux machine
   (or Windows via Docker Desktop/WSL2), offline install, upgrades.
 - [docs/server-monitoring.md](docs/server-monitoring.md) — monitoring the
   server itself (node-exporter, server-health alerts, Server Health dashboard).
@@ -56,6 +60,9 @@ Routers        --API---> routeros-exporter -/            -> Alertmanager -> Tele
   (detect → alert → explain → recover → no storm).
 
 ## Running the stack
+
+On the production server, deploy with Ansible instead:
+[docs/ANSIBLE.md](docs/ANSIBLE.md) (`scripts/deploy.sh`). For a local/dev run:
 
 1. Fill in the secret files (all gitignored, not committed):
    - `secrets/grafana_admin_password.txt` — Grafana admin password

@@ -1,0 +1,47 @@
+#!/bin/sh
+# Written by Ansible (ansible/templates/isp-obs-firewall.sh.j2) - edits here
+# are overwritten. Ranges come from ansible/secrets.yml.
+#
+# Docker publishes ports with its own NAT rules, which bypass ufw. Traffic to a
+# published port goes through the FORWARD chain, where Docker consults the
+# DOCKER-USER chain first - so the per-port allow lists live here. Matching on
+# --ctorigdstport uses the port the client dialled (before Docker's DNAT).
+set -eu
+
+for ipt in iptables ip6tables; do
+  command -v "$ipt" >/dev/null 2>&1 || continue
+  "$ipt" -N DOCKER-USER 2>/dev/null || true
+  "$ipt" -F DOCKER-USER
+  "$ipt" -A DOCKER-USER -m conntrack --ctstate ESTABLISHED,RELATED -j RETURN
+  # containers' own outbound traffic (e.g. a scrape of some device's :9090)
+  "$ipt" -A DOCKER-USER -i docker0 -j RETURN
+  "$ipt" -A DOCKER-USER -i br-+ -j RETURN
+done
+
+allow() { # allow <port> <cidr>
+  iptables -A DOCKER-USER -p tcp -m conntrack --ctorigdstport "$1" --ctdir ORIGINAL -s "$2" -j RETURN
+}
+drop() { # drop <port>  (everyone not allowed above; IPv6 is never allowed)
+  for ipt in iptables ip6tables; do
+    command -v "$ipt" >/dev/null 2>&1 || continue
+    "$ipt" -A DOCKER-USER -p tcp -m conntrack --ctorigdstport "$1" --ctdir ORIGINAL -j DROP
+  done
+}
+
+# Grafana: NOC + engineers
+{% for cidr in (firewall_noc_cidrs + firewall_engineer_cidrs) | unique %}
+allow 3000 {{ cidr }}
+{% endfor %}
+drop 3000
+# Prometheus, Alertmanager: engineers only
+{% for port in [9090, 9093] %}
+{% for cidr in firewall_engineer_cidrs %}
+allow {{ port }} {{ cidr }}
+{% endfor %}
+drop {{ port }}
+{% endfor %}
+
+for ipt in iptables ip6tables; do
+  command -v "$ipt" >/dev/null 2>&1 || continue
+  "$ipt" -A DOCKER-USER -j RETURN
+done

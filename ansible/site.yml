@@ -1,0 +1,52 @@
+# Prepares the monitoring server and releases the stack. Run it through
+# scripts/deploy.sh (it packages the commit and runs the local checks first).
+# Docs: docs/ANSIBLE.md
+#
+# Order: refuse bad input -> prepare host -> firewall -> unpack the release to
+# staging with the per-site files -> check staging against the real files ->
+# sync into the live folder -> reload/restart only what changed -> verify.
+# Nothing live changes until every check has passed.
+- name: Deploy the ISP observability stack
+  hosts: monitoring
+  become: true
+  vars_files:
+    - secrets.yml
+  vars:
+    staging_dir: "{{ app_dir }}-staging"
+    release_tmp: /var/tmp/isp-obs-release.tar.gz
+    preflight_project: isp-obs-preflight
+
+  tasks:
+    - name: Refuse bad input before touching the server
+      ansible.builtin.import_tasks: tasks/preflight.yml
+
+    - name: Prepare the host (packages, Docker)
+      ansible.builtin.import_tasks: tasks/host.yml
+
+    - name: OS updates (scripts/deploy.sh --os-updates)
+      ansible.builtin.import_tasks: tasks/os_updates.yml
+
+    - name: Firewall
+      ansible.builtin.import_tasks: tasks/firewall.yml
+
+    - name: Release
+      block:
+        - name: Unpack the release and write the per-site files to staging
+          ansible.builtin.import_tasks: tasks/stage.yml
+
+        - name: Check staging against the real files
+          ansible.builtin.import_tasks: tasks/validate.yml
+
+        - name: Sync into the live folder and apply what changed
+          ansible.builtin.import_tasks: tasks/apply.yml
+
+        - name: Verify the running stack
+          ansible.builtin.import_tasks: tasks/verify.yml
+      always:
+        # staging holds decrypted secrets - never leave it behind
+        - name: Remove staging and the release archive
+          ansible.builtin.file:
+            path: "{{ item }}"
+            state: absent
+          loop: ["{{ staging_dir }}", "{{ release_tmp }}"]
+          check_mode: false

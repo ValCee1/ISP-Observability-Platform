@@ -7,12 +7,19 @@ credentials** that only the ISP can supply. Work top to bottom; tick each box.
 
 - [ ] Dedicated Linux machine on the **management network only** (no leg in
       the customer network) - [SECURITY.md](SECURITY.md).
-- [ ] Docker Engine + Compose plugin installed and enabled at boot.
-- [ ] Repo cloned; `bash scripts/init.sh` run - [INSTALL.md](INSTALL.md),
-      [SETUP-INPUTS.md](SETUP-INPUTS.md).
-- [ ] Firewall: Grafana (3000) only from NOC workstations; 9090/9093 only from
-      engineers. (9100/9115/9116/9436 are bound to `127.0.0.1` in
-      `docker-compose.yml`, so they are already closed to the network.)
+- [ ] Ubuntu 24.04 LTS, SSH key login with `sudo`, listed in
+      `ansible/inventory.ini` - [ANSIBLE.md](ANSIBLE.md).
+- [ ] `ansible/secrets.yml` filled in, encrypted and committed; vault
+      password in the Keychain **and** in the password manager.
+- [ ] Firewall ranges set in `ansible/secrets.yml` (`firewall_noc_cidrs`,
+      `firewall_engineer_cidrs`, `firewall_ssh_cidrs`). The playbook installs
+      Docker, enables it at boot, and enforces Grafana (3000) only from NOC
+      workstations, 9090/9093 only from engineers. (9100/9115/9116/9436 are
+      bound to `127.0.0.1` in `docker-compose.yml`, so they are already
+      closed to the network.)
+- [ ] Manual install instead (no Ansible): Docker Engine + Compose plugin
+      enabled at boot, repo cloned, `bash scripts/init.sh` run, firewall by
+      hand - [INSTALL.md](INSTALL.md), [SETUP-INPUTS.md](SETUP-INPUTS.md).
 
 ## B. Replace the lab data (tracked files still hold lab values)
 
@@ -46,6 +53,10 @@ credentials** that only the ISP can supply. Work top to bottom; tick each box.
 
 ## C. Secrets and identities
 
+With Ansible every `secrets/...` file and `.env` below is a key in
+`ansible/secrets.yml` (`scripts/edit-secrets.sh`); the
+playbook writes the files with the right modes and refuses placeholder values.
+
 - [ ] `secrets/grafana_admin_password.txt` - strong password (not the
       `change-me-now` placeholder); create Viewer accounts for NOC staff.
 - [ ] Telegram: production bot token in `secrets/telegram_bot_token.txt`, and
@@ -73,6 +84,10 @@ credentials** that only the ISP can supply. Work top to bottom; tick each box.
 
 ## E. Validate before cut-over
 
+With Ansible, `scripts/deploy.sh` runs all of the commands below (locally and
+again on the server against the real files) and stops on any failure; the
+boxes after them are still yours. By hand:
+
 ```bash
 docker run --rm -v "$PWD/prometheus:/p" --entrypoint sh prom/prometheus:v3.13.2 \
   -c 'cd /p && promtool check rules rules/*.yml && promtool test rules rules/tests/*.yml'
@@ -98,8 +113,13 @@ docker compose up -d --build && docker compose ps
 - [ ] Dead-man's switch on: healthchecks.io check, URL in
       `secrets/deadman_url.txt`, Watchdog route receiver `deadman`
       ([deadman.md](deadman.md)); `docker compose stop alertmanager` test passes.
-- [ ] Rollback plan: `git revert` the config change and `docker compose up -d`;
-      WhatsApp can be switched off instantly with `WHATSAPP_MODE=dry_run`.
+- [ ] Rollback plan: `scripts/deploy.sh <previous deploy-... tag>` (or by hand:
+      `git revert` the change, `docker compose up -d`, restart the changed
+      service); WhatsApp can be switched off instantly with
+      `whatsapp_mode: dry_run` in the vault (or `WHATSAPP_MODE=dry_run` in
+      `.env`) and a deploy.
+- [ ] Backups (Ansible): the encrypted `ansible/secrets.yml` is in git; the
+      vault password is kept somewhere other than the deploying laptop.
 
 ## Known limits to accept
 

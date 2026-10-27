@@ -1,0 +1,4 @@
+# ansible-galaxy collection install -r ansible/requirements.yml
+# (already included if Ansible came from `brew install ansible` / `pip install ansible`)
+collections:
+  - name: community.general   # ufw

@@ -1,0 +1,114 @@
+# Input checks. They change nothing, so a failure here leaves the server as it was.
+- name: Release supplied by scripts/deploy.sh
+  ansible.builtin.assert:
+    that:
+      - release_archive | length > 0
+      - release_commit | length > 0
+    fail_msg: Run this through scripts/deploy.sh, which packages the release.
+    quiet: true
+
+- name: Ubuntu server
+  ansible.builtin.assert:
+    that:
+      - ansible_distribution == "Ubuntu"
+      - ansible_distribution_version is version("22.04", ">=")
+    fail_msg: >-
+      Expected Ubuntu 24.04 LTS, found {{ ansible_distribution }}
+      {{ ansible_distribution_version }}.
+    quiet: true
+
+- name: Recommend Ubuntu 24.04
+  ansible.builtin.debug:
+    msg: >-
+      Ubuntu {{ ansible_distribution_version }}: 24.04 LTS is the tested
+      release (22.04 leaves standard support in April 2027).
+  when: ansible_distribution_version != "24.04"
+
+- name: Firewall ranges set (refusing to guess)
+  ansible.builtin.assert:
+    that:
+      - firewall_ssh_cidrs | length > 0
+      - firewall_engineer_cidrs | length > 0
+    fail_msg: Set firewall_ssh_cidrs and firewall_engineer_cidrs in ansible/secrets.yml.
+    quiet: true
+
+- name: This SSH session (client address, server port)
+  # sudo drops SSH_CONNECTION, so read it as the login user
+  ansible.builtin.command: printenv SSH_CONNECTION
+  become: false
+  register: ssh_connection
+  changed_when: false
+  check_mode: false
+
+- name: Firewall ranges are valid and include this SSH session
+  # Enabling ufw without our own address in the SSH list would lock us out.
+  ansible.builtin.command:
+    argv:
+      - python3
+      - -c
+      - |
+        import ipaddress, sys
+        me = ipaddress.ip_address(sys.argv[1])
+        ssh = [ipaddress.ip_network(c, strict=False) for c in sys.argv[2].split(",")]
+        for c in sys.argv[3].split(","):
+            if c: ipaddress.ip_network(c, strict=False)
+        if not any(me in n for n in ssh):
+            sys.exit(f"{me} (this deploy) is not in firewall_ssh_cidrs - ufw would lock you out")
+      - "{{ ssh_connection.stdout.split()[0] }}"
+      - "{{ firewall_ssh_cidrs | join(',') }}"
+      - "{{ (firewall_engineer_cidrs + firewall_noc_cidrs) | join(',') }}"
+  changed_when: false
+  check_mode: false
+
+- name: WhatsApp mode valid
+  ansible.builtin.assert:
+    that: whatsapp_mode in ["dry_run", "live"]
+    fail_msg: whatsapp_mode must be dry_run or live.
+    quiet: true
+
+- name: Secrets are real values, not placeholders
+  ansible.builtin.assert:
+    that: item.value is not search(placeholder_re)
+    fail_msg: >-
+      {{ item.name }} still holds a placeholder. Fix it with
+      scripts/edit-secrets.sh (lab only: allow_placeholder_secrets: true).
+    quiet: true
+  loop:
+    - { name: grafana_admin_password, value: "{{ grafana_admin_password }}" }
+    - { name: telegram_bot_token, value: "{{ telegram_bot_token }}" }
+    - { name: deadman_url, value: "{{ deadman_url }}" }
+    - { name: routeros_api_credentials, value: "{{ routeros_api_credentials }}" }
+    - { name: snmp_auths, value: "{{ snmp_auths }}" }
+    - { name: whatsapp_access_token, value: "{{ whatsapp_access_token if whatsapp_mode == 'live' else '' }}" }
+  loop_control:
+    label: "{{ item.name }}"
+  no_log: true   # the loop items are secrets; fail_msg above still names the key
+  vars:
+    placeholder_re: "CHANGE-ME|PUT-[A-Z-]+-HERE|change-me-now|dry-run-placeholder"
+  when: not allow_placeholder_secrets | bool
+
+- name: Per-site files parse and router names line up
+  # Router names must match between the exporter config and the credentials
+  # (docs/SETUP-INPUTS.md) - a mismatch means a silently unpolled router.
+  ansible.builtin.assert:
+    that:
+      - snmp_auths | from_yaml is mapping
+      - "'auths' in (snmp_auths | from_yaml)"
+      - routeros_cfg_names | difference(routeros_cred_names) | length == 0
+    fail_msg: >-
+      snmp_auths needs a top-level auths: block, and every router in
+      routeros_exporter_config needs credentials. Routers without
+      credentials: {{ routeros_cfg_names | difference(routeros_cred_names) }}
+    quiet: true
+  vars:
+    routeros_cfg_names: "{{ (routeros_exporter_config | from_yaml).routers | map(attribute='name') | list }}"
+    routeros_cred_names: "{{ (routeros_api_credentials | from_json).keys() | reject('match', '_') | list }}"
+
+- name: Is Docker installed yet?
+  ansible.builtin.stat:
+    path: /usr/bin/docker
+  register: docker_bin
+
+- name: Preview needs a server that has been deployed once
+  ansible.builtin.meta: end_host
+  when: ansible_check_mode and not docker_bin.stat.exists

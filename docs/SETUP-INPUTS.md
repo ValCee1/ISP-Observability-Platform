@@ -1,9 +1,16 @@
 # First install: what you must provide, and where
 
 A fresh `git clone` (or a pulled Docker image) does **not** contain anything
-site-specific or secret. This is the complete list. Run `scripts/init.sh`
-first: it creates every missing file below from the repo's examples
-(never overwriting), then you edit the ones marked **EDIT**.
+site-specific or secret. This is the complete list.
+
+- **Deploying with Ansible** ([ANSIBLE.md](ANSIBLE.md)): sections A and B,
+  plus `routeros_exporter/config.yml`, are keys in one encrypted file,
+  `ansible/secrets.yml` (template `ansible/secrets.example.yml`, which names
+  the file each key becomes). The playbook writes them on the server with
+  the right modes. Sections C-E still apply as written.
+- **By hand:** run `scripts/init.sh` first: it creates every missing file
+  below from the repo's examples (never overwriting), then you edit the ones
+  marked **EDIT**.
 
 > A Docker registry pull alone is not enough. Only the Prometheus image is
 > published; Grafana, Alertmanager, the exporters and the bridge are built
@@ -25,7 +32,9 @@ first: it creates every missing file below from the repo's examples
 The containers read secrets as non-root users; on Linux a `600` file is
 unreadable to them, and Alertmanager would start without its Telegram token.
 
-**Changing the Grafana password later:** `grafana_admin_password.txt` is only
+**Changing the Grafana password later:** with Ansible, change
+`grafana_admin_password` in the vault and deploy; the playbook also resets
+the live admin password. By hand: `grafana_admin_password.txt` is only
 read when Grafana first creates its database (first start, empty `grafana_data`
 volume). Editing the file afterwards does **not** change the existing admin
 password, so the old one keeps working. To apply a new password to a running
