@@ -95,11 +95,15 @@
       register: compose_up
       changed_when: compose_up.stderr is search('Recreated|Created|Started|Removed')
 
+    # The signal is sent from inside the container: `docker kill -s SIGHUP`
+    # also marks the container "manually stopped", and restart:
+    # unless-stopped then leaves it down after the next reboot.
     - name: Reload changed config
       ansible.builtin.command:
-        argv: "{{ live_compose_cmd + ['kill', '-s', 'SIGHUP'] + (reload_services | difference(restart_services)) }}"
+        argv: "{{ live_compose_cmd + ['exec', '-T', item, 'kill', '-HUP', '1'] }}"
         chdir: "{{ app_dir }}"
-      when: not first_deploy and reload_services | difference(restart_services) | length > 0
+      loop: "{{ reload_services | difference(restart_services) }}"
+      when: not first_deploy
 
     - name: Restart services whose startup-only files changed
       ansible.builtin.command:
