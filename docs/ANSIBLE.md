@@ -109,8 +109,8 @@ scripts/deploy.sh              # release
    `docker compose config`; `promtool check config`; `amtool check-config`
    with the real secrets mounted; `blackbox_exporter --config.check`;
    `snmp_exporter --dry-run` with the real
-   SNMPv3 users (catches `SHA1`/`AES-256` spellings); the bridge and
-   exporter images built. Any failure stops here: the live stack is
+   SNMPv3 users (catches `SHA1`/`AES-256` spellings); the images
+   pulled (retried on a flaky link) and the bridge and exporter images built. Any failure stops here: the live stack is
    untouched.
 7. **Sync** staging into `/opt/isp-observability`, rewriting changed files in
    place. Files a container has mounted on their own (for example

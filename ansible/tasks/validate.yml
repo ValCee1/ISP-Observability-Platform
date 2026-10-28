@@ -12,7 +12,7 @@
       changed_when: false
       check_mode: false
 
-    - name: Config checks with the real files ({{ item.name }})
+    - name: Config checks with the real files
       ansible.builtin.command:
         argv: "{{ compose + ['run', '--rm', '--no-deps', '-T'] + item.args }}"
         chdir: "{{ staging_dir }}"
@@ -31,12 +31,30 @@
       loop_control:
         label: "{{ item.name }}"
 
+    # Downloads happen here, before anything live changes, with retries for
+    # flaky links (a reset mid-pull otherwise fails `compose up` half-way).
+    # Not in --check previews: it fills the server's image cache.
+    - name: Pull the published images
+      ansible.builtin.command:
+        argv: "{{ compose + ['pull', '--quiet', '--ignore-buildable'] }}"
+        chdir: "{{ staging_dir }}"
+      register: compose_pull
+      until: compose_pull.rc == 0
+      retries: 4
+      delay: 20
+      changed_when: false
+      when: not ansible_check_mode
+
     # Last: it re-tags the local images (isp-*:dev) that a later
     # `docker compose up` would pick up, so not in --check previews.
     - name: Build the bridge and exporter images
       ansible.builtin.command:
         argv: "{{ compose + ['build', '--quiet'] }}"
         chdir: "{{ staging_dir }}"
+      register: compose_build
+      until: compose_build.rc == 0
+      retries: 2
+      delay: 20
       changed_when: false
       when: not ansible_check_mode
   always:

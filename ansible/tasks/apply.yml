@@ -84,7 +84,7 @@
     # or .env changed; leaves the rest running.
     - name: docker compose up
       ansible.builtin.command:
-        argv: "{{ live_compose_cmd + ['up', '-d', '--build', '--remove-orphans', '--wait', '--wait-timeout', '300'] }}"
+        argv: "{{ live_compose_cmd + ['up', '-d', '--build', '--quiet-pull', '--remove-orphans', '--wait', '--wait-timeout', '300'] }}"
         chdir: "{{ app_dir }}"
       register: compose_up
       changed_when: compose_up.stderr is search('Recreated|Created|Started|Removed')
