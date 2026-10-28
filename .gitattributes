@@ -1,0 +1,3 @@
+# Not shipped to the server by scripts/deploy.sh (git archive): the playbook
+# runs from the laptop, and this keeps the vault (ansible/secrets.yml) off it.
+/ansible export-ignore
