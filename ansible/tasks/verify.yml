@@ -21,7 +21,9 @@
         url: "{{ item }}"
       register: health
       until: health.status == 200
-      retries: 20
+      # up to 5 min, like `compose up --wait-timeout`: a first Grafana start
+      # migrates its database and downloads the pinned Prometheus plugin
+      retries: 100
       delay: 3
       loop:
         - http://127.0.0.1:9090/-/ready

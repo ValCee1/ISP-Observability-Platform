@@ -8,11 +8,13 @@
     mode: "0600"
   check_mode: false
 
+# 755 like the live folder: rsync -a copies this folder's mode onto it.
+# The secrets are guarded by secrets/ (700) and .env (600).
 - name: Empty staging folder
   ansible.builtin.file:
     path: "{{ staging_dir }}"
     state: "{{ item }}"
-    mode: "0700"
+    mode: "0755"
   loop: [absent, directory]
   check_mode: false
 
