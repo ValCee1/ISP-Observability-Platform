@@ -57,10 +57,16 @@
 - name: Preview (--check)
   when: ansible_check_mode
   block:
+    # The staged compose file, but relative paths resolved against the live
+    # folder: from staging every bind mount has a different source path,
+    # so every container that mounts a file would look changed.
     - name: Containers docker compose up would create or recreate
       ansible.builtin.command:
-        argv: [docker, compose, -p, "{{ compose_project }}", --dry-run, up, -d, --no-build, --remove-orphans]
-        chdir: "{{ staging_dir }}"
+        argv: [docker, compose, -p, "{{ compose_project }}",
+               -f, "{{ staging_dir }}/docker-compose.yml", --project-directory, "{{ app_dir }}",
+               --env-file, "{{ staging_dir }}/.env",
+               --dry-run, up, -d, --no-build, --remove-orphans]
+        chdir: "{{ app_dir }}"
       register: compose_preview
       changed_when: false
       failed_when: false
