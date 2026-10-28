@@ -98,7 +98,7 @@ step "Ansible$($check && echo ' (preview, --check)')"
 args=(site.yml
   -e "release_archive=$tmp/release.tar.gz"
   -e "release_commit=$commit"
-  -e "release_ref=$ref"
+  -e "release_ref=$([[ $ref == HEAD ]] && git rev-parse --abbrev-ref HEAD || echo "$ref")"
   -e "deployed_by=$(git config user.name || whoami)"
   -e "os_updates=$os_updates")
 $check && args+=(--check --diff)

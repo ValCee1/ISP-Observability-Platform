@@ -7,8 +7,11 @@ credentials** that only the ISP can supply. Work top to bottom; tick each box.
 
 - [ ] Dedicated Linux machine on the **management network only** (no leg in
       the customer network) - [SECURITY.md](SECURITY.md).
-- [ ] Ubuntu 24.04 LTS, SSH key login with `sudo`, listed in
-      `ansible/inventory.ini` - [ANSIBLE.md](ANSIBLE.md).
+- [ ] Ubuntu 24.04 LTS, time sync on, SSH key login with passwordless
+      `sudo`, listed in `ansible/inventory.ini` - step by step in
+      [ANSIBLE.md](ANSIBLE.md#first-production-install-step-by-step).
+- [ ] Outbound HTTPS from the server to Ubuntu, Docker, PyPI and grafana.com
+      for the install ([ANSIBLE.md](ANSIBLE.md#what-you-need)).
 - [ ] `ansible/secrets.yml` filled in, encrypted and committed; vault
       password in the Keychain **and** in the password manager.
 - [ ] Firewall ranges set in `ansible/secrets.yml` (`firewall_noc_cidrs`,
