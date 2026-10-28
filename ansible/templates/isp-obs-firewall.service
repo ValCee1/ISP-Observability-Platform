@@ -1,0 +1,14 @@
+# Written by Ansible. Loads the DOCKER-USER allow lists for the published
+# ports (Grafana/Prometheus/Alertmanager) every time Docker starts.
+[Unit]
+Description=ISP observability: firewall for Docker-published ports
+After=docker.service
+PartOf=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/isp-obs-firewall
+
+[Install]
+WantedBy=docker.service

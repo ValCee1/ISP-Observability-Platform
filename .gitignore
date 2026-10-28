@@ -17,3 +17,6 @@ __pycache__/
 # local run helper output
 .claude-run.log
 apply-and-check.command
+
+# Ansible: per-site inventory (example committed). secrets.yml IS committed - encrypted.
+ansible/inventory.ini

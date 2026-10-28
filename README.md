@@ -31,8 +31,11 @@ Routers        --API---> routeros-exporter -/            -> Alertmanager -> Tele
   secure, verify and accept before cut-over.
 - [docs/SETUP-INPUTS.md](docs/SETUP-INPUTS.md) — **every secret/file/ID you must
   supply on a fresh install, and where it goes** (`scripts/init.sh` scaffolds them).
-- [docs/ISP Network Observability Platform - Operations Manual.docx](<docs/ISP Network Observability Platform - Operations Manual.docx>) — the NOC
-  operations manual (daily routine, alerts, routine changes, troubleshooting, backup, security).
+- [docs/ISP Network Observability Platform - Operations Manual.docx](<docs/ISP Network Observability Platform - Operations Manual.docx>) — engineer
+  edition (internal): daily routine, alerts, routine changes incl. SNMPv3, troubleshooting, backup,
+  security, command cheat sheet, go-live status, server sizing.
+- [docs/ISP Network Observability Platform - Management Overview.docx](<docs/ISP Network Observability Platform - Management Overview.docx>) — for
+  management: what is monitored, alerting, security, costs, rollout status. No install or backend detail.
 - [docs/ISP Network Observability Platform Pilot Proposal.pptx](<docs/ISP Network Observability Platform Pilot Proposal.pptx>) — the pilot proposal deck.
 - [docs/SECURITY.md](docs/SECURITY.md) — security model: locally hosted, outbound-only,
   read-only access, why management-network placement adds no attack surface, hardening checklist.
@@ -40,7 +43,11 @@ Routers        --API---> routeros-exporter -/            -> Alertmanager -> Tele
   check that alerts when the whole stack goes silent.
 - [docs/snmpv3.md](docs/snmpv3.md) — moving devices from SNMPv2c to encrypted
   SNMPv3 one at a time (credentials in a gitignored secret).
-- [docs/INSTALL.md](docs/INSTALL.md) — installing on another Linux machine
+- [docs/ANSIBLE.md](docs/ANSIBLE.md) — **production deploys**: one command
+  (`scripts/deploy.sh`) prepares an Ubuntu 24.04 server, writes secrets from an
+  encrypted Ansible vault, checks everything, and reloads only what changed;
+  previews, rollback, OS updates.
+- [docs/INSTALL.md](docs/INSTALL.md) — manual install on another Linux machine
   (or Windows via Docker Desktop/WSL2), offline install, upgrades.
 - [docs/server-monitoring.md](docs/server-monitoring.md) — monitoring the
   server itself (node-exporter, server-health alerts, Server Health dashboard).
@@ -53,6 +60,9 @@ Routers        --API---> routeros-exporter -/            -> Alertmanager -> Tele
   (detect → alert → explain → recover → no storm).
 
 ## Running the stack
+
+On the production server, deploy with Ansible instead:
+[docs/ANSIBLE.md](docs/ANSIBLE.md) (`scripts/deploy.sh`). For a local/dev run:
 
 1. Fill in the secret files (all gitignored, not committed):
    - `secrets/grafana_admin_password.txt` — Grafana admin password

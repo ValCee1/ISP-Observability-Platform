@@ -46,6 +46,10 @@ frequency-migration features, which needed write access, were removed.
 1. **Network placement.** Give the server an address on the management
    network only. Do not give it a leg in the customer network, and do not
    enable IP forwarding on it.
+   If the server plugs directly into a POP router, use a management-only
+   port or VLAN on that router, never the customer bridge. Sectors still
+   need a route to and from the POP router before the server can reach them
+   (see [GO-LIVE.md](GO-LIVE.md)).
 2. **Firewall the published ports.** `docker-compose.yml` publishes
    3000 (Grafana), 9090 (Prometheus) and 9093 (Alertmanager) on all
    interfaces. Allow only the NOC/management workstations to reach 3000
@@ -53,7 +57,10 @@ frequency-migration features, which needed write access, were removed.
    bound to `127.0.0.1` only - Prometheus reaches them over the internal
    Docker network, so they are not reachable from the LAN at all. Docker bypasses simple `ufw` rules for published ports; put
    the restriction in the `DOCKER-USER` iptables chain, or bind a port to a
-   specific address (`"10.0.0.5:3000:3000"`) in the compose file.
+   specific address (`"10.0.0.5:3000:3000"`) in the compose file. The
+   Ansible deploy does the `DOCKER-USER` part for you from the CIDR lists in
+   the vault, plus `ufw` deny-by-default for the host itself
+   ([ANSIBLE.md](ANSIBLE.md#firewall)).
 3. **Device-side limits.** On each router/sector: SNMP allowed only from the
    server's IP; RouterOS API service (`/ip service`) `address=` limited to
    the server's IP; the monitoring user is in the `read` group.
@@ -68,6 +75,11 @@ frequency-migration features, which needed write access, were removed.
    database, so editing the file later does not change an existing password
    (use `grafana cli admin reset-admin-password` or the UI; see SETUP-INPUTS.md).
    Rotate any token that has been pasted into chat or email.
+   With Ansible, the source of every secret is `ansible/secrets.yml`,
+   encrypted with `ansible-vault` (AES-256) and committed only in that
+   form; its password lives in the deploying laptop's Keychain and a
+   password manager, never in a file or in git. `scripts/deploy.sh` refuses
+   to run if the file is ever found decrypted.
 5. **Grafana.** Disable anonymous access (default is off), use a strong
    admin password, and give NOC staff Viewer accounts only.
 6. **Host hardening.** Keep Docker and the OS patched; SSH keys only; the
@@ -91,6 +103,7 @@ frequency-migration features, which needed write access, were removed.
 - [ ] `snmpwalk` from another host with the community is refused.
 - [ ] The RouterOS user is in group `read`; a write attempt with it fails.
 - [ ] `git status` shows no secrets; `secrets/` folder is `700`, files `644`.
+- [ ] `head -1 ansible/secrets.yml` starts with `$ANSIBLE_VAULT` (Ansible deploys).
 - [ ] Grafana default password changed.
 
 ## Residual risks (honest list)

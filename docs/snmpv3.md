@@ -1,6 +1,6 @@
 # SNMPv3
 
-SNMPv2c sends the community string in cleartext. SNMPv3 `authPriv`
+**ISP policy: SNMPv3 only.** SNMPv2c sends the community string in cleartext. SNMPv3 `authPriv`
 authenticates each request (SHA) and encrypts it (AES). The stack supports
 both side by side: each target picks its credential set with its `auth`
 label, so devices can move to v3 one at a time.
@@ -84,8 +84,10 @@ with no `auth` label uses the exporter default, `public_v2`.
 - A single slow radio can time out when it is walked many times at once;
   test with one request at a time.
 
-- A device that supports only v1/v2c (older airOS M-series) stays on its
-  community; restrict it to the server's IP.
+- A device that supports only v1/v2c (AirFiber; possibly older airOS
+  M-series) does not meet the policy. Until management decides (ping-only, a
+  documented exception, or replacement), keep its community restricted to the
+  server's IP.
 - Editors that save by replacing the file can leave a running container on
   the old copy; `docker compose restart snmp-exporter` always picks up edits.
 - Using different users per device: add one entry per device (e.g.

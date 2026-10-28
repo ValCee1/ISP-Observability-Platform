@@ -1,0 +1,84 @@
+# Health after the release. A down scrape target is reported, not fatal: the
+# device may really be down. Then the version is recorded on the server.
+- name: Verify
+  when: not ansible_check_mode
+  block:
+    - name: Every service running
+      ansible.builtin.shell:
+        cmd: >-
+          diff <(docker compose config --services | sort)
+          <(docker compose ps --status running --services | sort)
+        executable: /bin/bash
+        chdir: "{{ app_dir }}"
+      register: running
+      until: running.rc == 0
+      retries: 10
+      delay: 6
+      changed_when: false
+
+    - name: Prometheus, Alertmanager, Grafana healthy
+      ansible.builtin.uri:
+        url: "{{ item }}"
+      register: health
+      until: health.status == 200
+      # up to 5 min, like `compose up --wait-timeout`: a first Grafana start
+      # migrates its database and downloads the pinned Prometheus plugin
+      retries: 100
+      delay: 3
+      loop:
+        - http://127.0.0.1:9090/-/ready
+        - http://127.0.0.1:9093/-/ready
+        - http://127.0.0.1:3000/api/health
+
+    - name: Prometheus loaded its config
+      ansible.builtin.uri:
+        url: http://127.0.0.1:9090/api/v1/query?query=prometheus_config_last_reload_successful
+      register: prom_reload
+      until: (prom_reload.json.data.result | first).value[1] == "1"
+      retries: 10
+      delay: 3
+
+    - name: Alertmanager loaded its config
+      ansible.builtin.uri:
+        url: http://127.0.0.1:9093/metrics
+        return_content: true
+      register: am_reload
+      until: am_reload.content is search('(?m)^alertmanager_config_last_reload_successful 1$')
+      retries: 10
+      delay: 3
+
+    - name: Scrape targets currently down
+      ansible.builtin.uri:
+        url: http://127.0.0.1:9090/api/v1/query?query=up%3D%3D0
+      register: down_targets
+
+    - name: Down targets (check the device, its IP, SNMP user or firewall)
+      ansible.builtin.debug:
+        msg: "{{ down_targets.json.data.result | map(attribute='metric.instance') | list }}"
+      when: down_targets.json.data.result | length > 0
+
+    - name: Record the deployed version
+      ansible.builtin.copy:
+        content: |
+          commit: {{ release_commit }}
+          ref: {{ release_ref }}
+          deployed: {{ ansible_facts['date_time']['iso8601'] }}
+          by: {{ deployed_by }}
+        dest: "{{ app_dir }}/DEPLOYED_VERSION"
+        mode: "0644"
+
+    - name: Append to the deploy history
+      ansible.builtin.lineinfile:
+        path: "{{ app_dir }}/.deploy-history"
+        line: "{{ ansible_facts['date_time']['iso8601'] }} {{ release_commit }} {{ release_ref }} {{ deployed_by }}"
+        create: true
+        mode: "0644"
+
+    - name: Summary
+      ansible.builtin.debug:
+        msg:
+          - "Deployed {{ release_ref }} ({{ release_commit[:12] }})"
+          - "Changed files: {{ changed_paths | length }}"
+          - "Reloaded: {{ (reload_services | difference(restart_services)) or 'none' }}"
+          - "Restarted: {{ restart_services or 'none' }}"
+          - "Down targets: {{ down_targets.json.data.result | length }}"

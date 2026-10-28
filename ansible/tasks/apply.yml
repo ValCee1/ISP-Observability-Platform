@@ -1,0 +1,133 @@
+# Sync staging into the live folder, then reload/restart only what changed.
+# Why rsync --inplace: a file a container has mounted on its own (e.g.
+# prometheus.yml) is bound by inode. Replacing it (new file + rename, as most
+# tools do) leaves the container reading the old one; rewriting it in place
+# keeps the inode, so a reload sees the new content.
+- name: Is this the first deploy?
+  ansible.builtin.stat:
+    path: "{{ app_dir }}/docker-compose.yml"
+  register: live_compose
+
+- name: Sync staging into the live folder (--check - a dry run)
+  ansible.builtin.command:
+    argv: >-
+      {{ ['rsync', '-a', '--checksum', '--inplace', '--delete', '--itemize-changes',
+          '--exclude=/DEPLOYED_VERSION', '--exclude=/.deploy-history']
+         + (['--dry-run'] if ansible_check_mode else [])
+         + [staging_dir ~ '/', app_dir ~ '/'] }}
+  register: sync
+  changed_when: sync.stdout_lines | select('match', '^(>f|\\*deleting)') | list | length > 0
+  check_mode: false
+
+- name: Files whose content changed or that were removed
+  ansible.builtin.set_fact:
+    changed_paths: "{{ sync.stdout_lines | select('match', '^(>f|\\*deleting)')
+                       | map('regex_replace', '^\\S+\\s+', '') | list }}"
+    first_deploy: "{{ not live_compose.stat.exists }}"
+    reload_services: []
+    restart_services: []
+
+# Config a service re-reads on SIGHUP: no restart, no scrape gap.
+- name: Services to reload
+  ansible.builtin.set_fact:
+    reload_services: "{{ reload_services + [item.service] }}"
+  loop:
+    - { pattern: '^prometheus/', service: prometheus }
+    - { pattern: '^alertmanager/', service: alertmanager }
+    - { pattern: '^snmp_exporter/snmp\.yml$', service: snmp-exporter }
+    - { pattern: '^blackbox/', service: blackbox-exporter }
+  when: changed_paths | select('match', item.pattern) | list | length > 0
+
+# Files read only at startup (secrets, Grafana provisioning, exporter config).
+# grafana/dashboards/ needs nothing - Grafana rescans it every 30 s. Image,
+# compose and .env changes are handled by `docker compose up` below.
+- name: Services to restart
+  ansible.builtin.set_fact:
+    restart_services: "{{ (restart_services + [item.service]) | unique }}"
+  loop:
+    - { pattern: '^grafana/provisioning/', service: grafana }
+    - { pattern: '^secrets/grafana_admin_password\.txt$', service: grafana }
+    - { pattern: '^secrets/(telegram_bot_token|deadman_url)\.txt$', service: alertmanager }
+    - { pattern: '^secrets/whatsapp_access_token\.txt$', service: whatsapp-bridge }
+    - { pattern: '^secrets/routeros_api_credentials\.json$', service: routeros-exporter }
+    - { pattern: '^routeros_exporter/config\.yml$', service: routeros-exporter }
+    - { pattern: '^secrets/snmp_auths\.yml$', service: snmp-exporter }
+  when: changed_paths | select('match', item.pattern) | list | length > 0
+
+- name: Preview (--check)
+  when: ansible_check_mode
+  block:
+    # The staged compose file, but relative paths resolved against the live
+    # folder: from staging every bind mount has a different source path,
+    # so every container that mounts a file would look changed.
+    - name: Containers docker compose up would create or recreate
+      ansible.builtin.command:
+        argv: [docker, compose, -p, "{{ compose_project }}",
+               -f, "{{ staging_dir }}/docker-compose.yml", --project-directory, "{{ app_dir }}",
+               --env-file, "{{ staging_dir }}/.env",
+               --dry-run, up, -d, --no-build, --remove-orphans]
+        chdir: "{{ app_dir }}"
+      register: compose_preview
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    - name: What this release would do
+      ansible.builtin.debug:
+        msg:
+          - "Changed files: {{ changed_paths if changed_paths else 'none' }}"
+          - "Reload: {{ (reload_services | difference(restart_services)) or 'none' }}"
+          - "Restart: {{ restart_services or 'none' }}"
+          - "Compose: {{ compose_preview.stderr_lines | select('search', 'Recreate|Creat|Remov') | list or 'no container changes' }}"
+          - "Images built from source (bridge, exporter) are only compared on a real deploy."
+
+- name: Apply
+  when: not ansible_check_mode
+  vars:
+    live_compose_cmd: [docker, compose]
+  block:
+    # Creates/recreates exactly the containers whose image, compose definition
+    # or .env changed; leaves the rest running.
+    - name: docker compose up
+      ansible.builtin.command:
+        argv: "{{ live_compose_cmd + ['up', '-d', '--build', '--quiet-pull', '--remove-orphans', '--wait', '--wait-timeout', '300'] }}"
+        chdir: "{{ app_dir }}"
+      register: compose_up
+      changed_when: compose_up.stderr is search('Recreated|Created|Started|Removed')
+
+    # The signal is sent from inside the container: `docker kill -s SIGHUP`
+    # also marks the container "manually stopped", and restart:
+    # unless-stopped then leaves it down after the next reboot.
+    - name: Reload changed config
+      ansible.builtin.command:
+        argv: "{{ live_compose_cmd + ['exec', '-T', item, 'kill', '-HUP', '1'] }}"
+        chdir: "{{ app_dir }}"
+      loop: "{{ reload_services | difference(restart_services) }}"
+      when: not first_deploy
+
+    - name: Restart services whose startup-only files changed
+      ansible.builtin.command:
+        argv: "{{ live_compose_cmd + ['restart'] + restart_services }}"
+        chdir: "{{ app_dir }}"
+      when: not first_deploy and restart_services | length > 0
+
+    # The password file is only read when Grafana creates its database, so a
+    # changed password must also be set on the running instance.
+    - name: Set the new Grafana admin password
+      ansible.builtin.command:
+        argv:
+          - docker
+          - compose
+          - exec
+          - -T
+          - grafana
+          - sh
+          - -c
+          - grafana cli admin reset-admin-password "$(cat /run/secrets/grafana_admin_password)"
+        chdir: "{{ app_dir }}"
+      register: grafana_pw
+      until: grafana_pw.rc == 0
+      retries: 10
+      delay: 3
+      no_log: true
+      when: not first_deploy and 'secrets/grafana_admin_password.txt' in changed_paths

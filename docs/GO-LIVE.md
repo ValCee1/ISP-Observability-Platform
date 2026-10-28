@@ -7,12 +7,22 @@ credentials** that only the ISP can supply. Work top to bottom; tick each box.
 
 - [ ] Dedicated Linux machine on the **management network only** (no leg in
       the customer network) - [SECURITY.md](SECURITY.md).
-- [ ] Docker Engine + Compose plugin installed and enabled at boot.
-- [ ] Repo cloned; `bash scripts/init.sh` run - [INSTALL.md](INSTALL.md),
-      [SETUP-INPUTS.md](SETUP-INPUTS.md).
-- [ ] Firewall: Grafana (3000) only from NOC workstations; 9090/9093 only from
-      engineers. (9100/9115/9116/9436 are bound to `127.0.0.1` in
-      `docker-compose.yml`, so they are already closed to the network.)
+- [ ] Ubuntu 24.04 LTS, time sync on, SSH key login with passwordless
+      `sudo`, listed in `ansible/inventory.ini` - step by step in
+      [ANSIBLE.md](ANSIBLE.md#first-production-install-step-by-step).
+- [ ] Outbound HTTPS from the server to Ubuntu, Docker, PyPI and grafana.com
+      for the install ([ANSIBLE.md](ANSIBLE.md#what-you-need)).
+- [ ] `ansible/secrets.yml` filled in, encrypted and committed; vault
+      password in the Keychain **and** in the password manager.
+- [ ] Firewall ranges set in `ansible/secrets.yml` (`firewall_noc_cidrs`,
+      `firewall_engineer_cidrs`, `firewall_ssh_cidrs`). The playbook installs
+      Docker, enables it at boot, and enforces Grafana (3000) only from NOC
+      workstations, 9090/9093 only from engineers. (9100/9115/9116/9436 are
+      bound to `127.0.0.1` in `docker-compose.yml`, so they are already
+      closed to the network.)
+- [ ] Manual install instead (no Ansible): Docker Engine + Compose plugin
+      enabled at boot, repo cloned, `bash scripts/init.sh` run, firewall by
+      hand - [INSTALL.md](INSTALL.md), [SETUP-INPUTS.md](SETUP-INPUTS.md).
 
 ## B. Replace the lab data (tracked files still hold lab values)
 
@@ -21,18 +31,34 @@ credentials** that only the ISP can supply. Work top to bottom; tick each box.
 - [ ] `prometheus/targets/links.yml` - real PTP links (lab links such as
       `litebeam-a` must go).
 - [ ] `prometheus/targets/vantage-points.yml` - the production server's
-      default gateway (the file still says `lab-gateway`) and optionally a
+      default gateway, i.e. the POP router it plugs into (the file still says `lab-gateway`) and optionally a
       public IP such as 1.1.1.1.
 - [ ] `routeros_exporter/config.yml` + `secrets/routeros_api_credentials.json`
       - routers and their **read-only** API users (names identical everywhere).
 - [ ] `prometheus/topology.yml` - POP/dependency layout.
 - [ ] `snmp_exporter/snmp.yml` - SNMP communities (and the same on devices,
       restricted to the server's IP).
-- [ ] SNMPv3 where devices support it: users in `secrets/snmp_auths.yml`,
-      `auth: <name>` on each target - [snmpv3.md](snmpv3.md).
-- [ ] Sector management routes in place (proposal deck: "one route on each side").
+- [ ] SNMPv3 only (ISP policy): users in `secrets/snmp_auths.yml`, `auth: <name>`
+      on each target, v2c removed from the device - [snmpv3.md](snmpv3.md).
+      AirFiber has no v3: management decides ping-only, a documented
+      exception, or replacement.
+- [ ] Sector routes, POP by POP. The server plugs directly into its POP
+      router (one hop); the POP routers already reach each other over the
+      backhaul, so no inter-POP routing is needed. A NARROW route on each sector (monitoring subnet
+      only, no default route) and, unless the sector range is already on a
+      POP router interface, the matching route on the POP router; if the
+      server has a second NIC or another default gateway, a static route on
+      the server too. Then remove the POP masquerade rule. No routing protocols on
+      sectors. Sector services (`/ip service`) limited to management ranges.
+- [ ] Each POP router drops customer-to-management traffic, so sector/router
+      management IPs stay unreachable from the customer side; test from a
+      customer address (SECURITY.md checklist).
 
 ## C. Secrets and identities
+
+With Ansible every `secrets/...` file and `.env` below is a key in
+`ansible/secrets.yml` (`scripts/edit-secrets.sh`); the
+playbook writes the files with the right modes and refuses placeholder values.
 
 - [ ] `secrets/grafana_admin_password.txt` - strong password (not the
       `change-me-now` placeholder); create Viewer accounts for NOC staff.
@@ -61,6 +87,10 @@ credentials** that only the ISP can supply. Work top to bottom; tick each box.
 
 ## E. Validate before cut-over
 
+With Ansible, `scripts/deploy.sh` runs all of the commands below (locally and
+again on the server against the real files) and stops on any failure; the
+boxes after them are still yours. By hand:
+
 ```bash
 docker run --rm -v "$PWD/prometheus:/p" --entrypoint sh prom/prometheus:v3.13.2 \
   -c 'cd /p && promtool check rules rules/*.yml && promtool test rules rules/tests/*.yml'
@@ -86,8 +116,13 @@ docker compose up -d --build && docker compose ps
 - [ ] Dead-man's switch on: healthchecks.io check, URL in
       `secrets/deadman_url.txt`, Watchdog route receiver `deadman`
       ([deadman.md](deadman.md)); `docker compose stop alertmanager` test passes.
-- [ ] Rollback plan: `git revert` the config change and `docker compose up -d`;
-      WhatsApp can be switched off instantly with `WHATSAPP_MODE=dry_run`.
+- [ ] Rollback plan: `scripts/deploy.sh <previous deploy-... tag>` (or by hand:
+      `git revert` the change, `docker compose up -d`, restart the changed
+      service); WhatsApp can be switched off instantly with
+      `whatsapp_mode: dry_run` in the vault (or `WHATSAPP_MODE=dry_run` in
+      `.env`) and a deploy.
+- [ ] Backups (Ansible): the encrypted `ansible/secrets.yml` is in git; the
+      vault password is kept somewhere other than the deploying laptop.
 
 ## Known limits to accept
 
