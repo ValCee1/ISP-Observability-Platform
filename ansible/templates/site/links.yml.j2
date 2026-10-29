@@ -1,0 +1,29 @@
+{% include 'site/header.j2' %}{{ "\n" }}
+# PTP link endpoints (`ptp_links`). Read by three jobs: link-availability
+# (ICMP), link-interface-health (IF-MIB) and link-radio-health (the vendor
+# module named in `module`). One target per endpoint radio.
+#
+# Labels: link_id joins the two ends of a link; link_name, endpoint, site,
+# role, vendor describe the endpoint; `pop` (optional) feeds the dependency
+# inhibit rules; module + auth pick the SNMP module and credential set.
+{% for l in ptp_links %}
+
+# {{ l.id }} ({{ l.vendor }}, {{ l.role }})
+{% for e in l.endpoints %}
+- targets: [{{ e.ip | string | to_json }}]
+  labels:
+    module: {{ (l.vendor ~ '_link') | to_json }}
+    auth: {{ (e.get('auth') or l.auth) | string | to_json }}
+    link_name: {{ (e.get('link_name') or l.id) | string | to_json }}
+    link_id: {{ l.id | string | to_json }}
+    endpoint: {{ e.endpoint | string | to_json }}
+    site: {{ (e.get('site') or e.endpoint) | string | to_json }}
+{% if e.get('pop') %}
+    pop: {{ e['pop'] | string | to_json }}
+{% endif %}
+    role: {{ l.role | string | to_json }}
+    vendor: {{ l.vendor | string | to_json }}
+{% endfor %}
+{% else %}
+[]
+{% endfor %}

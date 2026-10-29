@@ -18,5 +18,10 @@ __pycache__/
 .claude-run.log
 apply-and-check.command
 
-# Ansible: per-site inventory (example committed). secrets.yml IS committed - encrypted.
+# Ansible: per-ISP data lives in each ISP's own site repo (--site), never
+# here. Only the fictional example site is committed. The old single-site
+# files are ignored so a leftover copy cannot be committed by accident.
+inventories/*
+!inventories/example/
 ansible/inventory.ini
+ansible/secrets.yml

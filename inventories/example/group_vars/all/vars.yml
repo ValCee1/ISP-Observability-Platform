@@ -1,0 +1,96 @@
+# Plain (non-secret) settings for one ISP - EXAMPLE, a fictional ISP.
+# Copy this whole folder out of the product repo to start a new site (it is
+# meant to live in a private git repo of its own), then edit. Secrets go in
+# group_vars/all/vault.yml (scripts/edit-secrets.sh --site <folder>).
+# Every key: docs/ANSIBLE.md "Site variables"; what to collect: docs/SETUP-INPUTS.md.
+#
+# Overrides the product defaults in ansible/roles/isp_defaults/defaults/main.yml.
+
+isp_name: example                  # short id: names the deploy tags (deploy-example-...)
+timezone: Africa/Lagos             # Alertmanager's 08:00 capacity-digest window
+telegram_chat_id: "-1001234567890" # NOC Telegram group id (docs/SETUP-INPUTS.md section D)
+
+# --- Firewall (CIDR lists) -------------------------------------------------
+# Must include the address you deploy from, or the deploy stops (it would
+# lock you out).
+firewall_ssh_cidrs: [10.50.0.0/24]
+firewall_engineer_cidrs: [10.50.0.0/24]   # Grafana, Prometheus, Alertmanager
+firewall_noc_cidrs: [10.50.1.0/24]        # Grafana only
+
+# --- WhatsApp (.env) - recipients and the token are in vault.yml ----------
+whatsapp_mode: dry_run             # live = really send (costs money)
+whatsapp_phone_number_id: ""
+whatsapp_template: isp_critical_alert
+whatsapp_daily_cap: 10
+whatsapp_monthly_cap: 100
+
+# --- POPs ------------------------------------------------------------------
+# One entry per POP. `router` is the POP's MikroTik PPPoE server, listed ONCE
+# here: it becomes the SNMP target (prometheus/targets/mikrotik-routers.yml),
+# the RouterOS API exporter entry, and the key its API login must have in
+# vault.yml routeros_api_logins. `router: null` for a POP with no polled
+# router yet. `upstream_links` lists the ptp_links ids that feed this POP.
+#   router fields: name, ip, wan_ifname (ifName of the real WAN uplink), auth
+#   (SNMP credential set), optional site (default: the POP's), api_port
+#   (default 8728, or 8729 with api_tls: true).
+pops:
+  IKEJA:
+    site: Ikeja
+    router: {name: pop-ikeja, ip: 10.50.0.1, wan_ifname: ether1, auth: mikrotik_v3}
+    upstream_links: []               # head-end: the internet uplink lands here
+  YABA:
+    site: Yaba
+    router: {name: pop-yaba, ip: 10.50.2.1, wan_ifname: sfp1, auth: mikrotik_v3,
+             api_port: 8729, api_tls: true}
+    upstream_links: [IKEJA-YABA]
+  LEKKI:
+    site: Lekki
+    router: null                     # no polled router at this POP yet
+    upstream_links: [YABA-LEKKI]
+
+# --- SNMP-only MikroTiks ---------------------------------------------------
+# Routers that are SNMP targets but are never polled over the RouterOS API
+# (repeaters, stand-ins). Client routers are never polled over the API.
+#   fields: name, ip, site, role, wan_ifname, auth; optional pop
+snmp_only_routers:
+  - {name: yaba-repeater, ip: 10.50.2.15, site: Yaba, role: Repeater,
+     wan_ifname: wlan1, auth: mikrotik_v3, pop: YABA}
+
+# --- PtMP sectors ----------------------------------------------------------
+#   fields: sector (short id, no spaces), ip, pop, auth; optional site
+#   (default: the POP's) and role (default sector-ap)
+sectors:
+  - {sector: YB1, ip: 10.50.13.1, pop: YABA, role: Yaba sector 1, auth: mikrotik_v3}
+  - {sector: YB2, ip: 10.50.13.2, pop: YABA, role: Yaba sector 2, auth: mikrotik_v3}
+
+# --- PTP links ---------------------------------------------------------------
+# One entry per link, one endpoint per monitored radio.
+#   link fields: id, vendor (ubiquiti_airmax | ubiquiti_airfiber | saf),
+#   role, auth (an endpoint may override it), endpoints
+#   endpoint fields: ip, endpoint; optional site (default: endpoint),
+#   pop, link_name (default: the link id)
+ptp_links:
+  - id: IKEJA-YABA
+    vendor: ubiquiti_airfiber
+    role: Backhaul
+    auth: public_v2                  # AirFiber firmware has no SNMPv3
+    endpoints:
+      - {ip: 10.50.6.82, endpoint: IKEJA, site: IKEJA, pop: YABA}
+      - {ip: 10.50.6.83, endpoint: YABA, site: YABA, pop: YABA}
+  - id: YABA-LEKKI
+    vendor: saf
+    role: Backhaul
+    auth: saf_v3
+    endpoints:
+      - {ip: 10.50.6.90, endpoint: RADIO1, site: YABA, pop: LEKKI, link_name: YABA-LEKKI-RADIO1}
+      - {ip: 10.50.6.91, endpoint: LEKKI, site: LEKKI, pop: LEKKI, link_name: YABA-LEKKI-RADIO2}
+
+# --- Vantage points ----------------------------------------------------------
+# What the monitoring server pings to tell "I lost my network" apart from
+# "everything is down": its default gateway, and optionally a public address.
+vantage_points:
+  - {vantage: server-gateway, ip: 10.50.0.1}
+  - {vantage: public-internet, ip: 1.1.1.1}
+
+# --- Existing manual install only --------------------------------------------
+# compose_project: isp-observability-platform   # keeps its volumes/history

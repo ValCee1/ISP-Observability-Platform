@@ -1,11 +1,13 @@
-# SNMPv3 credentials - TEMPLATE. Copy to secrets/snmp_auths.yml (gitignored;
+# SNMP credentials (v1/v2c communities and SNMPv3 users) - TEMPLATE for a
+# MANUAL install. Copy to secrets/snmp_auths.yml (gitignored;
 # `bash scripts/init.sh` does it) and fill in real values there, never here.
+# An Ansible deploy writes secrets/snmp_auths.yml itself, from the site
+# vault's `snmp_communities` and `snmpv3_users` (docs/ANSIBLE.md).
 #
 # snmp-exporter loads this file IN ADDITION to snmp_exporter/snmp.yml (two
-# --config.file flags in docker-compose.yml), so these names are selectable
-# exactly like the v2c ones: set `auth: <name>` on a target in
-# prometheus/targets/*.yml. Names must not repeat a name already in
-# snmp.yml's `auths:` - a duplicate stops snmp-exporter from starting.
+# --config.file flags in docker-compose.yml); snmp.yml holds no auths. Select
+# one with `auth: <name>` on a target in prometheus/targets/*.yml. Names must
+# be unique - a duplicate stops snmp-exporter from starting.
 #
 # Unused entries are harmless (nothing is sent until a target selects one),
 # but replace the CHANGE-ME values before pointing a target at them.
@@ -18,6 +20,18 @@
 # "AES-256" is `AES256` - any other spelling stops snmp-exporter at startup.
 # Device-side setup per vendor: docs/snmpv3.md.
 auths:
+  # SNMPv1/v2c communities. Policy is SNMPv3 everywhere the device supports
+  # it; v2c stays only where firmware has no v3 (AirFiber).
+  public_v2:
+    version: 2
+    community: CHANGE-ME-community
+  public_v1:
+    version: 1
+    community: CHANGE-ME-community
+  saf_v2:
+    version: 2
+    community: CHANGE-ME-community
+
   # MikroTik routers and sectors (RouterOS v6 and v7). The RouterOS
   # "community" name is the v3 username. SHA = SHA1, AES = AES-128 - the
   # combination every RouterOS version supports. CONFIRMED 2026-10-25 on
@@ -34,7 +48,7 @@ auths:
   # Ubiquiti airMAX. UNVERIFIED - needs live device: confirm the auth/priv
   # algorithms the firmware offers (airOS UI: Services > SNMP Agent).
   # AirFiber has NO SNMPv3 (CONFIRMED 2026-10-25) - AirFiber targets stay
-  # on their v2c community in snmp.yml.
+  # on their v2c community (public_v2 above).
   ubiquiti_v3:
     version: 3
     security_level: authPriv

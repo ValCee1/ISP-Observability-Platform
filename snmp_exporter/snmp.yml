@@ -1,24 +1,15 @@
-# SNMP exporter config. `auths` are named community/version credential
-# sets; `modules` define what OIDs to walk/read and how to name them as
-# Prometheus metrics. Prometheus selects an auth + module per-target via
-# the `auth`/`module` labels in prometheus/targets/*.yml (see
+# SNMP exporter config. `modules` define what OIDs to walk/read and how to
+# name them as Prometheus metrics. Prometheus selects an auth + module
+# per-target via the `auth`/`module` labels in prometheus/targets/*.yml (see
 # prometheus.yml's relabel_configs for how those become the __param_*
 # query params the exporter reads).
 #
-# Only v1/v2c communities live here. SNMPv3 auths (usernames + passwords)
-# are in secrets/snmp_auths.yml, loaded as a second config file - see
-# snmp_exporter/snmp_auths.example.yml and docs/snmpv3.md. Auth names must
-# be unique across both files.
-auths:
-  public_v2:
-    community: monitoring
-    version: 2
-  public_v1:
-    community: monitoring
-    version: 1
-  saf_v2:
-    community: saf-public
-    version: 2
+# No credentials live here. Every `auths:` entry - SNMPv1/v2c communities
+# and SNMPv3 users alike - is per ISP and secret, so it is in
+# secrets/snmp_auths.yml, loaded as a second config file. The Ansible deploy
+# writes that file from the site vault (`snmp_communities` + `snmpv3_users`);
+# for a manual install copy snmp_exporter/snmp_auths.example.yml. See
+# docs/snmpv3.md. Auth names must be unique.
 
 modules:
   # Generic router health module (standard MIB-2/HOST-RESOURCES OIDs, works

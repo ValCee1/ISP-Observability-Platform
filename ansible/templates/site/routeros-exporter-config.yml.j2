@@ -1,0 +1,24 @@
+{% include 'site/header.j2' %}{{ "\n" }}
+# routeros-exporter configuration: the POP routers (`pops.<POP>.router`) -
+# the PPPoE servers. Only these are polled over the RouterOS API; client
+# routers never are. API logins are in secrets/routeros_api_credentials.json,
+# keyed by `name` and written from the vault's routeros_api_logins.
+
+options:
+{% for k, v in routeros_exporter_options.items() %}
+  {{ k }}: {{ v | to_json }}
+{% endfor %}
+
+routers:
+{% for pop, p in pops.items() if p and p.get('router') %}
+{% set r = p.router %}
+  - name: {{ r.name | string | to_json }}
+    host: {{ r.ip | string | to_json }}
+    port: {{ (r.get('api_port') or (8729 if r.get('api_tls') else 8728)) | int }}
+{% if r.get('api_tls') %}
+    use_tls: true
+{% endif %}
+    site: {{ (r.get('site') or p.get('site') or pop) | string | to_json }}
+    pop: {{ pop | string | to_json }}
+    role: "core-router"
+{% endfor %}

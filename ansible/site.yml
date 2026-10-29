@@ -9,8 +9,10 @@
 - name: Deploy the ISP observability stack
   hosts: monitoring
   become: true
-  vars_files:
-    - secrets.yml
+  # Product defaults; the site folder (-i <site>/hosts.ini, its group_vars/all/)
+  # overrides every one of them.
+  roles:
+    - isp_defaults
   vars:
     staging_dir: "{{ app_dir }}-staging"
     release_tmp: /var/tmp/isp-obs-release.tar.gz

@@ -1,0 +1,29 @@
+{% include 'site/header.j2' %}{{ "\n" }}
+# Network dependency map - documentation, not loaded by Prometheus. The
+# dependency-aware alerting itself comes from the `pop` label on targets:
+# the inhibit_rules in alertmanager/alertmanager.yml keyed on `equal: [pop]`
+# silence everything behind a POP whose upstream link or router is down.
+{% set by_pop = {} %}
+{% for s in sectors %}{% set _ = by_pop.update({s['pop']: by_pop.get(s['pop'], []) + [s.sector | string]}) %}{% endfor %}
+
+pops:
+{% for pop, p in pops.items() %}
+{% set p = p or {} %}
+  {{ pop | string | to_json }}:
+    site: {{ (p.get('site') or pop) | string | to_json }}
+    router: {{ (p.router.ip | string) | to_json if p.get('router') else 'null' }}
+{% if p.get('router') %}
+    router_name: {{ p.router.name | string | to_json }}
+{% endif %}
+    upstream_links: {{ p.get('upstream_links', []) | map('string') | list | to_json }}
+    sectors: {{ by_pop.get(pop, []) | to_json }}
+{% else %}
+  {}
+{% endfor %}
+{% if snmp_only_routers %}
+
+# SNMP-only routers (not POPs):
+{% for r in snmp_only_routers %}
+#   {{ r.ip }}  {{ r.name }}  ({{ r.role }}{{ ', pop ' ~ r['pop'] if r.get('pop') else '' }})
+{% endfor %}
+{% endif %}

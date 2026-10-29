@@ -62,6 +62,8 @@
         content: |
           commit: {{ release_commit }}
           ref: {{ release_ref }}
+          site: {{ isp_name }}
+          site_commit: {{ site_commit or 'not a git repo' }}
           deployed: {{ ansible_facts['date_time']['iso8601'] }}
           by: {{ deployed_by }}
         dest: "{{ app_dir }}/DEPLOYED_VERSION"
@@ -70,14 +72,14 @@
     - name: Append to the deploy history
       ansible.builtin.lineinfile:
         path: "{{ app_dir }}/.deploy-history"
-        line: "{{ ansible_facts['date_time']['iso8601'] }} {{ release_commit }} {{ release_ref }} {{ deployed_by }}"
+        line: "{{ ansible_facts['date_time']['iso8601'] }} {{ release_commit }} {{ release_ref }} {{ isp_name }}@{{ site_commit[:12] or '-' }} {{ deployed_by }}"
         create: true
         mode: "0644"
 
     - name: Summary
       ansible.builtin.debug:
         msg:
-          - "Deployed {{ release_ref }} ({{ release_commit[:12] }})"
+          - "Deployed {{ release_ref }} ({{ release_commit[:12] }}) to {{ isp_name }}, site data {{ site_commit[:12] or 'not in git' }}"
           - "Changed files: {{ changed_paths | length }}"
           - "Reloaded: {{ (reload_services | difference(restart_services)) or 'none' }}"
           - "Restarted: {{ restart_services or 'none' }}"

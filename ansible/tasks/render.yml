@@ -1,0 +1,53 @@
+# Writes the per-site, non-secret files into {{ render_root }} from the site's
+# inventory: the Prometheus target lists, the topology map, the routeros
+# exporter config, and the site values in alertmanager.yml. The same tasks
+# run on the server (staging, from stage.yml) and on the laptop
+# (render-site.yml, for the local checks and the repo's example files).
+# Expects tasks/check_site.yml to have passed.
+- name: Target lists, topology and routeros exporter config
+  ansible.builtin.template:
+    src: "site/{{ item.src }}"
+    dest: "{{ render_root }}/{{ item.dest }}"
+    mode: "0644"
+  loop:
+    - { src: mikrotik-routers.yml.j2, dest: prometheus/targets/mikrotik-routers.yml }
+    - { src: mikrotik-sectors.yml.j2, dest: prometheus/targets/mikrotik-sectors.yml }
+    - { src: links.yml.j2, dest: prometheus/targets/links.yml }
+    - { src: vantage-points.yml.j2, dest: prometheus/targets/vantage-points.yml }
+    - { src: topology.yml.j2, dest: prometheus/topology.yml }
+    - { src: routeros-exporter-config.yml.j2, dest: "{{ routeros_config_path | default('routeros_exporter/config.yml') }}" }
+  loop_control:
+    label: "{{ item.dest }}"
+  check_mode: false
+
+# The routing logic stays in the product's alertmanager.yml; only the
+# Telegram group and the timezone are per site, swapped in on their lines.
+- name: Read alertmanager.yml
+  ansible.builtin.slurp:
+    src: "{{ render_root }}/alertmanager/alertmanager.yml"
+  register: am_file
+
+- name: Telegram group and timezone in alertmanager.yml
+  vars:
+    chat_re: '(?m)^(\s*chat_id: &noc_chat_id )-?[0-9]+'
+    tz_re: '(?m)^(\s*- location: )"[^"]*"'
+    am_text: "{{ am_file.content | b64decode }}"
+  block:
+    - name: The lines to replace are there
+      ansible.builtin.assert:
+        that:
+          - am_text is search(chat_re)
+          - am_text is search(tz_re)
+        fail_msg: >-
+          alertmanager.yml no longer has a `chat_id: &noc_chat_id <id>` line or a
+          `- location: "<zone>"` line - ansible/tasks/render.yml cannot set the
+          site's telegram_chat_id / timezone.
+        quiet: true
+
+    - name: Write the site's values
+      ansible.builtin.copy:
+        content: "{{ am_text | regex_replace(chat_re, '\\g<1>' ~ telegram_chat_id)
+                             | regex_replace(tz_re, '\\g<1>\"' ~ timezone ~ '\"') }}"
+        dest: "{{ render_root }}/alertmanager/alertmanager.yml"
+        mode: "0644"
+      check_mode: false

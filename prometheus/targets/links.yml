@@ -1,107 +1,60 @@
-# LINK-001: Tower A ↔ Tower B (AirMAX)
-- targets: ["192.168.10.2"]
-  labels:
-    {
-      module: ubiquiti_airmax_link,
-      auth: public_v1,
-      link_name: litebeam-a,
-      link_id: HOME-GSIA,
-      endpoint: a,
-      site: Home,
-      role: P2P,
-      vendor: ubiquiti_airmax,
-    }
-- targets: ["192.168.10.3"]
-  labels:
-    {
-      module: ubiquiti_airmax_link,
-      auth: public_v1,
-      link_name: litebeam-b,
-      link_id: HOME-GSIA,
-      endpoint: b,
-      site: GSIA,
-      role: P2P,
-      vendor: ubiquiti_airmax,
-    }
+# GENERATED - do not edit. Written by the Ansible deploy (ansible/tasks/
+# render.yml) from the site's group_vars/all/vars.yml; edit that and
+# redeploy. In the product repo this copy is rendered from the example site
+# (inventories/example) by scripts/render-example.sh.
 
-# LINK-002: Tower A ↔ Tower B (AirMAX)
-- targets: ["192.168.10.5"]
-  labels:
-    {
-      module: ubiquiti_airmax_link,
-      auth: public_v1,
-      link_name: litebeam-a,
-      link_id: HOME-EVANG,
-      endpoint: a,
-      site: Home,
-      role: P2P,
-      vendor: ubiquiti_airmax,
-    }
-- targets: ["192.168.10.6"]
-  labels:
-    {
-      module: ubiquiti_airmax_link,
-      auth: public_v1,
-      link_name: litebeam-b,
-      link_id: HOME-EVANG,
-      endpoint: b,
-      site: EVANG,
-      role: P2P,
-      vendor: ubiquiti_airmax,
-    }
-
-# LINK-002: Tower A ↔ Tower B (AirFiber)
-- targets: ["10.10.6.82"]
-  labels:
-    {
-      module: ubiquiti_airfiber_link,
-      auth: public_v2, # AirFiber firmware has no SNMPv3 - stays v2c
-      link_name: POP6-POP2,
-      link_id: POP6-POP2,
-      pop: POP2,
-      endpoint: POP2,
-      site: "POP2",
-      role: Backhaul,
-      vendor: ubiquiti_airfiber,
-    }
-- targets: ["10.10.6.83"]
-  labels:
-    {
-      module: ubiquiti_airfiber_link,
-      auth: public_v2, # AirFiber firmware has no SNMPv3 - stays v2c
-      link_name: POP6-POP2,
-      link_id: POP6-POP2,
-      pop: POP6,
-      endpoint: POP6,
-      site: "POP6",
-      role: Backhaul,
-      vendor: ubiquiti_airfiber,
-    }
+# PTP link endpoints (`ptp_links`). Read by three jobs: link-availability
+# (ICMP), link-interface-health (IF-MIB) and link-radio-health (the vendor
+# module named in `module`). One target per endpoint radio.
 #
-# # LINK-003: Tower B ↔ Branch (SAF)
-- targets: ["10.10.6.90"]
+# Labels: link_id joins the two ends of a link; link_name, endpoint, site,
+# role, vendor describe the endpoint; `pop` (optional) feeds the dependency
+# inhibit rules; module + auth pick the SNMP module and credential set.
+
+# IKEJA-YABA (ubiquiti_airfiber, Backhaul)
+- targets: ["10.50.6.82"]
   labels:
-    {
-      module: saf_link,
-      auth: saf_v3, # SNMPv3 (CONFIRMED 2026-10-25), secrets/snmp_auths.yml
-      link_name: POP1-POP7-RADIO1,
-      link_id: POP1-POP7,
-      pop: POP7,
-      endpoint: RADIO1,
-      site: POP1,
-      role: Backhaul,
-      vendor: saf,
-    }
-- targets: ["10.10.6.91"]
+    module: "ubiquiti_airfiber_link"
+    auth: "public_v2"
+    link_name: "IKEJA-YABA"
+    link_id: "IKEJA-YABA"
+    endpoint: "IKEJA"
+    site: "IKEJA"
+    pop: "YABA"
+    role: "Backhaul"
+    vendor: "ubiquiti_airfiber"
+- targets: ["10.50.6.83"]
   labels:
-    {
-      module: saf_link,
-      auth: saf_v3, # SNMPv3 (CONFIRMED 2026-10-25), secrets/snmp_auths.yml
-      link_name: POP1-POP7-RADIO2,
-      link_id: POP1-POP7,
-      pop: POP7,
-      endpoint: POP7,
-      site: POP7,
-      role: Backhaul,
-      vendor: saf,
-    }
+    module: "ubiquiti_airfiber_link"
+    auth: "public_v2"
+    link_name: "IKEJA-YABA"
+    link_id: "IKEJA-YABA"
+    endpoint: "YABA"
+    site: "YABA"
+    pop: "YABA"
+    role: "Backhaul"
+    vendor: "ubiquiti_airfiber"
+
+# YABA-LEKKI (saf, Backhaul)
+- targets: ["10.50.6.90"]
+  labels:
+    module: "saf_link"
+    auth: "saf_v3"
+    link_name: "YABA-LEKKI-RADIO1"
+    link_id: "YABA-LEKKI"
+    endpoint: "RADIO1"
+    site: "YABA"
+    pop: "LEKKI"
+    role: "Backhaul"
+    vendor: "saf"
+- targets: ["10.50.6.91"]
+  labels:
+    module: "saf_link"
+    auth: "saf_v3"
+    link_name: "YABA-LEKKI-RADIO2"
+    link_id: "YABA-LEKKI"
+    endpoint: "LEKKI"
+    site: "LEKKI"
+    pop: "LEKKI"
+    role: "Backhaul"
+    vendor: "saf"

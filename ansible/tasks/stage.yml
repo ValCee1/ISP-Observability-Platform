@@ -42,19 +42,17 @@
     - { file: telegram_bot_token.txt, content: "{{ telegram_bot_token }}" }
     - { file: whatsapp_access_token.txt, content: "{{ whatsapp_access_token }}" }
     - { file: deadman_url.txt, content: "{{ deadman_url }}" }
-    - { file: routeros_api_credentials.json, content: "{{ routeros_api_credentials }}" }
-    - { file: snmp_auths.yml, content: "{{ snmp_auths }}" }
+    - { file: routeros_api_credentials.json, content: "{{ routeros_api_logins | to_nice_json }}" }
+    - { file: snmp_auths.yml, content: "{{ lookup('ansible.builtin.template', 'site/snmp_auths.yml.j2') }}" }
   loop_control:
     label: "{{ item.file }}"
   no_log: true
   check_mode: false
 
-- name: routeros_exporter/config.yml
-  ansible.builtin.copy:
-    content: "{{ routeros_exporter_config }}"
-    dest: "{{ staging_dir }}/routeros_exporter/config.yml"
-    mode: "0644"
-  check_mode: false
+- name: Per-site files from the inventory (targets, topology, exporter config, Alertmanager values)
+  ansible.builtin.import_tasks: render.yml
+  vars:
+    render_root: "{{ staging_dir }}"
 
 - name: .env (WhatsApp settings, Compose project name)
   ansible.builtin.template:

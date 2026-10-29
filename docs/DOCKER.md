@@ -6,6 +6,15 @@
 `prometheus.yml`, every file under `prometheus/rules/`, the SNMP/ICMP target
 lists in `prometheus/targets/`, `topology.yml`, and the promtool alert tests.
 
+> **The baked targets are the example site's.** `prometheus/targets/*.yml` and
+> `topology.yml` in the product repo are rendered from the fictional
+> `inventories/example` (`scripts/render-example.sh`), so the build checks
+> pass and the image is the same for every ISP. Real targets are per ISP:
+> the Ansible deploy renders them from the site folder, and
+> `docker-compose.image.yml` bind-mounts `./prometheus/targets` over the baked
+> ones. Never build or push an image from a tree holding an ISP's own targets -
+> they name its devices and addresses.
+
 It is built `FROM prom/prometheus:v3.13.2` — the config is the only custom
 layer. The rest of the stack (Grafana, Alertmanager, snmp-exporter,
 blackbox-exporter) stays on unmodified upstream images and mounts its config
@@ -92,8 +101,9 @@ docker compose -f docker-compose.yml -f docker-compose.image.yml up -d
 ```
 
 This replaces the `prometheus` service's config bind mounts with the baked
-config while keeping the `prometheus_data` volume, and leaves the other four
-services untouched. Secrets (`secrets/grafana_admin_password.txt`,
+config while keeping the `prometheus_data` volume and mounting this folder's
+`prometheus/targets/` (the per-ISP target lists) over the baked example
+targets, and leaves the other services untouched. Secrets (`secrets/grafana_admin_password.txt`,
 `secrets/telegram_bot_token.txt`) are still required.
 
 Point at another tag or registry without editing files:
@@ -109,10 +119,10 @@ Baked config is immutable per tag. Two options:
 
 - **New tag** — edit `prometheus/**`, `docker build -t chikere/isp-observability:v1.4 .`,
   push, bump `ISP_OBS_IMAGE`. Preferred.
-- **Hot patch** — bind-mount a single file over the baked path at run time,
-  e.g. add `- ./prometheus/targets/mikrotik-sectors.yml:/etc/prometheus/targets/mikrotik-sectors.yml:ro`
-  to the `prometheus` service. Target files reload within 1 min; rule/scrape
-  changes need `docker compose restart prometheus`.
+- **Targets** need no new tag: they are mounted from `prometheus/targets/`
+  (written by the Ansible deploy from the site folder) and reload within 1 min.
+- **Hot patch** — bind-mount another single file over the baked path at run
+  time; rule/scrape changes need `docker compose restart prometheus`.
 
 ## Note: new rules need a new tag
 

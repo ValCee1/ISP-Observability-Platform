@@ -1,0 +1,22 @@
+# Renders a site's per-site files on this laptop, without touching a server.
+# scripts/deploy.sh runs it on the packaged tree before the local promtool /
+# amtool checks; scripts/render-example.sh uses it for the repo's example
+# files. Needs the site inventory (-i <site>/hosts.ini) and render_root.
+- name: Check and render the site inventory locally
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  roles:
+    - isp_defaults
+  tasks:
+    - name: Output folder given
+      ansible.builtin.assert:
+        that: render_root is defined and render_root | length > 0
+        fail_msg: Pass -e render_root=<folder holding the unpacked release>.
+        quiet: true
+
+    - name: Check the site inventory
+      ansible.builtin.import_tasks: tasks/check_site.yml
+
+    - name: Render the per-site files
+      ansible.builtin.import_tasks: tasks/render.yml

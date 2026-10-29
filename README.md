@@ -47,9 +47,12 @@ Routers        --API---> routeros-exporter -/            -> Alertmanager -> Tele
 - [docs/snmpv3.md](docs/snmpv3.md) — moving devices from SNMPv2c to encrypted
   SNMPv3 one at a time (credentials in a gitignored secret).
 - [docs/ANSIBLE.md](docs/ANSIBLE.md) — **production deploys**: one command
-  (`scripts/deploy.sh`) prepares an Ubuntu 24.04 server, writes secrets from an
-  encrypted Ansible vault, checks everything, and reloads only what changed;
-  previews, rollback, OS updates.
+  (`scripts/deploy.sh --site <isp-folder>`) prepares an Ubuntu 24.04 server,
+  generates the ISP's targets and config from its site folder (plain
+  `vars.yml` + encrypted `vault.yml`, kept in the ISP's own private repo),
+  checks everything, and reloads only what changed; previews, rollback, OS
+  updates. This repo is the same product for every ISP; its targets are a
+  fictional example ([inventories/example](inventories/example)).
 - [docs/INSTALL.md](docs/INSTALL.md) — manual install on another Linux machine
   (or Windows via Docker Desktop/WSL2), offline install, upgrades.
 - [docs/server-monitoring.md](docs/server-monitoring.md) — monitoring the
@@ -65,7 +68,8 @@ Routers        --API---> routeros-exporter -/            -> Alertmanager -> Tele
 ## Running the stack
 
 On the production server, deploy with Ansible instead:
-[docs/ANSIBLE.md](docs/ANSIBLE.md) (`scripts/deploy.sh`). For a local/dev run:
+[docs/ANSIBLE.md](docs/ANSIBLE.md) (`scripts/deploy.sh --site <isp-folder>`).
+For a local/dev run (it scrapes the example targets until you edit them):
 
 1. Fill in the secret files (all gitignored, not committed):
    - `secrets/grafana_admin_password.txt` — Grafana admin password
@@ -100,6 +104,10 @@ docker compose -f docker-compose.yml -f docker-compose.image.yml up -d
 ```
 
 ## What's monitored
+
+Per ISP, the devices below are listed in the site folder's `vars.yml`
+(`pops`, `snmp_only_routers`, `ptp_links`, `sectors`) and the deploy writes the
+`prometheus/targets/` files from it.
 
 - **Core routers** (`prometheus/targets/mikrotik-routers.yml`): CPU, memory/storage,
   uptime, interface state/traffic/errors via the generic `mikrotik` SNMP module.
@@ -161,8 +169,8 @@ docker compose -f docker-compose.yml -f docker-compose.image.yml up -d
   rule evaluation, WhatsApp budget.
 - **WAN/LAN Interfaces** — traffic and up/down state grouped by interface role
   (WAN, LAN, PPP, wireless backhaul), using textbox variables holding per-router
-  ifName regexes — check these against `wan_ifname` in
-  `prometheus/targets/mikrotik-routers.yml` when adding a new router, since ifName
+  ifName regexes — check these against the router's `wan_ifname` (site
+  `vars.yml`) when adding a new router, since ifName
   conventions aren't guaranteed to match across devices.
 
 ## Notes
@@ -171,7 +179,8 @@ docker compose -f docker-compose.yml -f docker-compose.image.yml up -d
   (see the `.gitkeep` comments under `grafana/provisioning/alerting/`).
 - Sector capacity alerts (`SectorOverClientCapacity`, `SectorOverThroughputBudget`)
   don't page in real time — Alertmanager holds them and delivers one batched digest
-  daily in the 08:00–08:15 Africa/Lagos window (`time_intervals` +
+  daily in the 08:00–08:15 site-local window (`timezone` in the site's
+  `vars.yml`; `time_intervals` +
   `active_time_intervals` in `alertmanager/alertmanager.yml`). Real-time sector
   alerting is limited to RF/state/device problems.
 - Every alert carries `severity` (critical/warning/info), `category`

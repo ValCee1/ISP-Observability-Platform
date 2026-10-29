@@ -1,0 +1,55 @@
+# Secrets for one ISP - TEMPLATE. Never fill this file in.
+# scripts/edit-secrets.sh --site <folder> copies it to
+# <folder>/group_vars/all/vault.yml, encrypts that, and opens it in your
+# editor; commit the encrypted file to the site's private repo.
+# Docs: docs/ANSIBLE.md, what each value is: docs/SETUP-INPUTS.md
+#
+# Each key becomes a file on the server (secrets/ folder 700, files 644,
+# .env 600). Placeholder values (CHANGE-ME, PUT-...-HERE, change-me-now) are
+# refused at deploy time.
+
+# -> secrets/grafana_admin_password.txt. Changing it later also resets the
+#    live admin password on the next deploy.
+grafana_admin_password: change-me-now
+
+# -> secrets/telegram_bot_token.txt (@BotFather)
+telegram_bot_token: PUT-TELEGRAM-BOT-TOKEN-HERE
+
+# -> secrets/deadman_url.txt (healthchecks.io ping URL, docs/deadman.md).
+#    Required: the dead-man's switch is on.
+deadman_url: https://hc-ping.com/PUT-YOUR-CHECK-UUID-HERE
+
+# -> secrets/whatsapp_access_token.txt and .env. The placeholder is fine
+#    while whatsapp_mode is dry_run.
+whatsapp_access_token: dry-run-placeholder
+whatsapp_recipients: ""            # digits only, comma-separated, e.g. "2348012345678"
+
+# -> secrets/routeros_api_credentials.json. One entry per POP router `name`
+#    in vars.yml - no more, no fewer (checked at deploy). A read-only user:
+#    /user add name=prom-ro group=read password=...
+routeros_api_logins:
+  pop-ikeja: {username: prom-ro, password: CHANGE-ME}
+  pop-yaba: {username: prom-ro, password: CHANGE-ME}
+
+# -> secrets/snmp_auths.yml. Every SNMP credential set a target's `auth` may
+#    name. Remove entries you do not use rather than leaving CHANGE-ME values.
+#    v1/v2c communities (only where the firmware has no SNMPv3, e.g. AirFiber):
+snmp_communities:
+  public_v2: {version: 2, community: CHANGE-ME-community}
+
+#    SNMPv3 users. Spell protocols exactly: SHA (the device's "SHA1"), SHA256,
+#    AES (AES-128), AES256 (the device's "AES-256"). security_level defaults
+#    to authPriv. Device setup: docs/snmpv3.md.
+snmpv3_users:
+  mikrotik_v3:
+    username: monitoring
+    auth_protocol: SHA
+    password: CHANGE-ME-auth-password
+    priv_protocol: AES
+    priv_password: CHANGE-ME-priv-password
+  saf_v3:
+    username: monitoring
+    auth_protocol: SHA256
+    password: CHANGE-ME-auth-password
+    priv_protocol: AES256
+    priv_password: CHANGE-ME-priv-password

@@ -1,0 +1,217 @@
+{#- Every problem with the site's inventory, one per line (empty = fine).
+    Read by tasks/check_site.yml. Uses .get() throughout so that a
+    malformed entry is reported, not a template crash. -#}
+{%- set ip_re = '^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])[.]){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$' -%}
+{%- set vendors = ['ubiquiti_airmax', 'ubiquiti_airfiber', 'saf'] -%}
+{%- set auth_protocols = ['MD5', 'SHA', 'SHA224', 'SHA256', 'SHA384', 'SHA512'] -%}
+{%- set priv_protocols = ['DES', 'AES', 'AES192', 'AES256', 'AES192C', 'AES256C'] -%}
+{%- set levels = ['noAuthNoPriv', 'authNoPriv', 'authPriv'] -%}
+
+{%- macro need(what, obj, fields) -%}
+{%- if obj is not mapping -%}
+{{ what }}: must be a mapping (key: value), got a {{ obj | type_debug }}
+{% else -%}
+{%- for f in fields if obj.get(f) is none or obj.get(f) | string | length == 0 -%}
+{{ what }}: missing `{{ f }}`
+{% endfor -%}
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro is_list(name, value) -%}
+{%- if value is string or value is mapping or value is not iterable -%}
+{{ name }}: must be a list (- item per line), got {{ value | to_json }}
+{% endif -%}
+{%- endmacro -%}
+
+{#- ---- scalars --------------------------------------------------------- -#}
+{%- if isp_name is not defined or isp_name is not string or isp_name is not match('^[a-z0-9][a-z0-9-]*$') -%}
+isp_name: set it to a short id - lowercase letters, digits, dashes (e.g. acme). It names the deploy tags.
+{% endif -%}
+{%- if timezone is not defined or timezone is not string or timezone is not match('^[A-Za-z_]+(/[A-Za-z0-9_+-]+)*$') -%}
+timezone: set it to an IANA name such as Africa/Lagos (Alertmanager's daily digest window).
+{% endif -%}
+{%- if telegram_chat_id is not defined or telegram_chat_id | string is not match('^-?[0-9]+$') -%}
+telegram_chat_id: set it to the NOC Telegram group id, digits with a leading minus (docs/SETUP-INPUTS.md section D).
+{% endif -%}
+
+{#- ---- lists and maps --------------------------------------------------- -#}
+{{- is_list('snmp_only_routers', snmp_only_routers) -}}
+{{- is_list('sectors', sectors) -}}
+{{- is_list('ptp_links', ptp_links) -}}
+{{- is_list('vantage_points', vantage_points) -}}
+{%- for name, value in {'pops': pops, 'snmp_communities': snmp_communities, 'snmpv3_users': snmpv3_users, 'routeros_api_logins': routeros_api_logins}.items() if value is not mapping -%}
+{{ name }}: must be a mapping (key: value), got a {{ value | type_debug }}
+{% endfor -%}
+
+{%- if pops is mapping and snmp_communities is mapping and snmpv3_users is mapping and routeros_api_logins is mapping
+      and snmp_only_routers is not string and snmp_only_routers is iterable and snmp_only_routers is not mapping
+      and sectors is not string and sectors is iterable and sectors is not mapping
+      and ptp_links is not string and ptp_links is iterable and ptp_links is not mapping
+      and vantage_points is not string and vantage_points is iterable and vantage_points is not mapping -%}
+
+{%- set pop_names = pops.keys() | map('string') | list -%}
+{%- set link_ids = ptp_links | select('mapping') | map(attribute='id', default='') | map('string') | list -%}
+{%- set known_auths = (snmp_communities.keys() | list) + (snmpv3_users.keys() | list) -%}
+{%- set targets = [] -%}  {#- {ip, who} for every polled device -#}
+{%- set routers = [] -%}  {#- router names, POP + SNMP-only -#}
+{%- set auths_used = [] -%}  {#- {auth, who} -#}
+{%- set api_routers = [] -%}
+
+{#- ---- POPs and their routers ----------------------------------------- -#}
+{%- if pops | length == 0 -%}
+pops: define at least one POP with a router - the RouterOS API exporter needs one.
+{% endif -%}
+{%- for pop, p in pops.items() -%}
+{%- set p = p if p is not none else {} -%}
+{%- if p is not mapping -%}
+pops.{{ pop }}: must be a mapping (site, router, upstream_links), got {{ p | to_json }}
+{% else -%}
+{%- set r = p.get('router') -%}
+{%- if r is not none -%}
+{{- need('pops.' ~ pop ~ '.router', r, ['name', 'ip', 'wan_ifname', 'auth']) -}}
+{%- if r is mapping -%}
+{%- set _ = routers.append(r.get('name') | string) -%}
+{%- set _ = api_routers.append(r.get('name') | string) -%}
+{%- set _ = targets.append({'ip': r.get('ip') | string, 'who': 'POP router ' ~ r.get('name')}) -%}
+{%- set _ = auths_used.append({'auth': r.get('auth'), 'who': 'POP router ' ~ r.get('name')}) -%}
+{%- if r.get('api_port') is not none and r.get('api_port') | string is not match('^[0-9]+$') -%}
+pops.{{ pop }}.router.api_port: must be a port number, got {{ r.get('api_port') | to_json }}
+{% endif -%}
+{%- endif -%}
+{%- endif -%}
+{%- set up = p.get('upstream_links', []) -%}
+{%- if up is string or up is mapping or up is not iterable -%}
+pops.{{ pop }}.upstream_links: must be a list of ptp_links ids, got {{ up | to_json }}
+{% else -%}
+{%- for l in up if l | string not in link_ids -%}
+pops.{{ pop }}.upstream_links: unknown link `{{ l }}` - not an id in ptp_links ({{ link_ids | join(', ') or 'none defined' }})
+{% endfor -%}
+{%- endif -%}
+{%- endif -%}
+{%- endfor -%}
+{%- if pops | length > 0 and api_routers | length == 0 -%}
+pops: no POP has a router - at least one is needed for the RouterOS API exporter.
+{% endif -%}
+
+{#- ---- SNMP-only routers ---------------------------------------------- -#}
+{%- for r in snmp_only_routers -%}
+{%- set what = 'snmp_only_routers[' ~ loop.index0 ~ '] (' ~ (r.get('name', '?') if r is mapping else '?') ~ ')' -%}
+{{- need(what, r, ['name', 'ip', 'site', 'role', 'wan_ifname', 'auth']) -}}
+{%- if r is mapping -%}
+{%- set _ = routers.append(r.get('name') | string) -%}
+{%- set _ = targets.append({'ip': r.get('ip') | string, 'who': 'SNMP-only router ' ~ r.get('name')}) -%}
+{%- set _ = auths_used.append({'auth': r.get('auth'), 'who': 'SNMP-only router ' ~ r.get('name')}) -%}
+{%- if r.get('pop') is not none and r.get('pop') | string not in pop_names -%}
+{{ what }}: unknown pop `{{ r.get('pop') }}` (POPs: {{ pop_names | join(', ') }})
+{% endif -%}
+{%- endif -%}
+{%- endfor -%}
+
+{#- ---- sectors -------------------------------------------------------- -#}
+{%- set sector_ids = [] -%}
+{%- for s in sectors -%}
+{%- set what = 'sectors[' ~ loop.index0 ~ '] (' ~ (s.get('sector', '?') if s is mapping else '?') ~ ')' -%}
+{{- need(what, s, ['sector', 'ip', 'pop', 'auth']) -}}
+{%- if s is mapping -%}
+{%- set _ = sector_ids.append(s.get('sector') | string) -%}
+{%- set _ = targets.append({'ip': s.get('ip') | string, 'who': 'sector ' ~ s.get('sector')}) -%}
+{%- set _ = auths_used.append({'auth': s.get('auth'), 'who': 'sector ' ~ s.get('sector')}) -%}
+{%- if s.get('pop') is not none and s.get('pop') | string not in pop_names -%}
+{{ what }}: unknown pop `{{ s.get('pop') }}` (POPs: {{ pop_names | join(', ') }})
+{% endif -%}
+{%- endif -%}
+{%- endfor -%}
+
+{#- ---- PTP links ------------------------------------------------------ -#}
+{%- for l in ptp_links -%}
+{%- set what = 'ptp_links[' ~ loop.index0 ~ '] (' ~ (l.get('id', '?') if l is mapping else '?') ~ ')' -%}
+{{- need(what, l, ['id', 'vendor', 'role', 'auth', 'endpoints']) -}}
+{%- if l is mapping -%}
+{%- if l.get('vendor') is not none and l.get('vendor') not in vendors -%}
+{{ what }}: vendor `{{ l.get('vendor') }}` is not one of {{ vendors | join(', ') }}
+{% endif -%}
+{%- set eps = l.get('endpoints') or [] -%}
+{%- if eps is string or eps is mapping or eps is not iterable -%}
+{{ what }}.endpoints: must be a list of endpoints
+{% else -%}
+{%- for e in eps -%}
+{%- set ewhat = what ~ '.endpoints[' ~ loop.index0 ~ ']' -%}
+{{- need(ewhat, e, ['ip', 'endpoint']) -}}
+{%- if e is mapping -%}
+{%- set _ = targets.append({'ip': e.get('ip') | string, 'who': 'link ' ~ l.get('id') ~ ' endpoint ' ~ e.get('endpoint')}) -%}
+{%- set _ = auths_used.append({'auth': e.get('auth', l.get('auth')), 'who': 'link ' ~ l.get('id')}) -%}
+{%- if e.get('pop') is not none and e.get('pop') | string not in pop_names -%}
+{{ ewhat }}: unknown pop `{{ e.get('pop') }}` (POPs: {{ pop_names | join(', ') }})
+{% endif -%}
+{%- endif -%}
+{%- endfor -%}
+{%- endif -%}
+{%- endif -%}
+{%- endfor -%}
+
+{#- ---- vantage points ------------------------------------------------- -#}
+{%- if vantage_points | length == 0 -%}
+vantage_points: list at least one (the server's gateway) - without it the "server lost its network" alert cannot fire.
+{% endif -%}
+{%- for v in vantage_points -%}
+{{- need('vantage_points[' ~ loop.index0 ~ ']', v, ['vantage', 'ip']) -}}
+{%- if v is mapping and v.get('ip') | string is not match(ip_re) -%}
+vantage_points[{{ loop.index0 }}] ({{ v.get('vantage') }}): `{{ v.get('ip') }}` is not an IPv4 address
+{% endif -%}
+{%- endfor -%}
+
+{#- ---- addresses and names -------------------------------------------- -#}
+{%- for t in targets if t.ip not in ['None', ''] and t.ip is not match(ip_re) -%}
+{{ t.who }}: `{{ t.ip }}` is not an IPv4 address
+{% endfor -%}
+{%- for ip in targets | map(attribute='ip') | reject('in', ['None', '']) | community.general.counter | dict2items | selectattr('value', 'gt', 1) | map(attribute='key') -%}
+duplicate IP {{ ip }}: {{ targets | selectattr('ip', 'equalto', ip) | map(attribute='who') | join(', ') }}
+{% endfor -%}
+{%- for kind, names in {'router name': routers, 'sector id': sector_ids, 'link id': link_ids,
+                        'vantage name': vantage_points | select('mapping') | map(attribute='vantage', default='') | map('string') | list}.items() -%}
+{%- for n in names | reject('in', ['None', '']) | community.general.counter | dict2items | selectattr('value', 'gt', 1) | map(attribute='key') -%}
+duplicate {{ kind }} `{{ n }}` - each must be unique
+{% endfor -%}
+{%- endfor -%}
+
+{#- ---- SNMP credentials ------------------------------------------------ -#}
+{%- for a in auths_used if a.auth is not none and a.auth not in known_auths -%}
+{{ a.who }}: auth `{{ a.auth }}` is not defined - add it to snmp_communities or snmpv3_users in vault.yml (defined: {{ known_auths | join(', ') or 'none' }})
+{% endfor -%}
+{%- for n in snmp_communities.keys() if n in snmpv3_users -%}
+snmp auth `{{ n }}` is in both snmp_communities and snmpv3_users - names must be unique
+{% endfor -%}
+{%- for n, c in snmp_communities.items() -%}
+{{- need('snmp_communities.' ~ n, c, ['community', 'version']) -}}
+{%- if c is mapping and c.get('version') | string not in ['1', '2'] -%}
+snmp_communities.{{ n }}: version must be 1 or 2 (v3 users go in snmpv3_users)
+{% endif -%}
+{%- endfor -%}
+{%- for n, u in snmpv3_users.items() -%}
+{%- set level = (u.get('security_level', 'authPriv') if u is mapping else 'authPriv') -%}
+{{- need('snmpv3_users.' ~ n, u, ['username'] + (['auth_protocol', 'password'] if level != 'noAuthNoPriv' else []) + (['priv_protocol', 'priv_password'] if level == 'authPriv' else [])) -}}
+{%- if u is mapping -%}
+{%- if level not in levels -%}
+snmpv3_users.{{ n }}: security_level `{{ level }}` is not one of {{ levels | join(', ') }}
+{% endif -%}
+{%- if u.get('auth_protocol') is not none and u.get('auth_protocol') not in auth_protocols -%}
+snmpv3_users.{{ n }}: auth_protocol `{{ u.get('auth_protocol') }}` is not one of {{ auth_protocols | join(', ') }} (the device's "SHA1" is SHA here)
+{% endif -%}
+{%- if u.get('priv_protocol') is not none and u.get('priv_protocol') not in priv_protocols -%}
+snmpv3_users.{{ n }}: priv_protocol `{{ u.get('priv_protocol') }}` is not one of {{ priv_protocols | join(', ') }} (the device's "AES-256" is AES256 here)
+{% endif -%}
+{%- endif -%}
+{%- endfor -%}
+
+{#- ---- RouterOS API logins: exactly one per POP router ------------------ -#}
+{%- for n in api_routers if n not in routeros_api_logins -%}
+POP router {{ n }}: no API login - add `{{ n }}: {username: ..., password: ...}` under routeros_api_logins in vault.yml
+{% endfor -%}
+{%- for n, c in routeros_api_logins.items() -%}
+{%- if n | string not in api_routers -%}
+routeros_api_logins.{{ n }}: not a POP router name (POP routers: {{ api_routers | join(', ') or 'none' }}) - renamed router, or a client router? Only POP routers are polled over the API.
+{% else -%}
+{{- need('routeros_api_logins.' ~ n, c, ['username', 'password']) -}}
+{%- endif -%}
+{%- endfor -%}
+{%- endif -%}

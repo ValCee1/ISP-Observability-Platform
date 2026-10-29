@@ -1,0 +1,16 @@
+{% include 'site/header.j2' %}{{ "\n" }}
+# "Can the monitoring server itself see the network?" reference targets
+# (`vantage_points`), pinged by the "vantage-points" job. If EVERY one is
+# unreachable the problem is the server's own network path: the
+# MonitoringVantageLost alert fires and Alertmanager holds back the
+# per-device alerts (prometheus/rules/vantage.yml, inhibit_rules).
+#
+# Pick targets on the SERVER'S side of the network that you do not want paged
+# on as "down" themselves: the server's default gateway, and optionally a
+# public address. A second independent target makes a false "network lost"
+# less likely.
+{% for v in vantage_points %}
+- targets: [{{ v.ip | string | to_json }}]
+  labels:
+    vantage: {{ v.vantage | string | to_json }}
+{% endfor %}

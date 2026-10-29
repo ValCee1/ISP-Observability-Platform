@@ -1,6 +1,6 @@
 #!/bin/sh
 # Written by Ansible (ansible/templates/isp-obs-firewall.sh.j2) - edits here
-# are overwritten. Ranges come from ansible/secrets.yml.
+# are overwritten. Ranges come from the site's group_vars/all/vars.yml.
 #
 # Docker publishes ports with its own NAT rules, which bypass ufw. Traffic to a
 # published port goes through the FORWARD chain, where Docker consults the

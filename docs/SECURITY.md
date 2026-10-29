@@ -75,11 +75,14 @@ frequency-migration features, which needed write access, were removed.
    database, so editing the file later does not change an existing password
    (use `grafana cli admin reset-admin-password` or the UI; see SETUP-INPUTS.md).
    Rotate any token that has been pasted into chat or email.
-   With Ansible, the source of every secret is `ansible/secrets.yml`,
-   encrypted with `ansible-vault` (AES-256) and committed only in that
-   form; its password lives in the deploying laptop's Keychain and a
-   password manager, never in a file or in git. `scripts/deploy.sh` refuses
-   to run if the file is ever found decrypted.
+   With Ansible, the source of every secret is the ISP's site folder
+   `group_vars/all/vault.yml` (outside the product repo), encrypted with
+   `ansible-vault` (AES-256) and committed to the ISP's private site repo
+   only in that form; its password (one per ISP) lives in the deploying
+   laptop's Keychain and a password manager, never in a file or in git.
+   `scripts/deploy.sh` and `edit-secrets.sh` refuse to run if the file is
+   ever found decrypted. The product repo holds no ISP data: only a
+   fictional example site.
 5. **Grafana.** Disable anonymous access (default is off), use a strong
    admin password, and give NOC staff Viewer accounts only.
 6. **Host hardening.** Keep Docker and the OS patched; SSH keys only; the
@@ -103,7 +106,7 @@ frequency-migration features, which needed write access, were removed.
 - [ ] `snmpwalk` from another host with the community is refused.
 - [ ] The RouterOS user is in group `read`; a write attempt with it fails.
 - [ ] `git status` shows no secrets; `secrets/` folder is `700`, files `644`.
-- [ ] `head -1 ansible/secrets.yml` starts with `$ANSIBLE_VAULT` (Ansible deploys).
+- [ ] `head -1 <site>/group_vars/all/vault.yml` starts with `$ANSIBLE_VAULT` (Ansible deploys).
 - [ ] Grafana default password changed.
 
 ## Residual risks (honest list)

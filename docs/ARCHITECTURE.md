@@ -98,7 +98,7 @@ flowchart TB
 | Service | Image | Host port | Config (read-only mounts) | State |
 |---|---|---|---|---|
 | prometheus | `prom/prometheus:v3.13.2` | 9090 | `prometheus/prometheus.yml`, `prometheus/rules/`, `prometheus/targets/` | `prometheus_data` (TSDB) |
-| snmp-exporter | `prom/snmp-exporter:v0.30.1` | 9116 | `snmp_exporter/snmp.yml` | `snmp_auths` (SNMPv3 users) |
+| snmp-exporter | `prom/snmp-exporter:v0.30.1` | 9116 | `snmp_exporter/snmp.yml` | `snmp_auths` (all SNMP credentials) |
 | blackbox-exporter | `prom/blackbox-exporter:v0.28.0` | 9115 | `blackbox/blackbox.yml` | — |
 | routeros-exporter | built from `routeros_exporter/` (`v0.1`) | 9436 | `routeros_exporter/config.yml` | `routeros_exporter_data` (generated topology file) |
 | node-exporter | `prom/node-exporter:v1.9.1` | 9100 | host `/` mounted read-only at `/host` | — |

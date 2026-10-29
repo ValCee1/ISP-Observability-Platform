@@ -1,0 +1,43 @@
+{% include 'site/header.j2' %}{{ "\n" }}
+# MikroTik routers, scraped by the "snmp-mikrotik" job (prometheus.yml) via
+# the generic `mikrotik` SNMP module. Sources: every `pops.<POP>.router` (role
+# core-router; also polled over the RouterOS API) and `snmp_only_routers`
+# (SNMP only, never the API).
+#
+# Labels:
+#   router     - the router's `name`: the same id the RouterOS API exporter
+#                uses, so Alertmanager can `equal: [router]` CoreRouterDown
+#                against RouterOSAPICollectorDown. Generated from one entry,
+#                so the two can no longer drift apart.
+#   auth       - SNMP credential set (snmp_communities / snmpv3_users)
+#   wan_ifname - ifName of the real WAN uplink: drives WANInterfaceDown and
+#                the WAN panels of the WAN/LAN Interfaces dashboard.
+#   site/role/pop - grouping; `pop` feeds the dependency inhibit rules.
+{% set ns = namespace(n=0) %}
+{% for pop, p in pops.items() if p and p.get('router') %}
+{% set r = p.router %}{% set ns.n = ns.n + 1 %}
+- targets: [{{ r.ip | string | to_json }}]
+  labels:
+    router: {{ r.name | string | to_json }}
+    site: {{ (r.get('site') or p.get('site') or pop) | string | to_json }}
+    role: "core-router"
+    pop: {{ pop | string | to_json }}
+    auth: {{ r.auth | string | to_json }}
+    wan_ifname: {{ r.wan_ifname | string | to_json }}
+{% endfor %}
+{% for r in snmp_only_routers %}
+{% set ns.n = ns.n + 1 %}
+- targets: [{{ r.ip | string | to_json }}]
+  labels:
+    router: {{ r.name | string | to_json }}
+    site: {{ r.site | string | to_json }}
+    role: {{ r.role | string | to_json }}
+{% if r.get('pop') %}
+    pop: {{ r['pop'] | string | to_json }}
+{% endif %}
+    auth: {{ r.auth | string | to_json }}
+    wan_ifname: {{ r.wan_ifname | string | to_json }}
+{% endfor %}
+{% if ns.n == 0 %}
+[]
+{% endif %}
