@@ -31,6 +31,9 @@ Routers        --API---> routeros-exporter -/            -> Alertmanager -> Tele
   secure, verify and accept before cut-over.
 - [docs/SETUP-INPUTS.md](docs/SETUP-INPUTS.md) — **every secret/file/ID you must
   supply on a fresh install, and where it goes** (`scripts/init.sh` scaffolds them).
+- [docs/ISP Network Observability Platform - Installation Manual.docx](<docs/ISP Network Observability Platform - Installation Manual.docx>) — production
+  install with Ansible in one document: before install (requirements, devices, server, laptop, site data,
+  checklist), running the install, and acceptance tests with a sign-off.
 - [docs/ISP Network Observability Platform - Operations Manual.docx](<docs/ISP Network Observability Platform - Operations Manual.docx>) — engineer
   edition (internal): daily routine, alerts, routine changes incl. SNMPv3, troubleshooting, backup,
   security, command cheat sheet, go-live status, server sizing.

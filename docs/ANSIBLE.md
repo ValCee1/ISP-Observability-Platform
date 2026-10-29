@@ -44,6 +44,9 @@ from your laptop.
 
 ## First production install, step by step
 
+The same steps, with the device preparation and the acceptance tests, are in
+one printable document: [Installation Manual](<ISP Network Observability Platform - Installation Manual.docx>).
+
 Done once. Expect about an hour, most of it filling in site data. The deploy
 itself takes 10-40 minutes depending on the internet link (it downloads
 about 1.5 GB).
@@ -116,7 +119,8 @@ sections A and B where to get the values:
 | `telegram_bot_token` | from @BotFather |
 | `routeros_api_credentials`, `routeros_exporter_config` | the routers and their read-only API users, names identical in both |
 | `snmp_auths` | SNMPv3 users |
-| `whatsapp_access_token`, `deadman_url` | the placeholders are accepted while WhatsApp is in `dry_run` and the dead-man's switch is off |
+| `deadman_url` | the healthchecks.io ping URL; required, because the dead-man's switch is on in `alertmanager/alertmanager.yml` (the placeholder is refused) |
+| `whatsapp_access_token` | the placeholder is accepted while WhatsApp is in `dry_run` |
 
 Then describe the network in the tracked files ([SETUP-INPUTS.md](SETUP-INPUTS.md)
 section C: targets, topology; section D: the Telegram chat id) and ship it
