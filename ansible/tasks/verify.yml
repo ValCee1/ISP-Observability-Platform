@@ -47,6 +47,37 @@
       retries: 10
       delay: 3
 
+    # `up` right after a restart is the old exporter's last answer, or missing
+    # for a new target, so the down list would be empty on every first
+    # deploy. Wait until every active target has been scraped since now
+    # (slowest job: 30 s interval + 25 s timeout); report, never fail.
+    - name: Prometheus time now
+      ansible.builtin.uri:
+        url: http://127.0.0.1:9090/api/v1/query?query=time()
+      register: prom_now
+
+    - name: Active scrape targets
+      ansible.builtin.uri:
+        url: http://127.0.0.1:9090/api/v1/targets?state=active
+      register: active_targets
+
+    - name: Every target scraped since the release
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:9090/api/v1/query?query={{ ('count(timestamp(up) > ' ~ prom_now.json.data.result[1] ~ ')') | urlencode }}"
+      register: scraped
+      until: >-
+        (scraped.json.data.result | length > 0) and
+        (scraped.json.data.result[0].value[1] | int) >= (active_targets.json.data.activeTargets | length)
+      retries: 24
+      delay: 5
+      failed_when: false
+
+    - name: Remember whether they all were
+      ansible.builtin.set_fact:
+        all_scraped: >-
+          {{ (scraped.json.data.result | length > 0) and
+             (scraped.json.data.result[0].value[1] | int) >= (active_targets.json.data.activeTargets | length) }}
+
     - name: Scrape targets currently down
       ansible.builtin.uri:
         url: http://127.0.0.1:9090/api/v1/query?query=up%3D%3D0
@@ -54,7 +85,9 @@
 
     - name: Down targets (check the device, its IP, SNMP user or firewall)
       ansible.builtin.debug:
-        msg: "{{ down_targets.json.data.result | map(attribute='metric.instance') | list }}"
+        msg: "{{ down_targets.json.data.result | map(attribute='metric')
+                 | map('dict2items') | map('selectattr', 'key', 'in', ['job', 'instance', 'router', 'link_id', 'sector'])
+                 | map('items2dict') | list }}"
       when: down_targets.json.data.result | length > 0
 
     - name: Record the deployed version
@@ -83,4 +116,4 @@
           - "Changed files: {{ changed_paths | length }}"
           - "Reloaded: {{ (reload_services | difference(restart_services)) or 'none' }}"
           - "Restarted: {{ restart_services or 'none' }}"
-          - "Down targets: {{ down_targets.json.data.result | length }}"
+          - "Down targets: {{ down_targets.json.data.result | length }}{{ '' if all_scraped | bool else ' (some targets not scraped yet - check /targets)' }}"
