@@ -234,7 +234,7 @@ flowchart TB
     ev["Prometheus evaluates alerting rules<br/>(for: 2–15m swallows transients)"]
 
     subgraph amr["Alertmanager route tree (alertmanager.yml)"]
-        cap["category=capacity →<br/>hold, deliver ONE digest daily<br/>08:00–08:15 Africa/Lagos (repeat 24h)"]
+        cap["category=capacity →<br/>hold, deliver ONE digest daily<br/>08:00–08:15 site local time (repeat 24h)"]
         sec["sector=~.+ → group_by sector"]
         link["link_id=~.+ → group_by link_id"]
         rtr["instance=~.+ → group_by instance"]
@@ -267,7 +267,7 @@ and `prometheus/rules/tests/alerts_test.yml`):
   SectorEther1Down, SectorWideCPEDegradation, POP backhaul/router down) silences
   its symptoms; two-tier warning+critical pairs collapse to the critical.
 - **Capacity digest** — `SectorOverClientCapacity` / `SectorOverThroughputBudget`
-  never page; they batch into the 08:00 Africa/Lagos message.
+  never page; they batch into the 08:00 site-local message.
 - **`repeat_interval`** 2 h critical / 12 h warning — reminds, doesn't nag.
 - **Warnings** go to a `telegram-warnings` receiver with no "RESOLVED" message
   (a warning clearing isn't worth a ping).

@@ -33,19 +33,19 @@ tests:
         exp_alerts:
           - exp_labels: { severity: critical, category: state, scope: link, alert_type: link-down,
                           link_id: LINK-T, link_name: t-a, endpoint: a, site: S, role: P2P, vendor: t }
-            exp_annotations: { summary: "🔴 Link DOWN", description: "t-a has been unreachable for 5 minutes." }
+            exp_annotations: { summary: "🔴 Link DOWN", description: "a end has not answered ping for 5 minutes." }
       - eval_time: 12m          # link_up==1 for 1m - keep_firing_for keeps it firing
         alertname: LinkDown
         exp_alerts:
           - exp_labels: { severity: critical, category: state, scope: link, alert_type: link-down,
                           link_id: LINK-T, link_name: t-a, endpoint: a, site: S, role: P2P, vendor: t }
-            exp_annotations: { summary: "🔴 Link DOWN", description: "t-a has been unreachable for 5 minutes." }
+            exp_annotations: { summary: "🔴 Link DOWN", description: "a end has not answered ping for 5 minutes." }
       - eval_time: 16m          # blip over, down again - still one continuous firing alert
         alertname: LinkDown
         exp_alerts:
           - exp_labels: { severity: critical, category: state, scope: link, alert_type: link-down,
                           link_id: LINK-T, link_name: t-a, endpoint: a, site: S, role: P2P, vendor: t }
-            exp_annotations: { summary: "🔴 Link DOWN", description: "t-a has been unreachable for 5 minutes." }
+            exp_annotations: { summary: "🔴 Link DOWN", description: "a end has not answered ping for 5 minutes." }
 
   # ------------------------------------------------------------------
   # At 45% loss both PacketLoss tiers evaluate (warning + critical). The
@@ -134,7 +134,7 @@ tests:
           - exp_labels: { severity: warning, category: degrading, scope: link, alert_type: link-degrading,
                           link_id: LINK-T, link_name: t-a, endpoint: a, site: S, role: P2P, vendor: t }
             exp_annotations: { summary: "🟡 Link degrading (still up)",
-                               description: "t-a is reachable but showing signal/quality/reliability degradation for most of the last 30 minutes - investigate before it goes down." }
+                               description: "a end is reachable but showing signal/quality/reliability degradation for most of the last 30 minutes - investigate before it goes down." }
 
   # ------------------------------------------------------------------
   # SectorWideCPEDegradation fires when >=4 CPEs on a sector are degraded.
@@ -190,3 +190,22 @@ tests:
             exp_annotations:
               summary: "🟠 CPE signal degraded vs baseline"
               description: "cpe-x on sector T is -8.0 dB below its 7-day average - vegetation growth, mount shift, or water ingress."
+
+  # ------------------------------------------------------------------
+  # LinkDown names the silent radio and says whether the other end still
+  # answers (live case 2026-10-31: POP1-POP7, only the POP7 radio down).
+  # ------------------------------------------------------------------
+  - interval: 1m
+    input_series:
+      - series: 'link_up{link_id="LINK-E", link_name="e-b", endpoint="POP7", instance="10.0.0.91", site="POP7", role="Backhaul", vendor="saf"}'
+        values: '0x10'
+      - series: 'link_up{link_id="LINK-E", link_name="e-a", endpoint="RADIO1", instance="10.0.0.90", site="POP1", role="Backhaul", vendor="saf"}'
+        values: '1x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: LinkDown
+        exp_alerts:
+          - exp_labels: { severity: critical, category: state, scope: link, alert_type: link-down,
+                          link_id: LINK-E, link_name: e-b, endpoint: POP7, instance: 10.0.0.91, site: POP7, role: Backhaul, vendor: saf }
+            exp_annotations: { summary: "🔴 Link DOWN",
+                               description: "POP7 end (10.0.0.91) has not answered ping for 5 minutes. The other end, RADIO1 (10.0.0.90), still answers: suspect this radio or the path to it, not the whole link." }

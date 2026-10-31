@@ -128,7 +128,7 @@ The machinery that keeps one fault = one message:
 - **Two-tier collapse** — `PacketLoss` / `HighLatency` warn+critical pairs:
   the critical inhibits the warning.
 - **Capacity digest** — `SectorOverClientCapacity` /
-  `...ThroughputBudget` never page; they batch into the 08:00 Africa/Lagos
+  `...ThroughputBudget` never page; they batch into the 08:00 site-local
   message.
 - **`repeat_interval`** 2 h critical / 12 h warning — an unfixed fault
   reminds you, it doesn't nag.

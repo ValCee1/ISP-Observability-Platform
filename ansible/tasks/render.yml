@@ -51,3 +51,41 @@
         dest: "{{ render_root }}/alertmanager/alertmanager.yml"
         mode: "0644"
       check_mode: false
+
+# The sector "busiest hour" rules shift time() into local time with a fixed
+# offset (PromQL has no timezones). Swapped in from the site's timezone at
+# render time; a zone with daylight saving gets the offset in force on the
+# day of the deploy.
+- name: Site timezone as a UTC offset
+  ansible.builtin.set_fact:
+    site_utc_offset: "{{ lookup('ansible.builtin.pipe', ansible_playbook_python ~ ' -c ' ~ (offset_py | quote) ~ ' ' ~ (timezone | quote)) | int }}"
+  vars:
+    offset_py: >-
+      import datetime, sys, zoneinfo;
+      print(int(datetime.datetime.now(zoneinfo.ZoneInfo(sys.argv[1])).utcoffset().total_seconds()))
+
+- name: Read sector-normalization.yml
+  ansible.builtin.slurp:
+    src: "{{ render_root }}/prometheus/rules/sector-normalization.yml"
+  register: sn_file
+
+- name: Local hour of day in the sector rules
+  vars:
+    offset_re: 'time\(\) [+-] [0-9]+'
+    sn_text: "{{ sn_file.content | b64decode }}"
+    sn_offset: "{{ ('+ ' ~ site_utc_offset) if (site_utc_offset | int) >= 0 else ('- ' ~ (site_utc_offset | int | abs)) }}"
+  block:
+    - name: The offsets to replace are there
+      ansible.builtin.assert:
+        that: sn_text is search(offset_re)
+        fail_msg: >-
+          prometheus/rules/sector-normalization.yml no longer has a `time() + <seconds>`
+          offset - ansible/tasks/render.yml cannot set the site's timezone there.
+        quiet: true
+
+    - name: Write the site's offset
+      ansible.builtin.copy:
+        content: "{{ sn_text | regex_replace(offset_re, 'time() ' ~ sn_offset) }}"
+        dest: "{{ render_root }}/prometheus/rules/sector-normalization.yml"
+        mode: "0644"
+      check_mode: false

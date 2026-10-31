@@ -188,7 +188,9 @@ groups:
         expr: avg_over_time((sector:backhaul_tx_bps + sector:backhaul_rx_bps)[1h:1m])
 
   # Throughput / client count / backhaul %, averaged by LOCAL HOUR OF DAY
-  # (Africa/Lagos = UTC+1, hence time()+3600) over the last 7 days - 24
+  # (time() + <the site's UTC offset in seconds>, set at deploy from the
+  # site's `timezone` - 3600 here is the example site, Africa/Lagos) over
+  # the last 7 days - 24
   # series per sector, hod label 00..23, so a bar chart answers 'which
   # hours is this sector busiest'. One rule per hour because PromQL
   # cannot derive an hour-of-day label from a timestamp.

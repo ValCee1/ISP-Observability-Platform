@@ -9,7 +9,7 @@
 # plus the identity labels the metric already carries (sector, cpe_name, instance).
 #
 # Routing: category state/health -> real-time per-sector Telegram;
-# category capacity -> batched 08:00 Africa/Lagos digest.
+# category capacity -> batched 08:00 site-local digest.
 # Capacity-tier thresholds come from sector-thresholds.yml.
 
 groups:
@@ -186,7 +186,7 @@ groups:
           description: '{{ $labels.cpe_name }} on sector {{ $labels.sector }} TX rate dropped to {{ $value | printf "%.0f" }} bps, well below its 6-hour norm - RF degradation or interference.'
 
   # ---------------------------------------------------------------------
-  # Capacity tier - batched into the 08:00 Africa/Lagos digest.
+  # Capacity tier - batched into the 08:00 site-local digest.
   # ---------------------------------------------------------------------
   - name: sector-capacity
     rules:
