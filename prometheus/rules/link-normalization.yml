@@ -82,6 +82,14 @@ groups:
       - record: link_packet_loss_percent
         expr: link_probe_failure_ratio * 100
 
+      # Loss over 15 minutes (~60 probes) for the health score. Over 5
+      # minutes one lost ping is already 5%, two are 10%, so a single
+      # dropped probe swung the score by up to 40 points and flagged a
+      # healthy link as degraded. Alerts keep using the 5m series above
+      # (they have their own sustain windows).
+      - record: link_packet_loss_percent_15m
+        expr: (1 - avg_over_time(probe_success{job="link-availability"}[15m])) * 100
+
       # link_noise_dbm only exists where the vendor SNMP module maps a
       # noise-floor OID (currently airMAX only - see link-schema-notes.md).
       # AirFiber/SAF simply won't produce a link_snr_db series, which is
@@ -122,9 +130,13 @@ groups:
       # and subtracting weighted, capped penalties for each problem
       # category - so one bad dimension can't single-handedly zero out an
       # otherwise-healthy link, but a link that's actually down still hits
-      # 0 via the last term. Penalty budget: packet loss up to 40, low SNR
-      # up to 30, in/out interface errors up to 15 each, and link_up==0
-      # forces the full 100-point penalty.
+      # 0 via the last term. Penalty budget: packet loss up to 40 (4 points
+      # per % over 15 minutes, so one lost ping costs ~7, sustained 10% loss
+      # the full 40), low SNR up to 30, in/out interface errors up to 15
+      # each, and an end that answered no ping for a whole minute (4 probes;
+      # one lost ping is not 'down') forces the full 100-point penalty. Every
+      # penalty is clamped at 0: a good SNR (above 25 dB) used to ADD
+      # points and pushed scores past 100.
       #
       # Each penalty term is written as `<penalty> or on(...) (link_up * 0)`
       # - PromQL's `on()` binary-op join drops a result entirely when the
@@ -142,9 +154,9 @@ groups:
         expr: >
           clamp_min(
             100
-            - clamp_max(link_packet_loss_percent * 5, 40)
+            - clamp(link_packet_loss_percent_15m * 4, 0, 40)
             - on(link_id, endpoint, site, role, vendor, link_name) (
-                clamp_max((25 - link_snr_db) * 2, 30)
+                clamp((25 - link_snr_db) * 2, 0, 30)
                 or on(link_id, endpoint, site, role, vendor, link_name) (link_up * 0)
               )
             - on(link_id, endpoint, site, role, vendor, link_name) (
@@ -155,7 +167,7 @@ groups:
                 clamp_max(sum by (link_id, endpoint, site, role, vendor, link_name) (rate(link_interface_out_errors[5m])) * 10, 15)
                 or on(link_id, endpoint, site, role, vendor, link_name) (link_up * 0)
               )
-            - on(link_id, endpoint, site, role, vendor, link_name) (1 - link_up) * 100,
+            - on(link_id, endpoint, site, role, vendor, link_name) (1 - max_over_time(link_up[1m])) * 100,
             0
           )
 

@@ -51,7 +51,7 @@
             "datasource": "Prometheus",
             "targets": [
                 {
-                    "expr": "link_up{link_id=\"$link_id\"}",
+                    "expr": "max_over_time(link_up{link_id=\"$link_id\"}[1m])",
                     "legendFormat": "{{link_name}}",
                     "instant": true
                 }
@@ -716,7 +716,7 @@
             "datasource": "Prometheus",
             "targets": [
                 {
-                    "expr": "sum by (link_id, link_name, endpoint) (link_up{link_id=\"$link_id\"})",
+                    "expr": "sum by (link_id, link_name, endpoint) (max_over_time(link_up{link_id=\"$link_id\"}[1m]))",
                     "refId": "Up",
                     "instant": true,
                     "format": "table"

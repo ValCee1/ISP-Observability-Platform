@@ -7,7 +7,7 @@
 # Overrides the product defaults in ansible/roles/isp_defaults/defaults/main.yml.
 
 isp_name: example                  # short id: names the deploy tags (deploy-example-...)
-timezone: Africa/Lagos             # Alertmanager's 08:00 capacity-digest window
+timezone: Africa/Lagos             # local time: 08:00 digest, busiest-hour charts, WhatsApp daily cap
 telegram_chat_id: "-1001234567890" # NOC Telegram group id (docs/SETUP-INPUTS.md section D)
 
 # --- Firewall (CIDR lists) -------------------------------------------------

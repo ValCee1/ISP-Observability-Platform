@@ -1,0 +1,87 @@
+# promtool unit tests for link_endpoint_health_score / link_health_score
+# (prometheus/rules/link-normalization.yml). Run:
+#   docker run --rm --entrypoint promtool -v "$PWD/prometheus":/p \
+#     prom/prometheus:v3.13.2 test rules /p/rules/tests/link_score_test.yml
+#
+# Live findings these pin down (2026-10-31): a good SNR pushed scores past
+# 100, and one lost ping in a 5-minute window cost up to 40 points, so a
+# healthy link showed as degraded (< 85) on the NOC Overview.
+
+rule_files:
+  - ../link-normalization.yml
+
+evaluation_interval: 15s
+
+tests:
+  # Clean link, SNR 40 dB (better than the 25 dB reference): exactly 100,
+  # not 130.
+  - interval: 15s
+    input_series:
+      - series: 'probe_success{job="link-availability",instance="10.0.0.1",link_id="L1",endpoint="a",site="S",role="P2P",vendor="ubiquiti_airmax",link_name="L1-a"}'
+        values: '1x80'
+      - series: 'link_signal_dbm{instance="10.0.0.1",link_id="L1",endpoint="a",site="S",role="P2P",vendor="ubiquiti_airmax",link_name="L1-a"}'
+        values: '-50x80'
+      - series: 'link_noise_dbm{instance="10.0.0.1",link_id="L1",endpoint="a",site="S",role="P2P",vendor="ubiquiti_airmax",link_name="L1-a"}'
+        values: '-90x80'
+    promql_expr_test:
+      - expr: round(link_health_score, 0.01)
+        eval_time: 20m
+        exp_samples:
+          - labels: '{link_id="L1"}'
+            value: 100
+
+  # One lost ping in the last 15 minutes (60 probes at 15 s): ~7 points,
+  # the link stays above the 85 "degraded" line.
+  - interval: 15s
+    input_series:
+      - series: 'probe_success{job="link-availability",instance="10.0.0.2",link_id="L2",endpoint="a",site="S",role="Backhaul",vendor="saf",link_name="L2-a"}'
+        values: '1x30 0 1x49'
+    promql_expr_test:
+      - expr: round(link_health_score, 0.01) > 85 < 100
+        eval_time: 20m
+        exp_samples:
+          - labels: '{link_id="L2"}'
+            value: 93.33
+
+  # Sustained 10% loss over the whole window: the full 40-point penalty.
+  - interval: 15s
+    input_series:
+      - series: 'probe_success{job="link-availability",instance="10.0.0.3",link_id="L3",endpoint="a",site="S",role="Backhaul",vendor="saf",link_name="L3-a"}'
+        values: '1 1 1 1 0 1 1 1 1 1 1 1 1 1 0 1 1 1 1 1 1 1 1 1 0 1 1 1 1 1 1 1 1 1 0 1 1 1 1 1 1 1 1 1 0 1 1 1 1 1 1 1 1 1 0 1 1 1 1 1 1 1 1 1 0 1 1 1 1 1 1 1 1 1 0 1 1 1 1 1 1'
+    promql_expr_test:
+      - expr: round(link_health_score, 0.01)
+        eval_time: 20m
+        exp_samples:
+          - labels: '{link_id="L3"}'
+            value: 60
+
+  # An unreachable endpoint zeroes the link, whatever the other end says:
+  # the link score is the worse of its two ends.
+  - interval: 15s
+    input_series:
+      - series: 'probe_success{job="link-availability",instance="10.0.0.4",link_id="L4",endpoint="a",site="S",role="Backhaul",vendor="saf",link_name="L4-a"}'
+        values: '1x80'
+      - series: 'probe_success{job="link-availability",instance="10.0.0.5",link_id="L4",endpoint="b",site="S",role="Backhaul",vendor="saf",link_name="L4-b"}'
+        values: '0x80'
+    promql_expr_test:
+      - expr: round(link_health_score, 0.01)
+        eval_time: 20m
+        exp_samples:
+          - labels: '{link_id="L4"}'
+            value: 0
+
+  # The latest ping lost, all others fine: not "down" (that needs a full
+  # minute of silence), just the small loss penalty. Before, the NOC table
+  # showed this link as DOWN for 15 s while its score was still high.
+  - interval: 15s
+    input_series:
+      - series: 'probe_success{job="link-availability",instance="10.0.0.6",link_id="L5",endpoint="a",site="S",role="Backhaul",vendor="saf",link_name="L5-a"}'
+        values: '1x79 0'
+    promql_expr_test:
+      # 93.33 or 100 depending on whether the rule run already counts the
+      # last probe; either way well clear of 'down'.
+      - expr: link_health_score{link_id="L5"} > bool 80
+        eval_time: 20m
+        exp_samples:
+          - labels: '{link_id="L5"}'
+            value: 1
