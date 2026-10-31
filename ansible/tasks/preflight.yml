@@ -7,6 +7,9 @@
     fail_msg: Run this through scripts/deploy.sh, which packages the release.
     quiet: true
 
+- name: Check the site inventory (same checks as on the laptop)
+  ansible.builtin.import_tasks: check_site.yml
+
 - name: Ubuntu server
   ansible.builtin.assert:
     that:
@@ -29,7 +32,7 @@
     that:
       - firewall_ssh_cidrs | length > 0
       - firewall_engineer_cidrs | length > 0
-    fail_msg: Set firewall_ssh_cidrs and firewall_engineer_cidrs in ansible/secrets.yml.
+    fail_msg: Set firewall_ssh_cidrs and firewall_engineer_cidrs in the site's group_vars/all/vars.yml.
     quiet: true
 
 - name: This SSH session (client address, server port)
@@ -71,14 +74,15 @@
     that: item.value is not search(placeholder_re)
     fail_msg: >-
       {{ item.name }} still holds a placeholder. Fix it with
-      scripts/edit-secrets.sh (lab only: allow_placeholder_secrets: true).
+      scripts/edit-secrets.sh --site <site> (lab only: allow_placeholder_secrets: true).
     quiet: true
   loop:
     - { name: grafana_admin_password, value: "{{ grafana_admin_password }}" }
     - { name: telegram_bot_token, value: "{{ telegram_bot_token }}" }
     - { name: deadman_url, value: "{{ deadman_url }}" }
-    - { name: routeros_api_credentials, value: "{{ routeros_api_credentials }}" }
-    - { name: snmp_auths, value: "{{ snmp_auths }}" }
+    - { name: routeros_api_logins, value: "{{ routeros_api_logins | to_json }}" }
+    - { name: snmp_communities, value: "{{ snmp_communities | to_json }}" }
+    - { name: snmpv3_users, value: "{{ snmpv3_users | to_json }}" }
     - { name: whatsapp_access_token, value: "{{ whatsapp_access_token if whatsapp_mode == 'live' else '' }}" }
   loop_control:
     label: "{{ item.name }}"
@@ -86,23 +90,6 @@
   vars:
     placeholder_re: "CHANGE-ME|PUT-[A-Z-]+-HERE|change-me-now|dry-run-placeholder"
   when: not allow_placeholder_secrets | bool
-
-- name: Per-site files parse and router names line up
-  # Router names must match between the exporter config and the credentials
-  # (docs/SETUP-INPUTS.md) - a mismatch means a silently unpolled router.
-  ansible.builtin.assert:
-    that:
-      - snmp_auths | from_yaml is mapping
-      - "'auths' in (snmp_auths | from_yaml)"
-      - routeros_cfg_names | difference(routeros_cred_names) | length == 0
-    fail_msg: >-
-      snmp_auths needs a top-level auths: block, and every router in
-      routeros_exporter_config needs credentials. Routers without
-      credentials: {{ routeros_cfg_names | difference(routeros_cred_names) }}
-    quiet: true
-  vars:
-    routeros_cfg_names: "{{ (routeros_exporter_config | from_yaml).routers | map(attribute='name') | list }}"
-    routeros_cred_names: "{{ (routeros_api_credentials | from_json).keys() | reject('match', '_') | list }}"
 
 - name: Is Docker installed yet?
   ansible.builtin.stat:

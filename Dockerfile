@@ -13,8 +13,12 @@
 #   docker build -t <dockerhub-user>/isp-observability:v1.4 .
 #   docker push   <dockerhub-user>/isp-observability:v1.4
 #
-# Config is baked but not frozen: bind-mount over /etc/prometheus/... at run
-# time to hot-patch targets without a rebuild.
+# The baked targets/topology are the EXAMPLE site's (inventories/example,
+# rendered by scripts/render-example.sh) - valid, fictional data so the build
+# checks pass. A real ISP's targets are per site: the Ansible deploy renders
+# them and docker-compose.image.yml bind-mounts them over /etc/prometheus/
+# targets. Never bake an ISP's targets into a published image (they name its
+# devices and addresses) - build only from a tree with the example targets.
 ###############################################################################
 ARG PROMETHEUS_VERSION=v3.13.2
 

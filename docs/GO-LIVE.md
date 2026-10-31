@@ -8,13 +8,15 @@ credentials** that only the ISP can supply. Work top to bottom; tick each box.
 - [ ] Dedicated Linux machine on the **management network only** (no leg in
       the customer network) - [SECURITY.md](SECURITY.md).
 - [ ] Ubuntu 24.04 LTS, time sync on, SSH key login with passwordless
-      `sudo`, listed in `ansible/inventory.ini` - step by step in
+      `sudo`, listed in the site folder's `hosts.ini` - step by step in
       [ANSIBLE.md](ANSIBLE.md#first-production-install-step-by-step).
 - [ ] Outbound HTTPS from the server to Ubuntu, Docker, PyPI and grafana.com
       for the install ([ANSIBLE.md](ANSIBLE.md#what-you-need)).
-- [ ] `ansible/secrets.yml` filled in, encrypted and committed; vault
-      password in the Keychain **and** in the password manager.
-- [ ] Firewall ranges set in `ansible/secrets.yml` (`firewall_noc_cidrs`,
+- [ ] A site folder for this ISP (copied from `inventories/example`) in a
+      private git repo, committed and pushed; its `group_vars/all/vault.yml`
+      encrypted; the vault password in the Keychain
+      (`isp-observability-vault-<isp_name>`) **and** in the password manager.
+- [ ] Firewall ranges set in the site's `vars.yml` (`firewall_noc_cidrs`,
       `firewall_engineer_cidrs`, `firewall_ssh_cidrs`). The playbook installs
       Docker, enables it at boot, and enforces Grafana (3000) only from NOC
       workstations, 9090/9093 only from engineers. (9100/9115/9116/9436 are
@@ -24,22 +26,28 @@ credentials** that only the ISP can supply. Work top to bottom; tick each box.
       enabled at boot, repo cloned, `bash scripts/init.sh` run, firewall by
       hand - [INSTALL.md](INSTALL.md), [SETUP-INPUTS.md](SETUP-INPUTS.md).
 
-## B. Replace the lab data (tracked files still hold lab values)
+## B. Describe the network (the site's `group_vars/all/vars.yml`)
 
-- [ ] `prometheus/targets/mikrotik-routers.yml` - real routers.
-- [ ] `prometheus/targets/mikrotik-sectors.yml` - real sectors.
-- [ ] `prometheus/targets/links.yml` - real PTP links (lab links such as
-      `litebeam-a` must go).
-- [ ] `prometheus/targets/vantage-points.yml` - the production server's
-      default gateway, i.e. the POP router it plugs into (the file still says `lab-gateway`) and optionally a
-      public IP such as 1.1.1.1.
-- [ ] `routeros_exporter/config.yml` + `secrets/routeros_api_credentials.json`
-      - routers and their **read-only** API users (names identical everywhere).
-- [ ] `prometheus/topology.yml` - POP/dependency layout.
-- [ ] `snmp_exporter/snmp.yml` - SNMP communities (and the same on devices,
-      restricted to the server's IP).
-- [ ] SNMPv3 only (ISP policy): users in `secrets/snmp_auths.yml`, `auth: <name>`
-      on each target, v2c removed from the device - [snmpv3.md](snmpv3.md).
+The product repo only holds a fictional example site; every device below is
+an entry in the site folder, and the deploy generates the target files from it
+([ANSIBLE.md](ANSIBLE.md#site-variables-varsyml-plain)). The site checks
+refuse duplicate IPs/names, unknown POPs and missing API logins.
+
+- [ ] `pops` - every POP, and its PPPoE router once (`name`, `ip`,
+      `wan_ifname` = the real WAN uplink, `auth`). `upstream_links` per POP.
+- [ ] A **read-only** RouterOS API user on each POP router, its login under
+      `routeros_api_logins` in the vault (keyed by the router `name`). Only
+      POP routers are polled over the API, never client routers.
+- [ ] `snmp_only_routers` - any other MikroTik to watch over SNMP.
+- [ ] `sectors` - real sectors, each with its `pop`.
+- [ ] `ptp_links` - real PTP links, both endpoints.
+- [ ] `vantage_points` - the production server's default gateway, i.e. the
+      POP router it plugs into, and optionally a public IP such as 1.1.1.1.
+- [ ] `telegram_chat_id` and `timezone` (section C).
+- [ ] SNMPv3 only (ISP policy): users under `snmpv3_users` in the vault,
+      `auth: <name>` on each device, v2c removed from the device -
+      [snmpv3.md](snmpv3.md). v2c communities (`snmp_communities`, vault) only
+      where the firmware has no v3, restricted on the device to the server's IP.
       AirFiber has no v3: management decides ping-only, a documented
       exception, or replacement.
 - [ ] Sector routes, POP by POP. The server plugs directly into its POP
@@ -56,16 +64,17 @@ credentials** that only the ISP can supply. Work top to bottom; tick each box.
 
 ## C. Secrets and identities
 
-With Ansible every `secrets/...` file and `.env` below is a key in
-`ansible/secrets.yml` (`scripts/edit-secrets.sh`); the
+With Ansible every `secrets/...` file and `.env` below is a key in the
+site's `vault.yml` (`scripts/edit-secrets.sh --site <folder>`); the
 playbook writes the files with the right modes and refuses placeholder values.
 
 - [ ] `secrets/grafana_admin_password.txt` - strong password (not the
       `change-me-now` placeholder); create Viewer accounts for NOC staff.
-- [ ] Telegram: production bot token in `secrets/telegram_bot_token.txt`, and
-      the **production NOC group id** as `chat_id` in
-      `alertmanager/alertmanager.yml` (both `telegram` and
-      `telegram-warnings`). The file currently points at the lab/dev group.
+- [ ] Telegram: production bot token (`telegram_bot_token`, vault), and the
+      **production NOC group id** as `telegram_chat_id` in the site's
+      `vars.yml` (the deploy writes it into `alertmanager/alertmanager.yml`
+      for both `telegram` and `telegram-warnings`). The product file holds an
+      example id.
 - [ ] Anything ever pasted in chat/email is rotated (e.g. WhatsApp tokens).
 - [ ] Linux host: `secrets/` is `700` and its files `644` (`bash scripts/init.sh`
       sets this; a `600` secret is unreadable inside the containers and
@@ -87,8 +96,9 @@ playbook writes the files with the right modes and refuses placeholder values.
 
 ## E. Validate before cut-over
 
-With Ansible, `scripts/deploy.sh` runs all of the commands below (locally and
-again on the server against the real files) and stops on any failure; the
+With Ansible, `scripts/deploy.sh --site <folder>` runs all of the commands
+below plus the site checks (locally on the site's rendered files, and again on
+the server against the real files) and stops on any failure; the
 boxes after them are still yours. By hand:
 
 ```bash
@@ -116,13 +126,15 @@ docker compose up -d --build && docker compose ps
 - [ ] Dead-man's switch on: healthchecks.io check, URL in
       `secrets/deadman_url.txt`, Watchdog route receiver `deadman`
       ([deadman.md](deadman.md)); `docker compose stop alertmanager` test passes.
-- [ ] Rollback plan: `scripts/deploy.sh <previous deploy-... tag>` (or by hand:
+- [ ] Rollback plan: `scripts/deploy.sh --site <folder> <previous deploy-<isp>-... tag>`;
+      site data by checking out the site repo's `deploy-...` tag (or by hand:
       `git revert` the change, `docker compose up -d`, restart the changed
       service); WhatsApp can be switched off instantly with
-      `whatsapp_mode: dry_run` in the vault (or `WHATSAPP_MODE=dry_run` in
+      `whatsapp_mode: dry_run` in the site's `vars.yml` (or `WHATSAPP_MODE=dry_run` in
       `.env`) and a deploy.
-- [ ] Backups (Ansible): the encrypted `ansible/secrets.yml` is in git; the
-      vault password is kept somewhere other than the deploying laptop.
+- [ ] Backups (Ansible): the site repo (with its encrypted `vault.yml`) is
+      pushed to a private remote; the vault password is kept somewhere other
+      than the deploying laptop.
 
 ## Known limits to accept
 

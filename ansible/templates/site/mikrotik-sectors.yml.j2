@@ -1,0 +1,24 @@
+{% include 'site/header.j2' %}{{ "\n" }}
+# MikroTik PtMP sector APs (`sectors`), scraped by the "snmp-sectors" job via
+# the `mikrotik_sector` SNMP module. Only the sector radio is polled - its
+# CPEs ride in the sector's wireless registration table.
+#
+# Labels:
+#   sector - stable id, the join key everywhere (dashboards, rules, alerts,
+#            the 08:00 capacity digest). Keep it short, no spaces.
+#   pop    - dependency group: if the POP's upstream link or router is down,
+#            these sectors' alerts are inhibited as unreachable-downstream.
+#   auth / site / role - credential set and grouping.
+#
+# Capacity thresholds are not here: prometheus/rules/sector-thresholds.yml.
+{% for s in sectors %}
+- targets: [{{ s.ip | string | to_json }}]
+  labels:
+    auth: {{ s.auth | string | to_json }}
+    sector: {{ s.sector | string | to_json }}
+    site: {{ (s.get('site') or (pops[s['pop']] or {}).get('site') or s['pop']) | string | to_json }}
+    role: {{ (s.get('role') or 'sector-ap') | string | to_json }}
+    pop: {{ s['pop'] | string | to_json }}
+{% else %}
+[]
+{% endfor %}

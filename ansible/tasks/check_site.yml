@@ -1,0 +1,12 @@
+# Consistency checks on the site's inventory (group_vars/all/vars.yml and
+# vault.yml): shapes, duplicate IPs/names, links/sectors pointing at unknown
+# POPs, POP routers without API logins, unknown SNMP auths, SNMPv3 spellings.
+# Runs on the laptop before packaging (render-site.yml) and again in
+# preflight. The messages name keys only, never secret values.
+- name: Site inventory is consistent
+  ansible.builtin.assert:
+    that: site_problems | length == 0
+    fail_msg: "{{ ['Fix in the site folder (group_vars/all/vars.yml or vault.yml):'] + site_problems }}"
+    quiet: true
+  vars:
+    site_problems: "{{ (lookup('ansible.builtin.template', 'site/problems.j2') or '') | string | split('\n') | map('trim') | select | list }}"

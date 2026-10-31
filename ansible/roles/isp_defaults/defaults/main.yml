@@ -1,0 +1,60 @@
+# Product defaults for every deploy. A role default is the lowest Ansible
+# precedence, so anything in the site folder (<site>/group_vars/all/vars.yml
+# and vault.yml) overrides it. Per-ISP values have no default here on
+# purpose: the deploy refuses to run until the site sets them.
+# Docs: docs/ANSIBLE.md
+
+# Live install folder on the server. Its staging twin is <app_dir>-staging.
+app_dir: /opt/isp-observability
+
+# Docker Compose project name = prefix of the named volumes (metric history).
+# Keep it stable. An existing manual install used its folder name (e.g.
+# isp-observability-platform); set that in the site's vars.yml to keep its
+# volumes.
+compose_project: isp-observability
+
+# WhatsApp bridge (.env). dry_run = log only, nothing sent. docs/whatsapp.md
+whatsapp_mode: dry_run
+whatsapp_phone_number_id: ""
+whatsapp_recipients: ""          # vault: phone numbers are personal data
+whatsapp_template: isp_critical_alert
+whatsapp_daily_cap: 10
+whatsapp_monthly_cap: 100
+
+# Firewall source ranges (CIDR lists). Set them in the site's vars.yml; the
+# playbook refuses to run with ssh/engineer ranges empty rather than guess.
+firewall_ssh_cidrs: []        # who may SSH to the server
+firewall_engineer_cidrs: []   # Grafana + Prometheus (9090) + Alertmanager (9093)
+firewall_noc_cidrs: []        # Grafana (3000) only
+
+# --- Network inventory (site vars.yml) - shapes: docs/ANSIBLE.md ----------
+pops: {}                 # POP name -> {site, router: {...} | null, upstream_links}
+snmp_only_routers: []    # MikroTiks polled over SNMP only, never the API
+sectors: []
+ptp_links: []
+vantage_points: []
+
+# --- SNMP and API credentials (site vault.yml) -----------------------------
+snmp_communities: {}     # auth name -> {community, version}
+snmpv3_users: {}         # auth name -> {username, auth_protocol, password, ...}
+routeros_api_logins: {}  # POP router name -> {username, password}
+
+# routeros_exporter/config.yml `options:` (rarely changed)
+routeros_exporter_options:
+  listen_port: 9436
+  poll_interval_seconds: 30
+  api_timeout_seconds: 30
+  topology_interval_seconds: 900
+  topology_output_path: /var/lib/routeros-exporter/topology.generated.yml
+  log_lookback: 200
+
+# Lab deploys only: accept CHANGE-ME / PUT-...-HERE placeholder secrets.
+allow_placeholder_secrets: false
+
+# Set by scripts/deploy.sh - not meant to be edited.
+release_archive: ""
+release_commit: ""
+release_ref: ""
+site_commit: ""
+deployed_by: ""
+os_updates: false

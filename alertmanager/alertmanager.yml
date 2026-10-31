@@ -1,21 +1,25 @@
-# CHANGING THE TELEGRAM GROUP: edit the ONE `chat_id: &noc_chat_id ...` line
-# in the `telegram` receiver below (search for noc_chat_id); the warnings
-# receiver reuses it. Then `docker compose restart alertmanager`.
+# PER-SITE VALUES: the Telegram group (`chat_id: &noc_chat_id ...` in the
+# `telegram` receiver below) and the timezone (`location:` in time_intervals)
+# are set per ISP - `telegram_chat_id` / `timezone` in the site's
+# group_vars/all/vars.yml - and written into this file by the Ansible deploy
+# (ansible/tasks/render.yml). The values below are the example site's. Edit
+# them here only on a manual (non-Ansible) install, then
+# `docker compose restart alertmanager`. Routing logic stays in this file.
 # How to find a group's id: docs/SETUP-INPUTS.md section D.
 global:
   resolve_timeout: 5m
 
 # Named time windows referenced by `active_time_intervals` on routes below.
-# `morning-0800-lagos` is the daily delivery window for the sector capacity
+# `morning-0800-local` is the daily delivery window for the sector capacity
 # digest: the underlying alerts (SectorOverClientCapacity /
 # SectorOverThroughputBudget) fire in Prometheus whenever a sector is over
 # budget, but Alertmanager only releases them to Telegram between 08:00 and
-# 08:15 Africa/Lagos, once per day (repeat_interval 24h), batched into one
-# message.
+# 08:15 site local time (the `location:` below), once per day
+# (repeat_interval 24h), batched into one message.
 time_intervals:
-  - name: morning-0800-lagos
+  - name: morning-0800-local
     time_intervals:
-      - location: "Africa/Lagos"
+      - location: "Africa/Lagos" # site timezone - set per site (`timezone`)
         times:
           - start_time: "08:00"
             end_time: "08:15"
@@ -95,7 +99,7 @@ route:
 
     # Sector capacity alerts (category: capacity, from sector-alerts.yml):
     # held back and delivered as a single once-a-day digest in the 08:00
-    # Africa/Lagos window. group_by alertname so every over-budget sector
+    # site-local window. group_by alertname so every over-budget sector
     # lands in one message; repeat_interval 24h so it's genuinely daily.
     # MUST come before the `sector` route below (capacity alerts also carry
     # a `sector` label and would otherwise match that first).
@@ -106,7 +110,7 @@ route:
       group_interval: 10m
       repeat_interval: 24h
       active_time_intervals:
-        - morning-0800-lagos
+        - morning-0800-local
 
     # All other sector alerts (state + health, from sector-alerts.yml) carry
     # a `sector` label. Group by it so SectorDown + its CPE symptom alerts
@@ -225,7 +229,7 @@ receivers:
   - name: telegram
     telegram_configs:
       - bot_token_file: /run/secrets/telegram_bot_token
-        chat_id: &noc_chat_id -1004387943176 # NOC Telegram group id - the ONLY place to change it
+        chat_id: &noc_chat_id -1001234567890 # NOC Telegram group id - set per site (`telegram_chat_id`)
         api_url: https://api.telegram.org
         parse_mode: HTML
         send_resolved: true   # also sends a "resolved" message when the alert clears

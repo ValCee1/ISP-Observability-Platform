@@ -1,3 +1,5 @@
 # Not shipped to the server by scripts/deploy.sh (git archive): the playbook
-# runs from the laptop, and this keeps the vault (ansible/secrets.yml) off it.
+# and the example site run from the laptop. A real site's vault lives in its
+# own repo and never enters the archive.
 /ansible export-ignore
+/inventories export-ignore

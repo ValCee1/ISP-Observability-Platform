@@ -9,8 +9,8 @@ label, so devices can move to v3 one at a time.
 
 | Piece | File |
 |---|---|
-| v1/v2c communities | `snmp_exporter/snmp.yml` → `auths:` (tracked) |
-| v3 users + passwords | `secrets/snmp_auths.yml` (gitignored Docker secret; template `snmp_exporter/snmp_auths.example.yml`) |
+| v1/v2c communities | `secrets/snmp_auths.yml` too (Ansible: `snmp_communities` in the site vault); `snmp_exporter/snmp.yml` holds no credentials |
+| v3 users + passwords | `secrets/snmp_auths.yml` (gitignored Docker secret; template `snmp_exporter/snmp_auths.example.yml`; Ansible: `snmpv3_users` in the site vault) |
 | Which auth a device uses | `auth:` label on the target in `prometheus/targets/*.yml` |
 
 snmp-exporter loads both config files (two `--config.file` flags in

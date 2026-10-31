@@ -1,46 +1,31 @@
-# MikroTik PtMP sector APs, scraped by the "snmp-sectors" job in
-# prometheus.yml via the `mikrotik_sector` SNMP module. One block per
-# sector AP. Only the sector radio is polled - the ~20 CPEs registered to
-# each sector are covered by that sector's wireless registration table, so
-# the CPEs do NOT need SNMP enabled on them.
+# GENERATED - do not edit. Written by the Ansible deploy (ansible/tasks/
+# render.yml) from the site's group_vars/all/vars.yml; edit that and
+# redeploy. In the product repo this copy is rendered from the example site
+# (inventories/example) by scripts/render-example.sh.
+
+# MikroTik PtMP sector APs (`sectors`), scraped by the "snmp-sectors" job via
+# the `mikrotik_sector` SNMP module. Only the sector radio is polled - its
+# CPEs ride in the sector's wireless registration table.
 #
 # Labels:
-#   auth   - SNMP credential set from snmp_exporter/snmp.yml `auths`
-#            (these sectors use community "monitoring" v2c -> public_v2)
-#   sector - stable identifier, used as the join key everywhere (dashboards,
-#            recording rules, alerts, the 08:00 capacity digest). Keep it
-#            short and free of spaces.
-#   site   - tower / location grouping label
-#   role   - free-form; "sector-ap" for all of these
-#   pop    - dependency group (see prometheus/topology.yml). If this POP's
-#            upstream link or router goes down, these sectors' alerts are
-#            inhibited as unreachable-downstream rather than sent separately.
+#   sector - stable id, the join key everywhere (dashboards, rules, alerts,
+#            the 08:00 capacity digest). Keep it short, no spaces.
+#   pop    - dependency group: if the POP's upstream link or router is down,
+#            these sectors' alerts are inhibited as unreachable-downstream.
+#   auth / site / role - credential set and grouping.
 #
-# Capacity thresholds (clients / Mbps before warn + critical) are NOT set
-# here - they live in prometheus/rules/sector-thresholds.yml, which
-# defaults every sector to 15/20 clients and 20/25 Mbps and lets you
-# override one sector in one place. See that file to change them.
-
-# Both BASE sectors are DISABLED (2026-09-12): not deployed/reachable yet,
-# so left enabled they just page SectorDown forever. Uncomment when BASE
-# goes live - nothing else needs to change.
-#
-# An all-comment file parses as YAML `null`, not an empty list - file_sd
-# wants a list, so an explicit `[]` keeps this file valid Prometheus config
-# with zero targets rather than relying on null being tolerated.
-# []
-#
-- targets: ["10.10.13.1"]
+# Capacity thresholds are not here: prometheus/rules/sector-thresholds.yml.
+- targets: ["10.50.13.1"]
   labels:
-    auth: public_v2
-    sector: 5B
-    site: POP 5
-    role: POP 5 SECTOR 2
-    pop: NKUANTOMA
-# - targets: ["10.10.13.129"]
-#   labels:
-#     auth: public_v2
-#     sector: 5E
-#     site: POP 5
-#     role: POP 5 SECTOR 5
-#     pop: NKUANTOMA
+    auth: "mikrotik_v3"
+    sector: "YB1"
+    site: "Yaba"
+    role: "Yaba sector 1"
+    pop: "YABA"
+- targets: ["10.50.13.2"]
+  labels:
+    auth: "mikrotik_v3"
+    sector: "YB2"
+    site: "Yaba"
+    role: "Yaba sector 2"
+    pop: "YABA"

@@ -102,8 +102,9 @@ survives `down`/`up` (not `down -v`).
 
 ## Moving an existing installation to another computer
 
-**With Ansible** there is nothing to copy: point `ansible/inventory.ini` at
-the new server and run `scripts/deploy.sh` ([ANSIBLE.md](ANSIBLE.md),
+**With Ansible** there is nothing to copy: point the site folder's
+`hosts.ini` at the new server and run `scripts/deploy.sh --site <folder>`
+([ANSIBLE.md](ANSIBLE.md),
 "Moving or rebuilding the server"). Only metric history (step 3 below) is
 optional extra work. The rest of this section is the manual route.
 

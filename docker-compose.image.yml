@@ -1,5 +1,6 @@
 # Override that swaps the stock prom/prometheus container for the
-# version-pinned isp-observability image (config baked in, no repo mounts).
+# version-pinned isp-observability image (config baked in; only the per-ISP
+# target lists are mounted from this folder).
 #
 # Everything else in docker-compose.yml is unchanged.
 #
@@ -26,5 +27,11 @@ services:
     # `- !reset null` list item was a no-op - `docker compose config`
     # showed all three repo bind mounts still attached, so "baked image"
     # mode was silently still running the repo's live config.
+    #
+    # The target lists are the one exception: they are per ISP (rendered from
+    # the site folder by the Ansible deploy), while the image only bakes the
+    # example site's. So this folder's prometheus/targets/ is mounted over
+    # them - rules and scrape config still come from the image.
     volumes: !override
       - prometheus_data:/prometheus
+      - ./prometheus/targets:/etc/prometheus/targets:ro

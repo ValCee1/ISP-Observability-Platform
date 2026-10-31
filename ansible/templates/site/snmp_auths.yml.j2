@@ -1,0 +1,11 @@
+{#- secrets/snmp_auths.yml: every SNMP credential set, from the vault. -#}
+{%- set auths = {} -%}
+{%- for n, c in snmp_communities.items() -%}
+{%- set _ = auths.update({n: {'version': c.version | int, 'community': c.community | string}}) -%}
+{%- endfor -%}
+{%- for n, u in snmpv3_users.items() -%}
+{%- set _ = auths.update({n: {'version': 3, 'security_level': u.get('security_level', 'authPriv')} | combine(u)}) -%}
+{%- endfor -%}
+# Written by the Ansible deploy from the site vault (snmp_communities,
+# snmpv3_users) - edit there with scripts/edit-secrets.sh --site.
+{{ {'auths': auths} | to_nice_yaml(indent=2, sort_keys=false) }}

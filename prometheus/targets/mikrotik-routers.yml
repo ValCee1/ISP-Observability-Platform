@@ -1,73 +1,43 @@
-# MikroTik core routers scraped by the "snmp-mikrotik" job in
-# prometheus.yml, via the generic `mikrotik` SNMP module. One block per
-# router; add more `- targets: [...]` entries below as routers are added.
-# `site`/`role` are free-form labels attached to every metric from this
-# router - used by dashboards to group/filter by location or function.
+# GENERATED - do not edit. Written by the Ansible deploy (ansible/tasks/
+# render.yml) from the site's group_vars/all/vars.yml; edit that and
+# redeploy. In the product repo this copy is rendered from the example site
+# (inventories/example) by scripts/render-example.sh.
+
+# MikroTik routers, scraped by the "snmp-mikrotik" job (prometheus.yml) via
+# the generic `mikrotik` SNMP module. Sources: every `pops.<POP>.router` (role
+# core-router; also polled over the RouterOS API) and `snmp_only_routers`
+# (SNMP only, never the API).
 #
-# `auth` (optional) picks the SNMP credential set: omit it for the default
-# v2c `public_v2`, or set e.g. `auth: "mikrotik_v3"` for SNMPv3 (defined in
-# secrets/snmp_auths.yml - see docs/snmpv3.md).
-#
-# `router` (added 2026-09-12) is the same stable id used as the `name` in
-# routeros_exporter/config.yml for this box. It exists purely so
-# Alertmanager can `equal: [router]` a SNMP-side alert (CoreRouterDown,
-# keyed by `instance`=IP) against the API-side alert for the same router
-# (RouterOSAPICollectorDown, keyed by `router`=this name) - see the
-# inhibit_rules note in alertmanager/alertmanager.yml. Not the file
-# unification discussed and declined earlier: this is one label, kept in
-# sync by hand, not a shared source of truth.
-#
-# `wan_ifname` is the ifName of this router's real WAN uplink. It IS the
-# source of truth (since 2026-10-06) for both the WANInterfaceDown alert
-# (prometheus/rules/mikrotik-alerts.yml) and the WAN panels of the WAN/LAN
-# Interfaces dashboard - both join ifOperStatus/ifHC*Octets against this
-# label via label_replace(up, "ifName", ..., "wan_ifname", ...). Change a
-# router's WAN here and the alert + dashboard follow; no rule edit needed.
-#
-# pop1-home's wan_ifname was "chiemerie-ppp" (CONFIRMED 2026-08-23: ether1
-# was an unused/down port then). CONFIRMED CHANGED (2026-09-13, per the
-# user): ether1 is the real WAN uplink now - the wiring/config on this
-# router genuinely changed. The WAN/LAN Interfaces dashboard's "WAN /
-# Backhaul regex" textbox default was updated to match; it's still a
-# textbox, adjust it live if this changes again.
-- targets:
-    - 192.168.10.1
+# Labels:
+#   router     - the router's `name`: the same id the RouterOS API exporter
+#                uses, so Alertmanager can `equal: [router]` CoreRouterDown
+#                against RouterOSAPICollectorDown. Generated from one entry,
+#                so the two can no longer drift apart.
+#   auth       - SNMP credential set (snmp_communities / snmpv3_users)
+#   wan_ifname - ifName of the real WAN uplink: drives WANInterfaceDown and
+#                the WAN panels of the WAN/LAN Interfaces dashboard.
+#   site/role/pop - grouping; `pop` feeds the dependency inhibit rules.
+- targets: ["10.50.0.1"]
   labels:
-    site: "HOME"
+    router: "pop-ikeja"
+    site: "Ikeja"
     role: "core-router"
-    pop: "HOME"
-    router: "pop1-home" # keep in sync with routeros_exporter/config.yml `name`
-    auth: "mikrotik_v3" # SNMPv3 (CONFIRMED 2026-10-25); v2c is off on this router
+    pop: "IKEJA"
+    auth: "mikrotik_v3"
     wan_ifname: "ether1"
-
-- targets:
-    - 192.168.10.15
+- targets: ["10.50.2.1"]
   labels:
-    site: "room-office"
+    router: "pop-yaba"
+    site: "Yaba"
+    role: "core-router"
+    pop: "YABA"
+    auth: "mikrotik_v3"
+    wan_ifname: "sfp1"
+- targets: ["10.50.2.15"]
+  labels:
+    router: "yaba-repeater"
+    site: "Yaba"
     role: "Repeater"
-    router: "room-office-repeater" # keep in sync with routeros_exporter/config.yml `name`
+    pop: "YABA"
+    auth: "mikrotik_v3"
     wan_ifname: "wlan1"
-
-- targets:
-    - 192.168.10.7
-  labels:
-    site: "Evang Home"
-    role: "Access Point"
-    router: "Evang-home" # keep in sync with routeros_exporter/config.yml `name`
-    wan_ifname: "ether1"
-
-- targets:
-    - 192.168.11.1
-  labels:
-    site: "Sam Router"
-    role: "sstp"
-    router: "Sam OFT"
-    wan_ifname: "chidinma-ppp"
-
-- targets:
-    - 192.168.11.2
-  labels:
-    site: "Sam Hotspot"
-    role: "Hotspot Router"
-    router: "Sam Hotspot"
-    wan_ifname: "chidinma-ppp"

@@ -1,32 +1,21 @@
-# "Can the monitoring server itself see the network?" reference targets.
-#
-# Pinged by the "vantage-points" job in prometheus.yml. If EVERY target in
-# this file is unreachable, the problem is the monitoring server's own
-# network path, not the links/routers/sectors - the MonitoringVantageLost
-# alert (prometheus/rules/vantage.yml) fires and Alertmanager holds back
-# all the per-device alerts until the path is back (see inhibit_rules in
-# alertmanager/alertmanager.yml).
-#
-# EDIT THIS FILE to change what counts as the server's own network. Prometheus
-# re-reads it within a minute - no restart needed.
-#
-# Pick targets that are on the SERVER'S side of the network and that are
-# NOT themselves things you want paged on as "down":
-#   - the server's default gateway (the first hop out of the server), and/or
-#   - a public address if "internet reachable" matters (e.g. 1.1.1.1).
-# The alert fires only when ALL listed targets fail, so adding a second,
-# independent target makes a false "network lost" less likely.
-#
-# At the ISP: replace the lab gateway below with the POP router / switch the
-# monitoring server is plugged into.
-#
-# NOTE: if the target is itself a monitored router, its own CoreRouterDown
-# alert is held back while this fires - the message says the server lost
-# its network, which is the more useful thing to know first.
-- targets: ["192.168.10.1"]   # lab: this server's default gateway (pop1-home)
-  labels:
-    vantage: lab-gateway
+# GENERATED - do not edit. Written by the Ansible deploy (ansible/tasks/
+# render.yml) from the site's group_vars/all/vars.yml; edit that and
+# redeploy. In the product repo this copy is rendered from the example site
+# (inventories/example) by scripts/render-example.sh.
 
-# - targets: ["1.1.1.1"]      # optional second reference: public internet
-#   labels:
-#     vantage: public-internet
+# "Can the monitoring server itself see the network?" reference targets
+# (`vantage_points`), pinged by the "vantage-points" job. If EVERY one is
+# unreachable the problem is the server's own network path: the
+# MonitoringVantageLost alert fires and Alertmanager holds back the
+# per-device alerts (prometheus/rules/vantage.yml, inhibit_rules).
+#
+# Pick targets on the SERVER'S side of the network that you do not want paged
+# on as "down" themselves: the server's default gateway, and optionally a
+# public address. A second independent target makes a false "network lost"
+# less likely.
+- targets: ["10.50.0.1"]
+  labels:
+    vantage: "server-gateway"
+- targets: ["1.1.1.1"]
+  labels:
+    vantage: "public-internet"
