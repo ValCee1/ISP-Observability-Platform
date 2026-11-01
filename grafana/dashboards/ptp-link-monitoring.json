@@ -784,7 +784,8 @@
                             "role": true,
                             "vendor": true,
                             "site": true,
-                            "remote_mac": true
+                            "remote_mac": true,
+                            "link_id": true
                         },
                         "renameByName": {
                             "Value #Up": "Status",
