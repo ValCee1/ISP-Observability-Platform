@@ -1552,7 +1552,7 @@
       "id": 43,
       "type": "timeseries",
       "title": "Temperature",
-      "description": "RouterOS temperature sensors on the sector radio. DeviceTemperatureHigh warns above 75 \u00b0C held for 15 minutes.",
+      "description": "Temperature sensors on the sector radio. Dashed line: 75 \u00b0C alert level (DeviceTemperatureHigh, held 15 minutes).",
       "gridPos": {
         "h": 7,
         "w": 8,
@@ -1569,16 +1569,14 @@
       "fieldConfig": {
         "defaults": {
           "unit": "celsius",
+          "decimals": 0,
+          "noValue": "No sensor",
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
                 "value": null,
-                "color": "green"
-              },
-              {
-                "value": 60,
-                "color": "orange"
+                "color": "transparent"
               },
               {
                 "value": 75,
@@ -1588,8 +1586,10 @@
           },
           "custom": {
             "thresholdsStyle": {
-              "mode": "line"
-            }
+              "mode": "dashed"
+            },
+            "fillOpacity": 10,
+            "lineWidth": 2
           }
         }
       }

@@ -207,7 +207,7 @@
         {
             "id": 101,
             "type": "row",
-            "title": "STORAGE",
+            "title": "STORAGE & TEMPERATURE",
             "gridPos": {
                 "h": 1,
                 "w": 24,
@@ -220,8 +220,8 @@
             "type": "gauge",
             "title": "Disk Used %",
             "gridPos": {
-                "h": 4,
-                "w": 8,
+                "h": 5,
+                "w": 6,
                 "x": 0,
                 "y": 6
             },
@@ -258,6 +258,119 @@
             }
         },
         {
+            "id": 103,
+            "type": "gauge",
+            "title": "Temperature",
+            "description": "Hottest temperature sensor on the router right now. DeviceTemperatureHigh warns above 75 °C held for 15 minutes. Boards without a sensor (hAP, hEX) show 'No sensor'.",
+            "gridPos": {
+                "h": 5,
+                "w": 6,
+                "x": 6,
+                "y": 6
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "max by (instance) (device_temperature_celsius{job=\"snmp-mikrotik\", instance=\"$instance\"})",
+                    "instant": true
+                }
+            ],
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "showThresholdMarkers": true,
+                "showThresholdLabels": false
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "celsius",
+                    "min": 0,
+                    "max": 100,
+                    "decimals": 0,
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "value": null,
+                                "color": "green"
+                            },
+                            {
+                                "value": 60,
+                                "color": "orange"
+                            },
+                            {
+                                "value": 75,
+                                "color": "red"
+                            }
+                        ]
+                    },
+                    "noValue": "No sensor"
+                }
+            }
+        },
+        {
+            "id": 104,
+            "type": "timeseries",
+            "title": "Temperature trend",
+            "description": "Every temperature sensor the router reports (e.g. CPU, board). Dashed line: 75 °C alert level.",
+            "gridPos": {
+                "h": 5,
+                "w": 12,
+                "x": 12,
+                "y": 6
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "device_temperature_celsius{job=\"snmp-mikrotik\", instance=\"$instance\"}",
+                    "legendFormat": "{{sensor}}"
+                }
+            ],
+            "options": {
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "right",
+                    "showLegend": true
+                },
+                "tooltip": {
+                    "mode": "multi",
+                    "sort": "desc"
+                }
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "celsius",
+                    "decimals": 0,
+                    "noValue": "No sensor",
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "value": null,
+                                "color": "transparent"
+                            },
+                            {
+                                "value": 75,
+                                "color": "red"
+                            }
+                        ]
+                    },
+                    "custom": {
+                        "thresholdsStyle": {
+                            "mode": "dashed"
+                        },
+                        "fillOpacity": 10,
+                        "lineWidth": 2
+                    }
+                }
+            }
+        },
+        {
             "id": 102,
             "type": "row",
             "title": "INTERFACES",
@@ -265,7 +378,7 @@
                 "h": 1,
                 "w": 24,
                 "x": 0,
-                "y": 10
+                "y": 11
             }
         },
         {
@@ -276,7 +389,7 @@
                 "h": 8,
                 "w": 12,
                 "x": 0,
-                "y": 11
+                "y": 12
             },
             "datasource": "Prometheus",
             "targets": [
@@ -299,7 +412,7 @@
                 "h": 8,
                 "w": 12,
                 "x": 12,
-                "y": 11
+                "y": 12
             },
             "datasource": "Prometheus",
             "targets": [
@@ -322,7 +435,7 @@
                 "h": 6,
                 "w": 24,
                 "x": 0,
-                "y": 19
+                "y": 20
             },
             "datasource": "Prometheus",
             "targets": [
@@ -364,7 +477,7 @@
                 "h": 10,
                 "w": 24,
                 "x": 0,
-                "y": 25
+                "y": 26
             },
             "datasource": "Prometheus",
             "options": {

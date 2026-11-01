@@ -521,7 +521,7 @@
             "description": "Messages used vs hard cap (dry-run sends count too, so caps behave as they will live). 80% of a cap raises WhatsAppBudgetNearlyUsed.",
             "gridPos": {
                 "h": 8,
-                "w": 12,
+                "w": 24,
                 "x": 0,
                 "y": 47
             },

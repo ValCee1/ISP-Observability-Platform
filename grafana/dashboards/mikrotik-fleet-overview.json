@@ -427,6 +427,10 @@
                                     "steps": [
                                         {
                                             "value": null,
+                                            "color": "white"
+                                        },
+                                        {
+                                            "value": 0,
                                             "color": "green"
                                         },
                                         {
@@ -443,8 +447,13 @@
                             {
                                 "id": "custom.cellOptions",
                                 "value": {
-                                    "type": "color-text"
+                                    "type": "color-background",
+                                    "mode": "gradient"
                                 }
+                            },
+                            {
+                                "id": "unit",
+                                "value": "celsius"
                             },
                             {
                                 "id": "decimals",

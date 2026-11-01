@@ -873,6 +873,10 @@
                                     "steps": [
                                         {
                                             "value": null,
+                                            "color": "white"
+                                        },
+                                        {
+                                            "value": 0,
                                             "color": "green"
                                         },
                                         {
@@ -893,6 +897,10 @@
                                 }
                             },
                             {
+                                "id": "unit",
+                                "value": "celsius"
+                            },
+                            {
                                 "id": "decimals",
                                 "value": 0
                             },
@@ -906,6 +914,63 @@
             }
         },
         {
+            "id": 27,
+            "type": "timeseries",
+            "title": "Radio temperature",
+            "description": "Every temperature sensor the radios report (SAF: radio, board, CPU). Dashed line: 75 °C alert level (DeviceTemperatureHigh, held 15 minutes). airMAX M and airFiber 5XHD have no sensor in their MIBs.",
+            "gridPos": {
+                "h": 7,
+                "w": 24,
+                "x": 0,
+                "y": 32
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "device_temperature_celsius{link_id=\"$link_id\"}",
+                    "legendFormat": "{{endpoint}} {{sensor}}"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "celsius",
+                    "decimals": 0,
+                    "noValue": "No sensor on these radios",
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "value": null,
+                                "color": "transparent"
+                            },
+                            {
+                                "value": 75,
+                                "color": "red"
+                            }
+                        ]
+                    },
+                    "custom": {
+                        "thresholdsStyle": {
+                            "mode": "dashed"
+                        },
+                        "fillOpacity": 10,
+                        "lineWidth": 2
+                    }
+                }
+            },
+            "options": {
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "right",
+                    "showLegend": true
+                },
+                "tooltip": {
+                    "mode": "multi",
+                    "sort": "desc"
+                }
+            }
+        },
+        {
             "id": 17,
             "type": "row",
             "title": "VENDOR DIAGNOSTICS (advanced)",
@@ -914,7 +979,7 @@
                 "h": 1,
                 "w": 24,
                 "x": 0,
-                "y": 32
+                "y": 39
             },
             "panels": [
                 {
@@ -967,52 +1032,6 @@
                     }
                 }
             ]
-        },
-        {
-            "id": 27,
-            "type": "timeseries",
-            "title": "Radio temperature",
-            "description": "Every temperature sensor the radios report (SAF: radio, board, CPU). DeviceTemperatureHigh warns above 75 °C held for 15 minutes. airMAX M and airFiber 5XHD have no sensor in their MIBs.",
-            "gridPos": {
-                "h": 7,
-                "w": 24,
-                "x": 0,
-                "y": 40
-            },
-            "datasource": "Prometheus",
-            "targets": [
-                {
-                    "expr": "device_temperature_celsius{link_id=\"$link_id\"}",
-                    "legendFormat": "{{endpoint}} {{sensor}}"
-                }
-            ],
-            "fieldConfig": {
-                "defaults": {
-                    "unit": "celsius",
-                    "thresholds": {
-                        "mode": "absolute",
-                        "steps": [
-                            {
-                                "value": null,
-                                "color": "green"
-                            },
-                            {
-                                "value": 60,
-                                "color": "orange"
-                            },
-                            {
-                                "value": 75,
-                                "color": "red"
-                            }
-                        ]
-                    },
-                    "custom": {
-                        "thresholdsStyle": {
-                            "mode": "line"
-                        }
-                    }
-                }
-            }
         }
     ],
     "annotations": {
