@@ -487,7 +487,7 @@
             "id": 15,
             "type": "timeseries",
             "title": "Alert notifications",
-            "description": "Alertmanager notifications sent vs failed, per integration. Any failed line above zero means people may not be getting alerts (AlertDeliveryFailing).",
+            "description": "Alertmanager notifications sent vs failed, per integration in use (integrations that never sent or failed are hidden). Any failed line above zero means people may not be getting alerts (AlertDeliveryFailing).",
             "gridPos": {
                 "h": 8,
                 "w": 12,
@@ -497,12 +497,12 @@
             "datasource": "Prometheus",
             "targets": [
                 {
-                    "expr": "sum by (integration) (rate(alertmanager_notifications_total[10m]))",
+                    "expr": "sum by (integration) (rate(alertmanager_notifications_total[10m])) and on (integration) (sum by (integration) (alertmanager_notifications_total) > 0)",
                     "legendFormat": "{{integration}} sent",
                     "refId": "A"
                 },
                 {
-                    "expr": "sum by (integration) (rate(alertmanager_notifications_failed_total[10m]))",
+                    "expr": "sum by (integration) (rate(alertmanager_notifications_failed_total[10m])) and on (integration) (sum by (integration) (alertmanager_notifications_failed_total) > 0)",
                     "legendFormat": "{{integration}} FAILED",
                     "refId": "B"
                 }
@@ -590,7 +590,7 @@
             "id": 18,
             "type": "timeseries",
             "title": "Rule evaluation",
-            "description": "Evaluation time per rule group and failures. Failures > 0 means some alerts may not be firing (PrometheusRuleFailures).",
+            "description": "Evaluation time of the five slowest rule groups, plus failures. Failures > 0 means some alerts may not be firing (PrometheusRuleFailures).",
             "gridPos": {
                 "h": 8,
                 "w": 12,
@@ -600,8 +600,8 @@
             "datasource": "Prometheus",
             "targets": [
                 {
-                    "expr": "max by (rule_group) (prometheus_rule_group_last_duration_seconds)",
-                    "legendFormat": "{{rule_group}}",
+                    "expr": "topk(5, label_replace(max by (rule_group) (prometheus_rule_group_last_duration_seconds), \"group\", \"$1\", \"rule_group\", \".*;(.*)\"))",
+                    "legendFormat": "{{group}}",
                     "refId": "A"
                 },
                 {

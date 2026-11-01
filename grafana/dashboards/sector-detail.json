@@ -622,7 +622,8 @@
           "custom": {
             "cellOptions": {
               "type": "auto"
-            }
+            },
+            "minWidth": 70
           }
         },
         "overrides": [
@@ -1515,7 +1516,9 @@
       "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
-          "unit": "percent"
+          "unit": "percent",
+          "min": 0,
+          "max": 100
         }
       },
       "targets": [
@@ -1538,7 +1541,9 @@
       "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
-          "unit": "percent"
+          "unit": "percent",
+          "min": 0,
+          "max": 100
         }
       },
       "targets": [
@@ -1589,7 +1594,10 @@
               "mode": "dashed"
             },
             "fillOpacity": 10,
-            "lineWidth": 2
+            "lineWidth": 2,
+            "axisSoftMin": 20,
+            "axisSoftMax": 80,
+            "spanNulls": 600000
           }
         }
       }

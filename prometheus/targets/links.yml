@@ -16,7 +16,7 @@
   labels:
     module: "ubiquiti_airfiber_link"
     auth: "public_v2"
-    link_name: "IKEJA-YABA"
+    link_name: "IKEJA-YABA (IKEJA)"
     link_id: "IKEJA-YABA"
     endpoint: "IKEJA"
     site: "IKEJA"
@@ -27,7 +27,7 @@
   labels:
     module: "ubiquiti_airfiber_link"
     auth: "public_v2"
-    link_name: "IKEJA-YABA"
+    link_name: "IKEJA-YABA (YABA)"
     link_id: "IKEJA-YABA"
     endpoint: "YABA"
     site: "YABA"

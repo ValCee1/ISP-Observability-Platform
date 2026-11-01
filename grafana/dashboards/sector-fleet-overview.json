@@ -82,7 +82,7 @@
         {
             "id": 13,
             "type": "stat",
-            "title": "Sectors Over Capacity",
+            "title": "Over Capacity",
             "description": "Sectors at/over their warn threshold for client count OR throughput (thresholds from sector-thresholds.yml). These feed the 08:00 capacity digest.",
             "gridPos": {
                 "h": 4,
@@ -327,6 +327,9 @@
                 "defaults": {
                     "color": {
                         "mode": "thresholds"
+                    },
+                    "custom": {
+                        "minWidth": 80
                     }
                 },
                 "overrides": [
@@ -378,7 +381,7 @@
                                             "match": "null+nan",
                                             "result": {
                                                 "text": "NO DATA",
-                                                "color": "white",
+                                                "color": "transparent",
                                                 "index": 2
                                             }
                                         }
@@ -621,7 +624,7 @@
                                     "steps": [
                                         {
                                             "value": null,
-                                            "color": "white"
+                                            "color": "transparent"
                                         },
                                         {
                                             "value": 0,

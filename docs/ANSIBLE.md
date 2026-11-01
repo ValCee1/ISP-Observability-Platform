@@ -90,7 +90,7 @@ ptp_links:
     vendor: ubiquiti_airfiber      # ubiquiti_airmax | ubiquiti_airfiber | saf
     role: Backhaul
     auth: public_v2                # an endpoint may override it
-    endpoints:                     # site defaults to endpoint, link_name to id
+    endpoints:                     # site defaults to endpoint, link_name to "id (endpoint)"
       - {ip: 10.50.6.82, endpoint: IKEJA, site: IKEJA, pop: YABA}
       - {ip: 10.50.6.83, endpoint: YABA, site: YABA, pop: YABA}
 

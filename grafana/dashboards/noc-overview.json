@@ -140,13 +140,13 @@
                     { "matcher": { "id": "byName", "options": "Status" }, "properties": [
                         { "id": "mappings", "value": [
                             { "type": "value", "options": { "1": { "text": "UP", "color": "green", "index": 0 }, "0": { "text": "DOWN", "color": "red", "index": 1 } } },
-                            { "type": "special", "options": { "match": "null+nan", "result": { "text": "NO DATA", "color": "white", "index": 2 } } }
+                            { "type": "special", "options": { "match": "null+nan", "result": { "text": "NO DATA", "color": "transparent", "index": 2 } } }
                         ] },
                         { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } },
                         { "id": "noValue", "value": "NO DATA" }
                     ] },
                     { "matcher": { "id": "byName", "options": "Health Score" }, "properties": [
-                        { "id": "thresholds", "value": { "mode": "absolute", "steps": [ { "value": null, "color": "white" }, { "value": 0, "color": "red" }, { "value": 60, "color": "yellow" }, { "value": 85, "color": "green" } ] } },
+                        { "id": "thresholds", "value": { "mode": "absolute", "steps": [ { "value": null, "color": "transparent" }, { "value": 0, "color": "red" }, { "value": 60, "color": "yellow" }, { "value": 85, "color": "green" } ] } },
                         { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } },
                         { "id": "noValue", "value": "NO DATA" }
                     ] }
@@ -295,7 +295,7 @@
                                             "match": "null+nan",
                                             "result": {
                                                 "text": "NO DATA",
-                                                "color": "white",
+                                                "color": "transparent",
                                                 "index": 2
                                             }
                                         }
@@ -344,7 +344,7 @@
                                     "steps": [
                                         {
                                             "value": null,
-                                            "color": "white"
+                                            "color": "transparent"
                                         },
                                         {
                                             "value": 0,
@@ -391,7 +391,7 @@
                                     "steps": [
                                         {
                                             "value": null,
-                                            "color": "white"
+                                            "color": "transparent"
                                         },
                                         {
                                             "value": 0,
@@ -466,7 +466,7 @@
                     { "matcher": { "id": "byName", "options": "Status" }, "properties": [
                         { "id": "mappings", "value": [
                             { "type": "value", "options": { "1": { "text": "UP", "color": "green", "index": 0 }, "0": { "text": "DOWN", "color": "red", "index": 1 } } },
-                            { "type": "special", "options": { "match": "null+nan", "result": { "text": "NO DATA", "color": "white", "index": 2 } } }
+                            { "type": "special", "options": { "match": "null+nan", "result": { "text": "NO DATA", "color": "transparent", "index": 2 } } }
                         ] },
                         { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } }
                     ] },

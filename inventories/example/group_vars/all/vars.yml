@@ -68,7 +68,7 @@ sectors:
 #   link fields: id, vendor (ubiquiti_airmax | ubiquiti_airfiber | saf),
 #   role, auth (an endpoint may override it), endpoints
 #   endpoint fields: ip, endpoint; optional site (default: endpoint),
-#   pop, link_name (default: the link id)
+#   pop, link_name (default: "<id> (<endpoint>)", so the two ends stay apart)
 ptp_links:
   - id: IKEJA-YABA
     vendor: ubiquiti_airfiber

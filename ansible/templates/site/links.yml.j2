@@ -14,7 +14,7 @@
   labels:
     module: {{ (l.vendor ~ '_link') | to_json }}
     auth: {{ (e.get('auth') or l.auth) | string | to_json }}
-    link_name: {{ (e.get('link_name') or l.id) | string | to_json }}
+    link_name: {{ (e.get('link_name') or (l.id ~ ' (' ~ e.endpoint ~ ')')) | string | to_json }}
     link_id: {{ l.id | string | to_json }}
     endpoint: {{ e.endpoint | string | to_json }}
     site: {{ (e.get('site') or e.endpoint) | string | to_json }}

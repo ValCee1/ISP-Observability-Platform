@@ -709,7 +709,7 @@
             "title": "Endpoint Snapshot",
             "description": "Current reading per radio endpoint (a/b) on this link. Temp is the hottest sensor the radio reports (SAF and MikroTik only; airMAX M and airFiber 5XHD expose none).",
             "gridPos": {
-                "h": 8,
+                "h": 5,
                 "w": 24,
                 "x": 0,
                 "y": 24
@@ -810,7 +810,8 @@
                     "custom": {
                         "cellOptions": {
                             "type": "auto"
-                        }
+                        },
+                        "minWidth": 80
                     }
                 },
                 "overrides": [
@@ -844,7 +845,7 @@
                                             "match": "null+nan",
                                             "result": {
                                                 "text": "NO DATA",
-                                                "color": "white",
+                                                "color": "transparent",
                                                 "index": 2
                                             }
                                         }
@@ -922,7 +923,7 @@
                 "h": 7,
                 "w": 24,
                 "x": 0,
-                "y": 32
+                "y": 29
             },
             "datasource": "Prometheus",
             "targets": [
@@ -954,7 +955,10 @@
                             "mode": "dashed"
                         },
                         "fillOpacity": 10,
-                        "lineWidth": 2
+                        "lineWidth": 2,
+                        "axisSoftMin": 20,
+                        "axisSoftMax": 80,
+                        "spanNulls": 600000
                     }
                 }
             },
@@ -979,7 +983,7 @@
                 "h": 1,
                 "w": 24,
                 "x": 0,
-                "y": 39
+                "y": 36
             },
             "panels": [
                 {
@@ -991,7 +995,7 @@
                         "h": 7,
                         "w": 12,
                         "x": 0,
-                        "y": 33
+                        "y": 37
                     },
                     "datasource": "Prometheus",
                     "targets": [
@@ -1010,7 +1014,7 @@
                         "h": 7,
                         "w": 12,
                         "x": 12,
-                        "y": 33
+                        "y": 37
                     },
                     "datasource": "Prometheus",
                     "targets": [
