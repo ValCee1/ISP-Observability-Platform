@@ -159,6 +159,7 @@ services:
       - WHATSAPP_TEMPLATE=${WHATSAPP_TEMPLATE:-isp_critical_alert}
       - WHATSAPP_DAILY_CAP=${WHATSAPP_DAILY_CAP:-10}
       - WHATSAPP_MONTHLY_CAP=${WHATSAPP_MONTHLY_CAP:-100}
+      - WHATSAPP_TZ=${WHATSAPP_TZ:-Africa/Lagos}   # daily/monthly caps roll over at local midnight (site `timezone`)
     # Public resolvers for the outbound call to Meta: the LAN/router resolver
     # intermittently failed to resolve graph.facebook.com from containers.
     # Container-to-container names still use Docker's own DNS.

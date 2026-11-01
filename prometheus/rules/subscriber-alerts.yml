@@ -5,7 +5,7 @@
 #
 # Routing (alertmanager/alertmanager.yml):
 #   category state/health -> real-time, grouped by `router`
-#   category capacity     -> batched into the 08:00 Africa/Lagos digest
+#   category capacity     -> batched into the 08:00 site-local digest
 # Inhibition: SectorDown / LinkDown / POPIsolated suppress these as
 # downstream noise (a shared cause is one incident, not N).
 

@@ -50,7 +50,7 @@ precedence, so the site overrides any of them.
 
 ```yaml
 isp_name: acme                     # short id; names the deploy tags
-timezone: Africa/Lagos             # Alertmanager's 08:00 capacity-digest window
+timezone: Africa/Lagos             # local time: 08:00 digest, busiest-hour charts, WhatsApp daily cap
 telegram_chat_id: "-1001234567890" # the NOC Telegram group
 
 firewall_ssh_cidrs:      [10.50.0.0/24]   # must include the address you deploy from

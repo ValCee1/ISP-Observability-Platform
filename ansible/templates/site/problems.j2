@@ -28,7 +28,7 @@
 isp_name: set it to a short id - lowercase letters, digits, dashes (e.g. acme). It names the deploy tags.
 {% endif -%}
 {%- if timezone is not defined or timezone is not string or timezone is not match('^[A-Za-z_]+(/[A-Za-z0-9_+-]+)*$') -%}
-timezone: set it to an IANA name such as Africa/Lagos (Alertmanager's daily digest window).
+timezone: set it to an IANA name such as Africa/Lagos (daily digest, busiest-hour charts, WhatsApp daily cap).
 {% endif -%}
 {%- if telegram_chat_id is not defined or telegram_chat_id | string is not match('^-?[0-9]+$') -%}
 telegram_chat_id: set it to the NOC Telegram group id, digits with a leading minus (docs/SETUP-INPUTS.md section D).

@@ -22,7 +22,8 @@ groups:
           alert_type: link-down
         annotations:
           summary: "🔴 Link DOWN"
-          description: "{{ $labels.link_name }} has been unreachable for 5 minutes."
+          description: >-
+            {{ if $labels.endpoint }}{{ $labels.endpoint }} end{{ with $labels.instance }} ({{ . }}){{ end }}{{ else }}{{ $labels.link_name }}{{ end }} has not answered ping for 5 minutes.{{ with printf "link_up{link_id=%q,endpoint!=%q}" $labels.link_id $labels.endpoint | query }}{{ range . }} The other end, {{ .Labels.endpoint }}{{ with .Labels.instance }} ({{ . }}){{ end }}, {{ if eq .Value 1.0 }}still answers: suspect this radio or the path to it, not the whole link.{{ else }}is not answering either.{{ end }}{{ end }}{{ end }}
 
       # PAGE tier for a link outage. LinkDown (above) tells the NOC on
       # Telegram after 5 minutes; THIS one adds the WhatsApp page only when
@@ -44,7 +45,8 @@ groups:
           alert_type: link-down-prolonged
         annotations:
           summary: "🔴 Link DOWN 30+ min"
-          description: "{{ $labels.link_name }} has been unreachable for 30 minutes - not a short weather fade."
+          description: >-
+            {{ if $labels.endpoint }}{{ $labels.endpoint }} end{{ with $labels.instance }} ({{ . }}){{ end }}{{ else }}{{ $labels.link_name }}{{ end }} has not answered ping for 30 minutes - not a short weather fade.{{ with printf "link_up{link_id=%q,endpoint!=%q}" $labels.link_id $labels.endpoint | query }}{{ range . }} The other end, {{ .Labels.endpoint }}{{ with .Labels.instance }} ({{ . }}){{ end }}, {{ if eq .Value 1.0 }}still answers: suspect this radio or the path to it, not the whole link.{{ else }}is not answering either.{{ end }}{{ end }}{{ end }}
 
   # HEALTH - the link is up, but degrading. Warning, not urgent, but worth
   # catching before it becomes a state problem.
@@ -62,7 +64,7 @@ groups:
           alert_type: weak-signal
         annotations:
           summary: "🟠 Weak Signal"
-          description: "{{ $labels.link_name }} signal has been below -80 dBm for most of the last 30 minutes (currently {{ $value }} dBm)."
+          description: "{{ if $labels.endpoint }}{{ $labels.endpoint }} end{{ with $labels.instance }} ({{ . }}){{ end }}{{ else }}{{ $labels.link_name }}{{ end }} signal has been below -80 dBm for most of the last 30 minutes (currently {{ $value }} dBm)."
 
       - alert: LowLinkQuality
         expr: |
@@ -76,7 +78,7 @@ groups:
           alert_type: low-quality
         annotations:
           summary: "🟠 Low Link Quality"
-          description: '{{ $labels.link_name }} quality has been below 70% for most of the last 30 minutes (currently {{ $value | printf "%.1f" }}%).'
+          description: '{{ if $labels.endpoint }}{{ $labels.endpoint }} end{{ with $labels.instance }} ({{ . }}){{ end }}{{ else }}{{ $labels.link_name }}{{ end }} quality has been below 70% for most of the last 30 minutes (currently {{ $value | printf "%.1f" }}%).'
 
       - alert: HighLatencyVariability
         expr: |
@@ -90,7 +92,7 @@ groups:
           alert_type: latency-variability
         annotations:
           summary: "🟠 Unstable Latency"
-          description: "{{ $labels.link_name }} latency variability has exceeded 50ms for most of the last 30 minutes - link is up but inconsistent."
+          description: "{{ if $labels.endpoint }}{{ $labels.endpoint }} end{{ with $labels.instance }} ({{ . }}){{ end }}{{ else }}{{ $labels.link_name }}{{ end }} latency variability has exceeded 50ms for most of the last 30 minutes - link is up but inconsistent."
 
       # Aggregated per link endpoint, NOT per interface - a radio logging
       # errors on three interfaces is one problem, one alert.
@@ -112,7 +114,7 @@ groups:
           alert_type: interface-errors
         annotations:
           summary: "🟠 Interface Errors"
-          description: '{{ $labels.link_name }} is logging interface errors ({{ $value | printf "%.2f" }}/s) - possible cabling, duplex, or hardware issue.'
+          description: '{{ if $labels.endpoint }}{{ $labels.endpoint }} end{{ with $labels.instance }} ({{ . }}){{ end }}{{ else }}{{ $labels.link_name }}{{ end }} is logging interface errors ({{ $value | printf "%.2f" }}/s) - possible cabling, duplex, or hardware issue.'
 
       - alert: PacketLoss
         expr: |
@@ -126,7 +128,7 @@ groups:
           alert_type: packet-loss
         annotations:
           summary: "🟠 Packet Loss"
-          description: '{{ $labels.link_name }} packet loss has been above 15% for most of the last 30 minutes (currently {{ $value | printf "%.1f" }}%).'
+          description: '{{ if $labels.endpoint }}{{ $labels.endpoint }} end{{ with $labels.instance }} ({{ . }}){{ end }}{{ else }}{{ $labels.link_name }}{{ end }} packet loss has been above 15% for most of the last 30 minutes (currently {{ $value | printf "%.1f" }}%).'
 
       - alert: PacketLoss
         expr: link_packet_loss_percent > 40
@@ -139,7 +141,7 @@ groups:
           alert_type: packet-loss
         annotations:
           summary: "🔴 Severe Packet Loss"
-          description: '{{ $labels.link_name }} packet loss has been above 40% for 10 minutes (currently {{ $value | printf "%.1f" }}%) - link is up but effectively unusable.'
+          description: '{{ if $labels.endpoint }}{{ $labels.endpoint }} end{{ with $labels.instance }} ({{ . }}){{ end }}{{ else }}{{ $labels.link_name }}{{ end }} packet loss has been above 40% for 10 minutes (currently {{ $value | printf "%.1f" }}%) - link is up but effectively unusable.'
 
       # Distinct from HighLatencyVariability (jitter/instability) above -
       # this is sustained absolute latency, the case where a link is
@@ -159,7 +161,7 @@ groups:
           alert_type: high-latency
         annotations:
           summary: "🟠 High Latency"
-          description: '{{ $labels.link_name }} latency has been above 200ms for most of the last 30 minutes (currently {{ $value | printf "%.1f" }}ms).'
+          description: '{{ if $labels.endpoint }}{{ $labels.endpoint }} end{{ with $labels.instance }} ({{ . }}){{ end }}{{ else }}{{ $labels.link_name }}{{ end }} latency has been above 200ms for most of the last 30 minutes (currently {{ $value | printf "%.1f" }}ms).'
 
       - alert: HighLatency
         expr: link_latency_ms > 500
@@ -172,7 +174,7 @@ groups:
           alert_type: high-latency
         annotations:
           summary: "🔴 Severe Latency"
-          description: '{{ $labels.link_name }} latency has been above 500ms for 10 minutes (currently {{ $value | printf "%.1f" }}ms) - link is up but barely usable.'
+          description: '{{ if $labels.endpoint }}{{ $labels.endpoint }} end{{ with $labels.instance }} ({{ . }}){{ end }}{{ else }}{{ $labels.link_name }}{{ end }} latency has been above 500ms for 10 minutes (currently {{ $value | printf "%.1f" }}ms) - link is up but barely usable.'
 
   # The actual point of separating state from health: a link that's UP but
   # visibly failing. This is the case a plain up/down monitor misses
@@ -204,4 +206,4 @@ groups:
           alert_type: link-degrading
         annotations:
           summary: "🟡 Link degrading (still up)"
-          description: "{{ $labels.link_name }} is reachable but showing signal/quality/reliability degradation for most of the last 30 minutes - investigate before it goes down."
+          description: "{{ if $labels.endpoint }}{{ $labels.endpoint }} end{{ with $labels.instance }} ({{ . }}){{ end }}{{ else }}{{ $labels.link_name }}{{ end }} is reachable but showing signal/quality/reliability degradation for most of the last 30 minutes - investigate before it goes down."

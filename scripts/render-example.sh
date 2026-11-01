@@ -2,7 +2,7 @@
 # Re-renders the repo's example per-site files from the example site
 # (inventories/example): prometheus/targets/*.yml, prometheus/topology.yml,
 # routeros_exporter/config.example.yml and the site values in
-# alertmanager/alertmanager.yml. Same templates as a real deploy, so the
+# alertmanager/alertmanager.yml and prometheus/rules/sector-normalization.yml. Same templates as a real deploy, so the
 # local checks, promtool tests and the Docker image always ship valid data.
 #   scripts/render-example.sh          rewrite the files
 #   scripts/render-example.sh --check  only report whether they are current
@@ -13,7 +13,7 @@ repo=$PWD
 files=(prometheus/targets/mikrotik-routers.yml prometheus/targets/mikrotik-sectors.yml
        prometheus/targets/links.yml prometheus/targets/vantage-points.yml
        prometheus/topology.yml routeros_exporter/config.example.yml
-       alertmanager/alertmanager.yml)
+       alertmanager/alertmanager.yml prometheus/rules/sector-normalization.yml)
 
 out=$(mktemp -d); trap 'rm -rf "$out"' EXIT
 for f in "${files[@]}"; do mkdir -p "$out/$(dirname "$f")"; cp "$f" "$out/$f"; done

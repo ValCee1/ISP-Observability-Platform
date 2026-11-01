@@ -74,14 +74,14 @@
             "id": 12, "type": "stat", "title": "Links Down",
             "description": "PTP links with either endpoint unreachable (matches LinkDown).",
             "gridPos": { "h": 4, "w": 4, "x": 0, "y": 11 }, "datasource": "Prometheus",
-            "targets": [ { "expr": "count(min by (link_id) (link_up) == 0) or vector(0)", "instant": true } ],
+            "targets": [ { "expr": "count(min by (link_id) (max_over_time(link_up[1m])) == 0) or vector(0)", "instant": true } ],
             "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "red" }, "noValue": "0" } }
         },
         {
             "id": 13, "type": "stat", "title": "Links Degraded",
             "description": "Links reachable but health score below 85 (LinkUpButDegrading territory).",
             "gridPos": { "h": 4, "w": 4, "x": 4, "y": 11 }, "datasource": "Prometheus",
-            "targets": [ { "expr": "count((min by (link_id) (link_up) == 1) and (link_health_score < 85)) or vector(0)", "instant": true } ],
+            "targets": [ { "expr": "count((min by (link_id) (max_over_time(link_up[1m])) == 1) and (link_health_score < 85)) or vector(0)", "instant": true } ],
             "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "yellow" }, "noValue": "0" } }
         },
         {
@@ -117,12 +117,12 @@
             "id": 1,
             "type": "table",
             "title": "All Links",
-            "description": "One row per link_id. Status = link_up; Health Score blends packet loss, SNR, interface errors, reachability (green >=85, yellow 60-84, red <60). Click a row for PTP Link Monitoring.",
+            "description": "One row per link_id. Status = DOWN when an end has answered no ping for a full minute (one lost ping does not flip it); Health Score blends packet loss, SNR, interface errors, reachability (green >=85, yellow 60-84, red <60). Click a row for PTP Link Monitoring.",
             "gridPos": { "h": 9, "w": 24, "x": 0, "y": 16 },
             "datasource": "Prometheus",
             "options": { "sortBy": [ { "displayName": "Health Score", "desc": false } ] },
             "targets": [
-                { "expr": "min by (link_id) (link_up)", "refId": "Status", "instant": true, "format": "table" },
+                { "expr": "min by (link_id) (max_over_time(link_up[1m]))", "refId": "Status", "instant": true, "format": "table" },
                 { "expr": "link_health_score", "refId": "Health", "instant": true, "format": "table" }
             ],
             "transformations": [

@@ -17,7 +17,7 @@ tests:
         alertname: LinkDown
         exp_alerts:
           - exp_labels: { severity: critical, category: state, scope: link, alert_type: link-down, link_id: LINK-W, link_name: w-a, endpoint: a, site: S, role: P2P, vendor: t }
-            exp_annotations: { summary: "🔴 Link DOWN", description: "w-a has been unreachable for 5 minutes." }
+            exp_annotations: { summary: "🔴 Link DOWN", description: "a end has not answered ping for 5 minutes." }
       - eval_time: 24m          # still down (fade ends at 25m)
         alertname: LinkDownProlonged
         exp_alerts: []
@@ -38,4 +38,4 @@ tests:
         alertname: LinkDownProlonged
         exp_alerts:
           - exp_labels: { severity: critical, page: "true", category: state, scope: link, alert_type: link-down-prolonged, link_id: LINK-R, link_name: r-a, endpoint: a, site: S, role: P2P, vendor: t }
-            exp_annotations: { summary: "🔴 Link DOWN 30+ min", description: "r-a has been unreachable for 30 minutes - not a short weather fade." }
+            exp_annotations: { summary: "🔴 Link DOWN 30+ min", description: "a end has not answered ping for 30 minutes - not a short weather fade." }
