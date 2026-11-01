@@ -68,7 +68,8 @@ sectors:
 #   link fields: id, vendor (ubiquiti_airmax | ubiquiti_airfiber | saf),
 #   role, auth (an endpoint may override it), endpoints
 #   endpoint fields: ip, endpoint; optional site (default: endpoint),
-#   pop, link_name (default: "<id> (<endpoint>)", so the two ends stay apart)
+#   pop, link_name (default: <id>-RADIO1 for the first endpoint listed,
+#   <id>-RADIO2 for the second)
 ptp_links:
   - id: IKEJA-YABA
     vendor: ubiquiti_airfiber
@@ -82,8 +83,8 @@ ptp_links:
     role: Backhaul
     auth: saf_v3
     endpoints:
-      - {ip: 10.50.6.90, endpoint: RADIO1, site: YABA, pop: LEKKI, link_name: YABA-LEKKI-RADIO1}
-      - {ip: 10.50.6.91, endpoint: LEKKI, site: LEKKI, pop: LEKKI, link_name: YABA-LEKKI-RADIO2}
+      - {ip: 10.50.6.90, endpoint: YABA, site: YABA, pop: LEKKI}
+      - {ip: 10.50.6.91, endpoint: LEKKI, site: LEKKI, pop: LEKKI}
 
 # --- Vantage points ----------------------------------------------------------
 # What the monitoring server pings to tell "I lost my network" apart from

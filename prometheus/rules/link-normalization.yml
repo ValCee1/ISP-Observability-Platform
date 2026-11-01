@@ -52,8 +52,15 @@ groups:
       # same device are pushing similar throughput. Revisit with a proper
       # per-vendor ifName once each device's real radio ifName is
       # confirmed via snmpwalk.
+      #
+      # Exception: the airFiber 5XHD switches customer traffic in hardware,
+      # so none of its interfaces see it. Its air-side byte counters
+      # (UBNT-AFLTU-MIB, airfiber_ltu_air_*_octets) are used instead, and
+      # `or on (link_id, endpoint)` keeps the interface pick out for it.
       - record: link_tx_bps
         expr: >
+          rate(airfiber_ltu_air_tx_octets[5m]) * 8
+          or on (link_id, endpoint)
           topk by (link_id, endpoint, site, role, vendor, link_name) (
             1,
             (
@@ -65,6 +72,8 @@ groups:
 
       - record: link_rx_bps
         expr: >
+          rate(airfiber_ltu_air_rx_octets[5m]) * 8
+          or on (link_id, endpoint)
           topk by (link_id, endpoint, site, role, vendor, link_name) (
             1,
             (

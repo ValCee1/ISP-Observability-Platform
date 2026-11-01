@@ -1,0 +1,40 @@
+# promtool unit tests for link_tx_bps / link_rx_bps
+# (prometheus/rules/link-normalization.yml). Run:
+#   docker run --rm --entrypoint promtool -v "$PWD/prometheus":/p \
+#     prom/prometheus:v3.13.2 test rules /p/rules/tests/link_traffic_test.yml
+#
+# Live finding (2026-11-01): an airFiber 5XHD link carrying ~40 Mb/s showed
+# ~5 kb/s, because its IF-MIB interfaces only see management traffic.
+
+rule_files:
+  - ../link-normalization.yml
+
+evaluation_interval: 1m
+
+tests:
+  # 5XHD end: the air counters win (5 MB/min = 666.7 kb/s, 1 MB/min =
+  # 133.3 kb/s) and the busy-looking ath0 interface is ignored.
+  # Other vendors keep the busiest-interface pick.
+  - interval: 1m
+    input_series:
+      - series: 'airfiber_ltu_air_tx_octets{job="link-radio-health",instance="10.0.0.82",link_id="P6-P2",endpoint="P2",site="P2",role="Backhaul",vendor="ubiquiti_airfiber",link_name="P6-P2-RADIO1"}'
+        values: '0+5000000x10'
+      - series: 'airfiber_ltu_air_rx_octets{job="link-radio-health",instance="10.0.0.82",link_id="P6-P2",endpoint="P2",site="P2",role="Backhaul",vendor="ubiquiti_airfiber",link_name="P6-P2-RADIO1"}'
+        values: '0+1000000x10'
+      - series: 'link_interface_out_octets{job="link-interface-health",instance="10.0.0.82",ifName="ath0",link_id="P6-P2",endpoint="P2",site="P2",role="Backhaul",vendor="ubiquiti_airfiber",link_name="P6-P2-RADIO1"}'
+        values: '0+600x10'
+      - series: 'link_interface_out_octets{job="link-interface-health",instance="10.0.0.90",ifName="eth1",link_id="P1-P7",endpoint="P1",site="P1",role="Backhaul",vendor="saf",link_name="P1-P7-RADIO1"}'
+        values: '0+60000x10'
+    promql_expr_test:
+      - expr: round(sum by (link_id) (link_tx_bps))
+        eval_time: 10m
+        exp_samples:
+          - labels: '{link_id="P6-P2"}'
+            value: 666667
+          - labels: '{link_id="P1-P7"}'
+            value: 8000
+      - expr: round(sum by (link_id) (link_rx_bps))
+        eval_time: 10m
+        exp_samples:
+          - labels: '{link_id="P6-P2"}'
+            value: 133333

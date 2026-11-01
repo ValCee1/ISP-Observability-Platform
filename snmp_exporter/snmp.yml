@@ -756,6 +756,8 @@ modules:
       - 1.3.6.1.4.1.41112.1.10.1.4.1
     get:
       - 1.3.6.1.4.1.41112.1.10.1.5.5.0 # afLTUConnected
+      - 1.3.6.1.4.1.41112.1.10.1.6.1.0 # air side: bytes received over the radio
+      - 1.3.6.1.4.1.41112.1.10.1.6.3.0 # air side: bytes sent over the radio
     metrics:
       - name: link_signal_dbm
         oid: 1.3.6.1.4.1.41112.1.3.2.1.11 # rxPower0 (field 11)
@@ -802,6 +804,17 @@ modules:
       - name: link_interface_state
         oid: 1.3.6.1.4.1.41112.1.10.1.5.5 # afLTUConnected: 0=disconnected, 1=connected
         type: gauge
+      # Traffic over the air. The 5XHD switches customer traffic in
+      # hardware, so its IF-MIB interfaces (eth0, ath0, br0) only carry
+      # management traffic (~5 kb/s against a measured 40 Mb/s,
+      # 2026-11-01). These counters see it all; link_tx_bps / link_rx_bps
+      # prefer them (prometheus/rules/link-normalization.yml).
+      - name: airfiber_ltu_air_rx_octets
+        oid: 1.3.6.1.4.1.41112.1.10.1.6.1
+        type: counter
+      - name: airfiber_ltu_air_tx_octets
+        oid: 1.3.6.1.4.1.41112.1.10.1.6.3
+        type: counter
 
   # Radio-side health for SAF Integra PTP backhaul links - rx level, MSE
   # (modem error), capacity, modem acquire status, and port state/octets.
