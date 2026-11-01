@@ -23,12 +23,39 @@ modules:
       - 1.3.6.1.2.1.31.1.1 # ifXTable
       - 1.3.6.1.2.1.25.3.3.1.2 # hrProcessorLoad
       - 1.3.6.1.2.1.25.2.3.1 # hrStorageTable
+      - 1.3.6.1.4.1.14988.1.1.3.100.1 # mtxrGaugeTable (temperature, voltage)
+    get:
+      - 1.3.6.1.4.1.14988.1.1.3.10.0 # mtxrHlTemperature (RouterOS 6)
 
     metrics:
       - name: sysUpTime
         oid: 1.3.6.1.2.1.1.3
         type: gauge
         help: Time since last reboot (hundredths of a second)
+
+      # Temperature, the silent killer of outdoor gear. RouterOS 7 lists its
+      # sensors in mtxrGaugeTable (name in `sensor`, e.g. "temperature",
+      # "cpu-temperature"; temperatures in whole degrees C, voltages in
+      # tenths of a volt). RouterOS 6 only has mtxrHlTemperature, in tenths
+      # of a degree. Boards without a sensor (hAP, hEX) return neither.
+      # Normalized to device_temperature_celsius in
+      # prometheus/rules/device-temperature.yml.
+      - name: mikrotik_gauge
+        oid: 1.3.6.1.4.1.14988.1.1.3.100.1.3 # mtxrGaugeValue
+        type: gauge
+        help: RouterOS health gauge (mtxrGaugeTable), sensor name in the sensor label
+        indexes:
+          - labelname: gauge_index
+            type: gauge
+        lookups:
+          - labels: [gauge_index]
+            labelname: sensor
+            oid: 1.3.6.1.4.1.14988.1.1.3.100.1.2 # mtxrGaugeName
+            type: DisplayString
+      - name: mikrotik_hl_temperature_dc
+        oid: 1.3.6.1.4.1.14988.1.1.3.10 # mtxrHlTemperature (RouterOS 6), tenths of a degree C
+        type: gauge
+        help: RouterOS 6 device temperature, tenths of a degree C
 
       - name: ifHCInOctets
         oid: 1.3.6.1.2.1.31.1.1.1.6
@@ -240,7 +267,33 @@ modules:
       - 1.3.6.1.2.1.25.3.3.1.2   # hrProcessorLoad
       - 1.3.6.1.2.1.25.2.3.1     # hrStorageTable (memory/disk)
       - 1.3.6.1.4.1.14988.1.1.1  # MikroTik wireless: rtab + AP table + scalars
+      - 1.3.6.1.4.1.14988.1.1.3.100.1 # mtxrGaugeTable (temperature, voltage)
+    get:
+      - 1.3.6.1.4.1.14988.1.1.3.10.0 # mtxrHlTemperature (RouterOS 6)
     metrics:
+      # Temperature, the silent killer of outdoor gear. RouterOS 7 lists its
+      # sensors in mtxrGaugeTable (name in `sensor`, e.g. "temperature",
+      # "cpu-temperature"; temperatures in whole degrees C, voltages in
+      # tenths of a volt). RouterOS 6 only has mtxrHlTemperature, in tenths
+      # of a degree. Boards without a sensor (hAP, hEX) return neither.
+      # Normalized to device_temperature_celsius in
+      # prometheus/rules/device-temperature.yml.
+      - name: sector_mikrotik_gauge
+        oid: 1.3.6.1.4.1.14988.1.1.3.100.1.3 # mtxrGaugeValue
+        type: gauge
+        help: RouterOS health gauge (mtxrGaugeTable), sensor name in the sensor label
+        indexes:
+          - labelname: gauge_index
+            type: gauge
+        lookups:
+          - labels: [gauge_index]
+            labelname: sensor
+            oid: 1.3.6.1.4.1.14988.1.1.3.100.1.2 # mtxrGaugeName
+            type: DisplayString
+      - name: sector_mikrotik_hl_temperature_dc
+        oid: 1.3.6.1.4.1.14988.1.1.3.10 # mtxrHlTemperature (RouterOS 6), tenths of a degree C
+        type: gauge
+        help: RouterOS 6 device temperature, tenths of a degree C
       - name: sector_uptime_seconds
         oid: 1.3.6.1.2.1.1.3
         type: gauge
@@ -687,10 +740,22 @@ modules:
   # built from both raw metrics in prometheus/rules/link-normalization.yml
   # - query that one, not the vendor-specific raw metrics, from dashboards
   # or alerts.
+  #
+  # Two MIBs, one module: classic airFiber (AF24, AF5X, AF11) answers
+  # UBNT-AirFIBER-MIB (41112.1.3); the newer airFiber 5XHD / LTU family
+  # answers only UBNT-AFLTU-MIB (41112.1.10) - confirmed live on the lab's
+  # 5XHD pair (2026-11-01), which returned nothing for the classic tree. A
+  # radio answers one tree and the other stays empty, so neither family
+  # needs its own module. Neither MIB has a temperature object for the
+  # 5XHD.
   ubiquiti_airfiber_link:
     # airFiberStatusEntry: ubntAirFIBER(3).airFiberStatus(2) -> 1.3.6.1.4.1.41112.1.3.2
+    # afLTUStationEntry:   ubntAFLTU(10).afLTUMIB(1).afLTUStationTable(4) -> 1.3.6.1.4.1.41112.1.10.1.4.1
     walk:
       - 1.3.6.1.4.1.41112.1.3.2.1
+      - 1.3.6.1.4.1.41112.1.10.1.4.1
+    get:
+      - 1.3.6.1.4.1.41112.1.10.1.5.5.0 # afLTUConnected
     metrics:
       - name: link_signal_dbm
         oid: 1.3.6.1.4.1.41112.1.3.2.1.11 # rxPower0 (field 11)
@@ -711,6 +776,33 @@ modules:
           - labelname: radio_index
             type: gauge
 
+      # --- airFiber 5XHD / LTU (UBNT-AFLTU-MIB), one row per remote radio,
+      # indexed by its MAC ---
+      - name: link_signal_dbm
+        oid: 1.3.6.1.4.1.41112.1.10.1.4.1.5 # afLTUStaRxPower0, dBm
+        type: gauge
+        indexes:
+          - labelname: remote_mac
+            type: PhysAddress48
+      # Measured vs ideal receive power, 0-100% (-1 = not available). The
+      # nearest thing these radios have to airMAX CCQ, so it shares
+      # link_quality_percent; dashboards say what it means per vendor.
+      - name: link_quality_percent
+        oid: 1.3.6.1.4.1.41112.1.10.1.4.1.9 # afLTUStaRxPowerLevel0
+        type: gauge
+        indexes:
+          - labelname: remote_mac
+            type: PhysAddress48
+      - name: airfiber_ltu_rx_capacity_kbps
+        oid: 1.3.6.1.4.1.41112.1.10.1.4.1.4 # afLTUStaRxCapacity, kb/s
+        type: gauge
+        indexes:
+          - labelname: remote_mac
+            type: PhysAddress48
+      - name: link_interface_state
+        oid: 1.3.6.1.4.1.41112.1.10.1.5.5 # afLTUConnected: 0=disconnected, 1=connected
+        type: gauge
+
   # Radio-side health for SAF Integra PTP backhaul links - rx level, MSE
   # (modem error), capacity, modem acquire status, and port state/octets.
   # MSE and capacity come off the wire in SAF-specific raw units (see the
@@ -723,7 +815,23 @@ modules:
       - 1.3.6.1.4.1.7571.100.1.1.7.1.3 # integraBmodem
       - 1.3.6.1.4.1.7571.100.1.1.7.1.5.1.1 # integraBifStatusTable (port state)
       - 1.3.6.1.4.1.7571.100.1.1.7.1.5.2.1 # integraBifStatisticsTable (octets)
+    get:
+      - 1.3.6.1.4.1.7571.100.1.1.7.1.4.2.0 # integraBsysCPUtemperature
+      - 1.3.6.1.4.1.7571.100.1.1.7.1.4.8.0 # integraBsysBoardTemperature
     metrics:
+      # Temperatures, all in tenths of a degree C per the MIB (raw 370 =
+      # 37.0 C). Normalized to device_temperature_celsius in
+      # prometheus/rules/device-temperature.yml.
+      - name: saf_radio_temperature_dc
+        oid: 1.3.6.1.4.1.7571.100.1.1.7.1.2.8 # integraBradioTemperature
+        type: gauge
+      - name: saf_board_temperature_dc
+        oid: 1.3.6.1.4.1.7571.100.1.1.7.1.4.8 # integraBsysBoardTemperature
+        type: gauge
+      - name: saf_cpu_temperature_dc
+        oid: 1.3.6.1.4.1.7571.100.1.1.7.1.4.2 # integraBsysCPUtemperature
+        type: gauge
+
       - name: link_signal_dbm
         oid: 1.3.6.1.4.1.7571.100.1.1.7.1.2.3 # integraBradioRxLevel
         type: gauge

@@ -359,7 +359,7 @@
             "id": 9,
             "type": "table",
             "title": "PPP Subscriber Sessions",
-            "description": "One row per live PPP/PPPoE server session on this router (dynamic \"<pppoe-USER>\" interfaces from the IF-MIB). Session uptime / Last flap / averages are derived - RouterOS SNMP has no /ppp active table. \"Last flap\" is the most recent reconnect edge and is blank when the user hasn't dropped in 2d; a true disconnect timestamp + reason has to be pushed off the router. Avg down/up are mean throughput over the current session's life. Defined in prometheus/rules/ppp-sessions.yml.",
+            "description": "One row per live PPP/PPPoE server session on this router (dynamic \"<pppoe-USER>\" interfaces from the IF-MIB). Reconnects / Session uptime / Last flap / averages are derived - RouterOS SNMP has no /ppp active table. \"Last flap\" is the most recent reconnect edge and is blank when the user hasn't dropped in 2d; a true disconnect timestamp + reason has to be pushed off the router. Avg down/up are mean throughput over the current session's life. Defined in prometheus/rules/ppp-sessions.yml.",
             "gridPos": {
                 "h": 10,
                 "w": 24,
@@ -390,12 +390,6 @@
                 {
                     "expr": "ppp:session:up{instance=\"$instance\"}",
                     "refId": "A",
-                    "instant": true,
-                    "format": "table"
-                },
-                {
-                    "expr": "ppp:session:start_timestamp{instance=\"$instance\"} * 1000",
-                    "refId": "B",
                     "instant": true,
                     "format": "table"
                 },
@@ -459,24 +453,24 @@
                             "site": true,
                             "role": true,
                             "ifName": true,
-                            "ifIndex": true
+                            "ifIndex": true,
+                            "router": true,
+                            "wan_ifname": true
                         },
                         "indexByName": {
                             "user": 0,
                             "Value #A": 1,
-                            "Value #C": 2,
-                            "Value #B": 3,
+                            "Value #I": 2,
+                            "Value #C": 3,
                             "Value #D": 4,
-                            "Value #E": 5,
-                            "Value #F": 6,
-                            "Value #G": 7,
-                            "Value #H": 8,
-                            "Value #I": 9
+                            "Value #G": 5,
+                            "Value #H": 6,
+                            "Value #E": 7,
+                            "Value #F": 8
                         },
                         "renameByName": {
                             "user": "Client",
                             "Value #A": "State",
-                            "Value #B": "Connected since",
                             "Value #C": "Session uptime",
                             "Value #D": "Last flap (≈ disconnect)",
                             "Value #E": "Avg ⬇ (bps)",
@@ -539,7 +533,7 @@
                     {
                         "matcher": {
                             "id": "byRegexp",
-                            "options": "Connected since|Last flap.*"
+                            "options": "Last flap.*"
                         },
                         "properties": [
                             {

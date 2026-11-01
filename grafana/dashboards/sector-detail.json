@@ -1213,7 +1213,7 @@
     {
       "id": 37,
       "type": "barchart",
-      "title": "Throughput & clients by hour of day (7-day avg, Lagos)",
+      "title": "Throughput & clients by hour of day (7-day avg, local)",
       "description": "Average sector throughput and client count for each local hour, over the last 7 days.",
       "gridPos": {
         "h": 9,
@@ -1508,7 +1508,7 @@
       "title": "CPU",
       "gridPos": {
         "h": 7,
-        "w": 12,
+        "w": 8,
         "x": 0,
         "y": 74
       },
@@ -1531,8 +1531,8 @@
       "title": "Memory used",
       "gridPos": {
         "h": 7,
-        "w": 12,
-        "x": 12,
+        "w": 8,
+        "x": 8,
         "y": 74
       },
       "datasource": "Prometheus",
@@ -1547,6 +1547,52 @@
           "legendFormat": "memory"
         }
       ]
+    },
+    {
+      "id": 43,
+      "type": "timeseries",
+      "title": "Temperature",
+      "description": "RouterOS temperature sensors on the sector radio. DeviceTemperatureHigh warns above 75 \u00b0C held for 15 minutes.",
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 74
+      },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "device_temperature_celsius{sector=\"$sector\"}",
+          "legendFormat": "{{sensor}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "green"
+              },
+              {
+                "value": 60,
+                "color": "orange"
+              },
+              {
+                "value": 75,
+                "color": "red"
+              }
+            ]
+          },
+          "custom": {
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          }
+        }
+      }
     }
   ],
   "annotations": {

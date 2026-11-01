@@ -100,14 +100,15 @@ groups:
         expr: link_signal_dbm - link_noise_dbm
 
       # Vendor-agnostic link capacity, built from each vendor's raw units
-      # (see snmp_exporter/snmp.yml): AirFiber's OID is already bits/sec;
-      # SAF's is kb/s and needs the x1000. Was link_capacity_bps
+      # (see snmp_exporter/snmp.yml): classic AirFiber's OID is already
+      # bits/sec; SAF's and the airFiber 5XHD's (UBNT-AFLTU-MIB) are kb/s
+      # and need the x1000. Was link_capacity_bps
       # previously produced directly by both SNMP modules under the same
       # name with DIFFERENT units - that made SAF's utilization read
       # ~6000% (confirmed live, 2026-08-23) once link_tx_bps started
       # working. Normalizing here, once, in one place, is the fix.
       - record: link_capacity_bps
-        expr: airfiber_rx_capacity_bps or (saf_modem_capacity_kbps * 1000)
+        expr: airfiber_rx_capacity_bps or (saf_modem_capacity_kbps * 1000) or (airfiber_ltu_rx_capacity_kbps * 1000)
 
       # SAF's raw MSE value is "the real number x10" per its MIB (e.g. raw
       # -320 means -32.0 dB) - never actually divided back down until now.

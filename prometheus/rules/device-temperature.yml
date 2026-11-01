@@ -1,0 +1,60 @@
+# Device temperature - heat kills outdoor radios and cabinet routers
+# slowly, and a hot radio often drops errors or reboots long before it dies.
+# One series per sensor, device_temperature_celsius{sensor=...}, from
+# whatever each vendor exposes (snmp_exporter/snmp.yml):
+#   MikroTik routers + sectors - RouterOS 7 mtxrGaugeTable sensors named
+#     *temperature* (whole degrees C); RouterOS 6 mtxrHlTemperature (tenths).
+#     Boards without a sensor (hAP, hEX) produce nothing.
+#   SAF Integra - radio, board and CPU (tenths of a degree C).
+#   Ubiquiti airMAX M (airOS 6) and airFiber 5XHD - no temperature object in
+#     their MIBs, so no series. Absent, not zero.
+groups:
+  - name: device-temperature
+    rules:
+      # One rule (promtool rejects the same record name twice); each `or`
+      # branch is one vendor and their series never share a label set.
+      - record: device_temperature_celsius
+        expr: >
+          max without (gauge_index) (mikrotik_gauge{sensor=~".*temperature.*"})
+          or label_replace(mikrotik_hl_temperature_dc / 10, "sensor", "temperature", "", "")
+          or max without (gauge_index) (sector_mikrotik_gauge{sensor=~".*temperature.*"})
+          or label_replace(sector_mikrotik_hl_temperature_dc / 10, "sensor", "temperature", "", "")
+          or label_replace(saf_radio_temperature_dc / 10, "sensor", "radio", "", "")
+          or label_replace(saf_board_temperature_dc / 10, "sensor", "board", "", "")
+          or label_replace(saf_cpu_temperature_dc / 10, "sensor", "cpu", "", "")
+
+  # One threshold for all gear: 75 C held for 15 minutes. Normal readings in
+  # the lab (2026-11-01, night) were 35-51 C; a radio in afternoon sun runs
+  # 15-20 C hotter, so 75 C sustained means a failing fan, a blocked vent or
+  # a radio that is cooking - check it, and a power cycle at a cool hour
+  # often clears the errors it causes. Split by scope so routing and the
+  # POP/link inhibit rules in alertmanager.yml treat it like the device's
+  # other health alerts.
+  - name: device-temperature-alerts
+    rules:
+      - alert: DeviceTemperatureHigh
+        expr: device_temperature_celsius{job="snmp-mikrotik"} > 75
+        for: 15m
+        keep_firing_for: 15m
+        labels: { severity: warning, category: health, scope: router, alert_type: temperature-high }
+        annotations:
+          summary: "🌡️ Router running hot"
+          description: "Router {{ $labels.router }} ({{ $labels.instance }}) {{ $labels.sensor }} sensor has read {{ $value | printf \"%.0f\" }} C for 15 minutes (alert above 75 C)."
+
+      - alert: DeviceTemperatureHigh
+        expr: device_temperature_celsius{job="snmp-sectors"} > 75
+        for: 15m
+        keep_firing_for: 15m
+        labels: { severity: warning, category: health, scope: sector, alert_type: temperature-high }
+        annotations:
+          summary: "🌡️ Sector radio running hot"
+          description: "Sector {{ $labels.sector }} ({{ $labels.instance }}) {{ $labels.sensor }} sensor has read {{ $value | printf \"%.0f\" }} C for 15 minutes (alert above 75 C)."
+
+      - alert: DeviceTemperatureHigh
+        expr: device_temperature_celsius{job="link-radio-health"} > 75
+        for: 15m
+        keep_firing_for: 15m
+        labels: { severity: warning, category: health, scope: link, alert_type: temperature-high }
+        annotations:
+          summary: "🌡️ Link radio running hot"
+          description: "{{ $labels.link_name }}: {{ $labels.endpoint }} end ({{ $labels.instance }}) {{ $labels.sensor }} sensor has read {{ $value | printf \"%.0f\" }} C for 15 minutes (alert above 75 C)."

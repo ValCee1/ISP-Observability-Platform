@@ -206,6 +206,7 @@ Rule groups, by file:
 | `link-normalization.yml` | `link-availability`, `link-interface-health`, `link-derived-metrics` | raw SNMP/ICMP → `link_*` |
 | `link-alerts.yml` | `link-state`, `link-health`, `link-degrading`, `link-composite-health` | LinkDown, WeakSignal, PacketLoss, LinkUpButDegrading, `link_health_score` |
 | `mikrotik-alerts.yml` | `mikrotik-core` | CoreRouterDown, HighCPU, HighMemory, WANInterfaceDown |
+| `device-temperature.yml` | `device-temperature`, `device-temperature-alerts` | `device_temperature_celsius` (MikroTik, SAF); DeviceTemperatureHigh above 75 °C for 15 min |
 | `exporter-health.yml` | `exporter-health` | ExporterDown (snmp / blackbox / routeros exporters, node-exporter, alertmanager, grafana, whatsapp-bridge); Alertmanager inhibits the per-device alerts behind a down exporter |
 | `server-health.yml` | `server-health` | the monitoring server itself: disk, memory, CPU, clock, rule failures, alert-delivery failures — see [server-monitoring.md](server-monitoring.md) |
 | `deadman.yml` | `deadman` | Watchdog (always firing) → outside heartbeat check; alerts when the whole stack goes silent — see [deadman.md](deadman.md) |

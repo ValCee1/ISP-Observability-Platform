@@ -333,7 +333,7 @@
         {
             "id": 10,
             "type": "stat",
-            "title": "CCQ",
+            "title": "CCQ / quality",
             "gridPos": {
                 "h": 5,
                 "w": 4,
@@ -343,7 +343,7 @@
             "datasource": "Prometheus",
             "targets": [
                 {
-                    "expr": "link_quality_percent{link_id=\"$link_id\"}",
+                    "expr": "link_quality_percent{link_id=\"$link_id\"} >= 0",
                     "legendFormat": "{{link_name}}",
                     "instant": true
                 }
@@ -388,7 +388,8 @@
                         }
                     ]
                 }
-            }
+            },
+            "description": "airMAX: CCQ (share of frames sent without retry). airFiber 5XHD: received power as a share of the ideal for this link (no CCQ on that radio). SAF has neither - see its MSE under Vendor Diagnostics."
         },
         {
             "id": 8,
@@ -706,7 +707,7 @@
             "id": 7,
             "type": "table",
             "title": "Endpoint Snapshot",
-            "description": "Current reading per radio endpoint (a/b) on this link.",
+            "description": "Current reading per radio endpoint (a/b) on this link. Temp is the hottest sensor the radio reports (SAF and MikroTik only; airMAX M and airFiber 5XHD expose none).",
             "gridPos": {
                 "h": 8,
                 "w": 24,
@@ -734,8 +735,14 @@
                     "format": "table"
                 },
                 {
-                    "expr": "sum by (link_id, link_name, endpoint) (link_quality_percent{link_id=\"$link_id\"})",
+                    "expr": "sum by (link_id, link_name, endpoint) (link_quality_percent{link_id=\"$link_id\"} >= 0)",
                     "refId": "Quality",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "max by (link_id, link_name, endpoint) (device_temperature_celsius{link_id=\"$link_id\"})",
+                    "refId": "Temp",
                     "instant": true,
                     "format": "table"
                 },
@@ -776,7 +783,8 @@
                             "ifIndex": true,
                             "role": true,
                             "vendor": true,
-                            "site": true
+                            "site": true,
+                            "remote_mac": true
                         },
                         "renameByName": {
                             "Value #Up": "Status",
@@ -788,7 +796,8 @@
                             "Value #OutErrors": "Out Errors",
                             "link_name": "Radio",
                             "endpoint": "Endpoint",
-                            "link_id": "Link"
+                            "link_id": "Link",
+                            "Value #Temp": "Temp (°C)"
                         }
                     }
                 }
@@ -848,6 +857,48 @@
                                     "type": "color-background",
                                     "mode": "gradient"
                                 }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Temp (°C)"
+                        },
+                        "properties": [
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        {
+                                            "value": null,
+                                            "color": "green"
+                                        },
+                                        {
+                                            "value": 60,
+                                            "color": "orange"
+                                        },
+                                        {
+                                            "value": 75,
+                                            "color": "red"
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "type": "color-text"
+                                }
+                            },
+                            {
+                                "id": "decimals",
+                                "value": 0
+                            },
+                            {
+                                "id": "noValue",
+                                "value": "N/A"
                             }
                         ]
                     }
@@ -916,6 +967,52 @@
                     }
                 }
             ]
+        },
+        {
+            "id": 27,
+            "type": "timeseries",
+            "title": "Radio temperature",
+            "description": "Every temperature sensor the radios report (SAF: radio, board, CPU). DeviceTemperatureHigh warns above 75 °C held for 15 minutes. airMAX M and airFiber 5XHD have no sensor in their MIBs.",
+            "gridPos": {
+                "h": 7,
+                "w": 24,
+                "x": 0,
+                "y": 40
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "device_temperature_celsius{link_id=\"$link_id\"}",
+                    "legendFormat": "{{endpoint}} {{sensor}}"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "celsius",
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "value": null,
+                                "color": "green"
+                            },
+                            {
+                                "value": 60,
+                                "color": "orange"
+                            },
+                            {
+                                "value": 75,
+                                "color": "red"
+                            }
+                        ]
+                    },
+                    "custom": {
+                        "thresholdsStyle": {
+                            "mode": "line"
+                        }
+                    }
+                }
+            }
         }
     ],
     "annotations": {

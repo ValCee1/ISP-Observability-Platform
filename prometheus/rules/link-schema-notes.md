@@ -12,7 +12,7 @@
 | link_tx_bps / link_rx_bps | Interface health | derived from IF-MIB HC octet counters |
 | link_signal_dbm | Radio health | ubntWlStatSignal (1.3.6.1.4.1.41112.1.4.5.1.5) |
 | link_noise_dbm | Radio health | ubntWlStatNoiseFloor (.1.4.5.1.8) |
-| link_quality_percent | Radio health | ubntWlStatCcq (.1.4.5.1.7) |
+| link_quality_percent | Radio health | ubntWlStatCcq (.1.4.5.1.7); airFiber 5XHD: afLTUStaRxPowerLevel0, see below; SAF: none (use link_mse_db) |
 | link_channel_width_mhz | Radio health | ubntWlStatChanWidth (.1.4.5.1.14) |
 | link_frequency_mhz | Radio health | ubntRadioFreq (.1.4.1.1.4) |
 
@@ -48,29 +48,20 @@
   observable on this hardware over SNMP.
 
 ## BROKEN - needs real investigation, not deployed as data
-- **AirFiber** (`ubiquiti_airfiber_link` module, OID base
-  1.3.6.1.4.1.41112.1.3.2.1): confirmed LIVE (2026-08-23) that this OID
-  subtree returns **zero PDUs** from the real unit (10.10.6.82, a genuine
-  "airFiber 5XHD") - despite this repo's earlier notes claiming these OIDs
-  were "fully resolved from real MIB text". They were evidently resolved
-  against MIB documentation for a different AirFiber model/firmware, not
-  this one. Result: link_signal_dbm/airfiber_rx_capacity_bps/
-  link_interface_state have never actually been collected for AirFiber
-  links, despite the module being wired into prometheus.yml/links.yml as
-  if they were.
-
-  A live snmpwalk of `1.3.6.1.4.1.41112.1.10` on this unit DOES return
-  real, changing data - RX power-like values (-52, -50 dBm), a pair of
-  ~355-358 Mbps figures that read like current/max modulation rate, a
-  Counter64 uptime, and the peer's IP (10.10.6.83) - but which numbered
-  field means what is a guess without the real UBNT-AirFiber-5X MIB text
-  (net-snmp's default MIB set doesn't include Ubiquiti's proprietary
-  MIBs). Deliberately NOT wired into snmp.yml as a guess: an alert firing
-  on a wrong RF number is worse than a link with admittedly-missing RF
-  data. To finish this: get the actual AF-5XHD MIB from Ubiquiti (or a
-  firmware dump / the UBNT Discovery Tool's OID list) and match field
-  numbers against the sample walk above, then add the module the same way
-  saf_link was added.
+- ~~**AirFiber 5XHD**~~ DONE (2026-11-01). The classic airFiber tree
+  (1.3.6.1.4.1.41112.1.3.2.1) returns zero PDUs on the 5XHD pair
+  (10.10.6.82/83): that radio speaks UBNT-AFLTU-MIB (41112.1.10) instead.
+  Fields matched against the MIB text (librenms mibs/ubnt/UBNT-AFLTU-MIB)
+  and a live walk; `ubiquiti_airfiber_link` now walks both trees, so a
+  classic AF and a 5XHD both work with the same module:
+  | Metric | UBNT-AFLTU-MIB object | Live (2026-11-01) |
+  |---|---|---|
+  | link_signal_dbm | afLTUStaRxPower0 (.10.1.4.1.5) | -54 dBm |
+  | link_quality_percent | afLTUStaRxPowerLevel0 (.10.1.4.1.9), measured vs ideal rx power, -1 = n/a | 65 % |
+  | airfiber_ltu_rx_capacity_kbps -> link_capacity_bps | afLTUStaRxCapacity (.10.1.4.1.4) | 358400 kb/s |
+  | link_interface_state | afLTUConnected (.10.1.5.5.0) | 1 |
+  No CCQ on this radio (link_quality_percent is the nearest equivalent) and
+  no temperature object in the MIB.
 - ~~**MikroTik wireless sector radios**~~ DONE (2026-08-27). The stale,
   unverified `mikrotik_wireless_link` module was replaced by
   `mikrotik_sector`, decoded from a live `snmpwalk` of
@@ -116,3 +107,14 @@ AP table `1.3.6.1.4.1.14988.1.1.1.3.1.<col>.<wlanIfIndex>`:
 - **Airtime %** is not exposed by RouterOS on the old `wireless` package
   (Nv2) via SNMP or the API - `SectorLikelyCongested` infers it from
   simultaneous PHY-rate collapse + throughput over budget.
+
+## Device temperature (2026-11-01)
+`device_temperature_celsius{sensor=...}` (prometheus/rules/device-temperature.yml),
+alert DeviceTemperatureHigh above 75 C for 15 minutes.
+| Vendor | Source | Live |
+|---|---|---|
+| SAF Integra | integraBradioTemperature (.7.1.2.8), integraBsysBoardTemperature (.7.1.4.8), integraBsysCPUtemperature (.7.1.4.2), tenths of C | 37 / 40 / 49 C |
+| MikroTik RouterOS 7 | mtxrGaugeTable (14988.1.1.3.100.1) sensors named *temperature*, whole C | sector 41 C |
+| MikroTik RouterOS 6 | mtxrHlTemperature (14988.1.1.3.10.0), tenths of C | - |
+| airMAX M (airOS 6), airFiber 5XHD | none in their MIBs | - |
+| hAP / hEX routers | no sensor | - |

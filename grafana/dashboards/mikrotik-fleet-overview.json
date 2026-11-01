@@ -139,7 +139,7 @@
             "id": 1,
             "type": "table",
             "title": "All Routers",
-            "description": "One row per router. Status reflects SNMP reachability (green = UP, red = DOWN). CPU % and Memory % are colored green/orange/red against the same thresholds as the per-router gauges. Click a row to open that router's full diagnostics on MikroTik Router Detail.",
+            "description": "One row per router. Status reflects SNMP reachability (green = UP, red = DOWN). CPU % and Memory % are colored green/orange/red against the same thresholds as the per-router gauges. Click a row to open that router's full diagnostics on MikroTik Router Detail. Temp is the hottest sensor (N/A on boards without one, e.g. hAP/hEX).",
             "gridPos": {
                 "h": 10,
                 "w": 24,
@@ -179,6 +179,12 @@
                     "refId": "Mem",
                     "instant": true,
                     "format": "table"
+                },
+                {
+                    "expr": "max by (instance, site, role) (device_temperature_celsius{job=\"snmp-mikrotik\"})",
+                    "refId": "Temp",
+                    "instant": true,
+                    "format": "table"
                 }
             ],
             "transformations": [
@@ -197,7 +203,8 @@
                             "Time 4": true,
                             "__name__": true,
                             "job": true,
-                            "wan_ifname": true
+                            "wan_ifname": true,
+                            "Time 5": true
                         },
                         "indexByName": {
                             "site": 0,
@@ -206,7 +213,8 @@
                             "Value #Status": 3,
                             "Value #Uptime": 4,
                             "Value #CPU": 5,
-                            "Value #Mem": 6
+                            "Value #Mem": 6,
+                            "Value #Temp": 7
                         },
                         "renameByName": {
                             "instance": "Router",
@@ -215,7 +223,8 @@
                             "Value #Status": "Status",
                             "Value #Uptime": "Uptime",
                             "Value #CPU": "CPU %",
-                            "Value #Mem": "Memory %"
+                            "Value #Mem": "Memory %",
+                            "Value #Temp": "Temp °C"
                         }
                     }
                 }
@@ -398,6 +407,48 @@
                             {
                                 "id": "unit",
                                 "value": "percent"
+                            },
+                            {
+                                "id": "noValue",
+                                "value": "N/A"
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Temp °C"
+                        },
+                        "properties": [
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        {
+                                            "value": null,
+                                            "color": "green"
+                                        },
+                                        {
+                                            "value": 60,
+                                            "color": "orange"
+                                        },
+                                        {
+                                            "value": 75,
+                                            "color": "red"
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "type": "color-text"
+                                }
+                            },
+                            {
+                                "id": "decimals",
+                                "value": 0
                             },
                             {
                                 "id": "noValue",
