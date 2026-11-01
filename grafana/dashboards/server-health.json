@@ -600,7 +600,7 @@
             "datasource": "Prometheus",
             "targets": [
                 {
-                    "expr": "topk(5, label_replace(max by (rule_group) (prometheus_rule_group_last_duration_seconds), \"group\", \"$1\", \"rule_group\", \".*;(.*)\"))",
+                    "expr": "label_replace(max by (rule_group) (prometheus_rule_group_last_duration_seconds) and on (rule_group) topk(5, max by (rule_group) (max_over_time(prometheus_rule_group_last_duration_seconds[$__range]))), \"group\", \"$1\", \"rule_group\", \".*;(.*)\")",
                     "legendFormat": "{{group}}",
                     "refId": "A"
                 },
