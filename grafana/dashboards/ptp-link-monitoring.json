@@ -458,75 +458,14 @@
             }
         },
         {
-            "id": 21,
-            "type": "stat",
-            "title": "Current Util",
-            "description": "Current utilization = max(TX,RX) / capacity. Only available for vendors that report link capacity (SAF; AirFiber's capacity OID is currently broken on real hardware - see prometheus/rules/link-schema-notes.md. airMAX exposes no traffic-capacity data on this hardware at all).",
-            "gridPos": {
-                "h": 4,
-                "w": 4,
-                "x": 12,
-                "y": 7
-            },
-            "datasource": "Prometheus",
-            "targets": [
-                {
-                    "expr": "link_utilization_percent{link_id=\"$link_id\"}",
-                    "legendFormat": "{{link_name}}",
-                    "instant": true
-                }
-            ],
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "thresholds"
-                    },
-                    "unit": "percent",
-                    "min": 0,
-                    "max": 100,
-                    "noValue": "N/A",
-                    "mappings": [
-                        {
-                            "type": "special",
-                            "options": {
-                                "match": "null+nan",
-                                "result": {
-                                    "text": "N/A",
-                                    "color": "white",
-                                    "index": 0
-                                }
-                            }
-                        }
-                    ],
-                    "thresholds": {
-                        "mode": "absolute",
-                        "steps": [
-                            {
-                                "value": 0,
-                                "color": "green"
-                            },
-                            {
-                                "value": 70,
-                                "color": "yellow"
-                            },
-                            {
-                                "value": 85,
-                                "color": "red"
-                            }
-                        ]
-                    }
-                }
-            }
-        },
-        {
             "id": 22,
             "type": "stat",
             "title": "Peak Util",
             "description": "Highest utilization observed in the selected time range.",
             "gridPos": {
                 "h": 4,
-                "w": 4,
-                "x": 16,
+                "w": 6,
+                "x": 12,
                 "y": 7
             },
             "datasource": "Prometheus",
@@ -586,8 +525,8 @@
             "description": "Vendor-reported link capacity (only SAF currently exposes this reliably - see link-schema-notes.md).",
             "gridPos": {
                 "h": 4,
-                "w": 4,
-                "x": 20,
+                "w": 6,
+                "x": 18,
                 "y": 7
             },
             "datasource": "Prometheus",
@@ -944,11 +883,7 @@
                         "properties": [
                             {
                                 "id": "unit",
-                                "value": "s"
-                            },
-                            {
-                                "id": "decimals",
-                                "value": 1
+                                "value": "dtdurations"
                             }
                         ]
                     }
