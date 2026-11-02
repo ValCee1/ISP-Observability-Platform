@@ -160,6 +160,11 @@ groups:
       # a link_up series but no SNR data, so every vendor now produces a
       # score. Once real per-vendor SNR data exists, this still prefers it
       # over the zero fallback.
+      #
+      # airMAX's internal radio interface (wifi0) is left out of the error
+      # penalties: its "out errors" are frames dropped after retries, ~3/s
+      # on a healthy link, which CCQ and SNR already reflect - counting
+      # them cost every airMAX link a flat 15 points (2026-11-02).
       - record: link_endpoint_health_score
         expr: >
           clamp_min(
@@ -170,11 +175,11 @@ groups:
                 or on(link_id, endpoint, site, role, vendor, link_name) (link_up * 0)
               )
             - on(link_id, endpoint, site, role, vendor, link_name) (
-                clamp_max(sum by (link_id, endpoint, site, role, vendor, link_name) (rate(link_interface_in_errors[5m])) * 10, 15)
+                clamp_max(sum by (link_id, endpoint, site, role, vendor, link_name) (rate(link_interface_in_errors{ifDescr!~"wifi[0-9]+"}[5m])) * 10, 15)
                 or on(link_id, endpoint, site, role, vendor, link_name) (link_up * 0)
               )
             - on(link_id, endpoint, site, role, vendor, link_name) (
-                clamp_max(sum by (link_id, endpoint, site, role, vendor, link_name) (rate(link_interface_out_errors[5m])) * 10, 15)
+                clamp_max(sum by (link_id, endpoint, site, role, vendor, link_name) (rate(link_interface_out_errors{ifDescr!~"wifi[0-9]+"}[5m])) * 10, 15)
                 or on(link_id, endpoint, site, role, vendor, link_name) (link_up * 0)
               )
             - on(link_id, endpoint, site, role, vendor, link_name) (1 - max_over_time(link_up[1m])) * 100,
@@ -187,3 +192,10 @@ groups:
       # what noc-overview.json's "All Links" table displays.
       - record: link_health_score
         expr: min by (link_id) (link_endpoint_health_score)
+
+  - name: link-device-names
+    rules:
+      # The radio's own name as a plain label, for display next to
+      # link_name (RADIO1/RADIO2), which stays the key.
+      - record: link_device_info
+        expr: max without (link_device_name) (label_replace(link_device_name, "device_name", "$1", "link_device_name", "(.*)"))

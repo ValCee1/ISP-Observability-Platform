@@ -150,6 +150,14 @@ modules:
         type: gauge
         help: Time since the radio's SNMP agent started, hundredths of a second (divide by 100)
 
+      # The name configured on the radio itself (sysName), e.g.
+      # "OFT_POP6 TO POP2_RADIO1". Display only - link_name stays the key,
+      # since these are typed by hand and can repeat or change.
+      - name: link_device_name
+        oid: 1.3.6.1.2.1.1.5
+        type: DisplayString
+        help: The radio's own configured name (sysName), value always 1
+
       - name: link_interface_state
         oid: 1.3.6.1.2.1.2.2.1.8
         type: gauge
@@ -214,6 +222,11 @@ modules:
             labelname: ifName
             type: DisplayString
 
+      # ifDescr as well as ifName: airMAX leaves ifName blank, and its
+      # internal radio interface (ifDescr "wifi0") counts frames dropped
+      # after retries as out errors - ~300k a day on a healthy link
+      # (2026-11-02). The health score and RisingInterfaceErrors leave
+      # wifi* out; dashboards still show them.
       - name: link_interface_in_errors
         oid: 1.3.6.1.2.1.2.2.1.14
         type: counter
@@ -224,6 +237,10 @@ modules:
           - labels: [ifIndex]
             oid: 1.3.6.1.2.1.31.1.1.1.1
             labelname: ifName
+            type: DisplayString
+          - labels: [ifIndex]
+            oid: 1.3.6.1.2.1.2.2.1.2
+            labelname: ifDescr
             type: DisplayString
 
       - name: link_interface_out_errors
@@ -236,6 +253,10 @@ modules:
           - labels: [ifIndex]
             oid: 1.3.6.1.2.1.31.1.1.1.1
             labelname: ifName
+            type: DisplayString
+          - labels: [ifIndex]
+            oid: 1.3.6.1.2.1.2.2.1.2
+            labelname: ifDescr
             type: DisplayString
 
   # MikroTik PtMP sector AP telemetry, via the proprietary MIKROTIK-MIB

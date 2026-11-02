@@ -1,0 +1,75 @@
+# promtool unit tests for interface errors in link_endpoint_health_score
+# (link-normalization.yml) and RisingInterfaceErrors (link-alerts.yml). Run:
+#   docker run --rm --entrypoint promtool -v "$PWD/prometheus":/p \
+#     prom/prometheus:v3.13.2 test rules /p/rules/tests/link_errors_test.yml
+#
+# Live finding (2026-11-02): airMAX's internal radio interface (ifDescr
+# "wifi0") counts frames dropped after retries as out errors, ~3/s on a
+# healthy link. That cost every airMAX link 15 points and fired
+# "possible cabling" alerts on all of them.
+
+rule_files:
+  - ../link-normalization.yml
+  - ../link-alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  # wifi0 drops (3/s) are ignored; errors on the cable port (eth0, 1/s)
+  # still cost 10 points.
+  - interval: 1m
+    input_series:
+      - series: 'probe_success{job="link-availability",instance="10.0.0.1",link_id="L1",endpoint="a",site="S",role="P2P",vendor="ubiquiti_airmax",link_name="L1-RADIO1"}'
+        values: '1x40'
+      - series: 'link_interface_out_errors{job="link-interface-health",instance="10.0.0.1",ifIndex="4",ifName="",ifDescr="wifi0",link_id="L1",endpoint="a",site="S",role="P2P",vendor="ubiquiti_airmax",link_name="L1-RADIO1"}'
+        values: '0+180x40'
+      - series: 'link_interface_out_errors{job="link-interface-health",instance="10.0.0.1",ifIndex="2",ifName="",ifDescr="eth0",link_id="L1",endpoint="a",site="S",role="P2P",vendor="ubiquiti_airmax",link_name="L1-RADIO1"}'
+        values: '0x40'
+      - series: 'link_interface_in_errors{job="link-interface-health",instance="10.0.0.1",ifIndex="2",ifName="",ifDescr="eth0",link_id="L1",endpoint="a",site="S",role="P2P",vendor="ubiquiti_airmax",link_name="L1-RADIO1"}'
+        values: '0x40'
+      - series: 'probe_success{job="link-availability",instance="10.0.0.2",link_id="L2",endpoint="a",site="S",role="P2P",vendor="ubiquiti_airmax",link_name="L2-RADIO1"}'
+        values: '1x40'
+      - series: 'link_interface_out_errors{job="link-interface-health",instance="10.0.0.2",ifIndex="4",ifName="",ifDescr="wifi0",link_id="L2",endpoint="a",site="S",role="P2P",vendor="ubiquiti_airmax",link_name="L2-RADIO1"}'
+        values: '0+180x40'
+      - series: 'link_interface_out_errors{job="link-interface-health",instance="10.0.0.2",ifIndex="2",ifName="",ifDescr="eth0",link_id="L2",endpoint="a",site="S",role="P2P",vendor="ubiquiti_airmax",link_name="L2-RADIO1"}'
+        values: '0x40'
+      - series: 'link_interface_in_errors{job="link-interface-health",instance="10.0.0.2",ifIndex="2",ifName="",ifDescr="eth0",link_id="L2",endpoint="a",site="S",role="P2P",vendor="ubiquiti_airmax",link_name="L2-RADIO1"}'
+        values: '0+60x40'
+    promql_expr_test:
+      - expr: round(link_endpoint_health_score)
+        eval_time: 35m
+        exp_samples:
+          - labels: '{link_id="L1",endpoint="a",site="S",role="P2P",vendor="ubiquiti_airmax",link_name="L1-RADIO1"}'
+            value: 100
+          - labels: '{link_id="L2",endpoint="a",site="S",role="P2P",vendor="ubiquiti_airmax",link_name="L2-RADIO1"}'
+            value: 90
+    alert_rule_test:
+      - eval_time: 35m
+        alertname: RisingInterfaceErrors
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              category: health
+              scope: link
+              alert_type: interface-errors
+              link_id: L2
+              endpoint: a
+              site: S
+              role: P2P
+              vendor: ubiquiti_airmax
+              link_name: L2-RADIO1
+            exp_annotations:
+              summary: "🟠 Interface Errors"
+              description: "a end is logging interface errors (1.00/s) - possible cabling, duplex, or hardware issue."
+
+  # The radio's own name becomes a device_name label.
+  - interval: 1m
+    input_series:
+      - series: 'link_device_name{job="link-interface-health",instance="10.0.0.82",link_id="P6-P2",endpoint="P2",link_name="P6-P2-RADIO1",link_device_name="OFT_POP6 TO POP2_RADIO1"}'
+        values: '1x5'
+    promql_expr_test:
+      - expr: link_device_info
+        eval_time: 5m
+        exp_samples:
+          - labels: 'link_device_info{job="link-interface-health",instance="10.0.0.82",link_id="P6-P2",endpoint="P2",link_name="P6-P2-RADIO1",device_name="OFT_POP6 TO POP2_RADIO1"}'
+            value: 1

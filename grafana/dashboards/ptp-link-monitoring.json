@@ -653,7 +653,8 @@
                     "expr": "sum by (link_id, link_name, endpoint) (rate(link_interface_out_errors{link_id=\"$link_id\"}[5m]))",
                     "legendFormat": "{{link_name}} out"
                 }
-            ]
+            ],
+            "description": "Errors per second on each radio's interfaces. On airMAX this includes frames the radio dropped after retries (its internal wifi0 interface), which the health score and the Interface Errors alert ignore."
         },
         {
             "id": 6,
@@ -670,7 +671,7 @@
             "id": 7,
             "type": "table",
             "title": "Endpoint Snapshot",
-            "description": "Current reading per radio endpoint on this link. Uptime is time since the radio last restarted. Errors are interface errors counted over the last 24 hours (airMAX radios count frames the radio gave up on after retries as out errors). Temp is the hottest sensor the radio reports (SAF and MikroTik only; airMAX M and airFiber 5XHD expose none).",
+            "description": "Current reading per radio endpoint on this link. Device name is the name configured on the radio itself. Uptime is time since the radio last restarted. Errors are interface errors counted over the last 24 hours (on airMAX this includes frames the radio dropped after retries, which the health score ignores). Temp is the hottest sensor the radio reports (SAF and MikroTik only; airMAX M and airFiber 5XHD expose none).",
             "gridPos": {
                 "h": 5,
                 "w": 24,
@@ -682,6 +683,12 @@
                 {
                     "expr": "sum by (link_id, link_name, endpoint) (max_over_time(link_up{link_id=\"$link_id\"}[1m]))",
                     "refId": "Up",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "max by (link_id, link_name, endpoint, device_name) (link_device_info{link_id=\"$link_id\"})",
+                    "refId": "Device",
                     "instant": true,
                     "format": "table"
                 },
@@ -748,7 +755,8 @@
                             "vendor": true,
                             "site": true,
                             "remote_mac": true,
-                            "link_id": true
+                            "link_id": true,
+                            "Value #Device": true
                         },
                         "renameByName": {
                             "Value #Up": "Status",
@@ -761,7 +769,14 @@
                             "link_name": "Radio",
                             "endpoint": "Endpoint",
                             "link_id": "Link",
-                            "Value #Temp": "Temp (°C)"
+                            "Value #Temp": "Temp (°C)",
+                            "device_name": "Device name"
+                        },
+                        "indexByName": {
+                            "endpoint": 0,
+                            "link_name": 1,
+                            "device_name": 2,
+                            "Value #Up": 3
                         }
                     }
                 }

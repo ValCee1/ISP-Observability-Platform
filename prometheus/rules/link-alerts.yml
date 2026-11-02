@@ -95,15 +95,17 @@ groups:
           description: "{{ if $labels.endpoint }}{{ $labels.endpoint }} end{{ with $labels.instance }} ({{ . }}){{ end }}{{ else }}{{ $labels.link_name }}{{ end }} latency variability has exceeded 50ms for most of the last 30 minutes - link is up but inconsistent."
 
       # Aggregated per link endpoint, NOT per interface - a radio logging
-      # errors on three interfaces is one problem, one alert.
+      # errors on three interfaces is one problem, one alert. airMAX wifi0
+      # is left out: its out errors are dropped-after-retry frames, not
+      # cabling (it fired on every healthy airMAX link, 2026-11-02).
       - alert: RisingInterfaceErrors
         expr: |
           sum by (link_id, endpoint, site, role, vendor, link_name) (
-            rate(link_interface_in_errors[5m]) + rate(link_interface_out_errors[5m])
+            rate(link_interface_in_errors{ifDescr!~"wifi[0-9]+"}[5m]) + rate(link_interface_out_errors{ifDescr!~"wifi[0-9]+"}[5m])
           ) > 0
           and sum_over_time((
             sum by (link_id, endpoint, site, role, vendor, link_name) (
-              rate(link_interface_in_errors[5m]) + rate(link_interface_out_errors[5m])
+              rate(link_interface_in_errors{ifDescr!~"wifi[0-9]+"}[5m]) + rate(link_interface_out_errors{ifDescr!~"wifi[0-9]+"}[5m])
             ) > bool 0
           )[30m:1m]) >= 24
         keep_firing_for: 10m
