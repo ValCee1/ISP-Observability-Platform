@@ -53,13 +53,31 @@ groups:
       # per-vendor ifName once each device's real radio ifName is
       # confirmed via snmpwalk.
       #
-      # Exception: the airFiber 5XHD switches customer traffic in hardware,
-      # so none of its interfaces see it. Its air-side byte counters
-      # (UBNT-AFLTU-MIB, airfiber_ltu_air_*_octets) are used instead, and
-      # `or on (link_id, endpoint)` keeps the interface pick out for it.
+      # Superseded where the air-side interface is known, which is every
+      # radio in the lab (2026-11-02): picking the busiest interface for TX
+      # and RX separately lands on the heavy direction both times - it
+      # leaves through the air port and is delivered through the cable
+      # port - so a 37/4.7 Mb/s SAF link read 37/37 and an airMAX link
+      # 835/150 kb/s read ~800/800. In order of preference:
+      #   1. airFiber 5XHD: its air counters (airfiber_ltu_air_*_octets) -
+      #      it switches customer traffic in hardware, so no interface
+      #      sees it.
+      #   2. airMAX: ath0, the radio interface (ifDescr; ifName is blank).
+      #   3. SAF Integra: the WAN port, its radio side.
+      #   4. anything else: the busiest-interface pick above.
+      # Each `or on (link_id, endpoint)` keeps later choices out for an
+      # endpoint an earlier one already covers.
       - record: link_tx_bps
         expr: >
           rate(airfiber_ltu_air_tx_octets[5m]) * 8
+          or on (link_id, endpoint)
+          (
+            rate(link_interface_out_octets{job="link-interface-health", ifDescr=~"ath[0-9]+"}[5m])
+            or
+            rate(link_interface_out_octets_32{job="link-interface-health", ifDescr=~"ath[0-9]+"}[5m])
+          ) * 8
+          or on (link_id, endpoint)
+          rate(link_interface_out_octets{job="link-interface-health", vendor="saf", ifName="WAN"}[5m]) * 8
           or on (link_id, endpoint)
           topk by (link_id, endpoint, site, role, vendor, link_name) (
             1,
@@ -73,6 +91,14 @@ groups:
       - record: link_rx_bps
         expr: >
           rate(airfiber_ltu_air_rx_octets[5m]) * 8
+          or on (link_id, endpoint)
+          (
+            rate(link_interface_in_octets{job="link-interface-health", ifDescr=~"ath[0-9]+"}[5m])
+            or
+            rate(link_interface_in_octets_32{job="link-interface-health", ifDescr=~"ath[0-9]+"}[5m])
+          ) * 8
+          or on (link_id, endpoint)
+          rate(link_interface_in_octets{job="link-interface-health", vendor="saf", ifName="WAN"}[5m]) * 8
           or on (link_id, endpoint)
           topk by (link_id, endpoint, site, role, vendor, link_name) (
             1,

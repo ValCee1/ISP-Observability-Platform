@@ -181,6 +181,10 @@ modules:
             oid: 1.3.6.1.2.1.31.1.1.1.1
             labelname: ifName
             type: DisplayString
+          - labels: [ifIndex]
+            oid: 1.3.6.1.2.1.2.2.1.2
+            labelname: ifDescr
+            type: DisplayString
 
       - name: link_interface_out_octets
         oid: 1.3.6.1.2.1.31.1.1.1.10
@@ -192,6 +196,10 @@ modules:
           - labels: [ifIndex]
             oid: 1.3.6.1.2.1.31.1.1.1.1
             labelname: ifName
+            type: DisplayString
+          - labels: [ifIndex]
+            oid: 1.3.6.1.2.1.2.2.1.2
+            labelname: ifDescr
             type: DisplayString
 
       # 32-bit ifInOctets/ifOutOctets fallback. SNMPv1 can't carry Counter64,
@@ -209,6 +217,10 @@ modules:
             oid: 1.3.6.1.2.1.31.1.1.1.1
             labelname: ifName
             type: DisplayString
+          - labels: [ifIndex]
+            oid: 1.3.6.1.2.1.2.2.1.2
+            labelname: ifDescr
+            type: DisplayString
 
       - name: link_interface_out_octets_32
         oid: 1.3.6.1.2.1.2.2.1.16
@@ -220,6 +232,10 @@ modules:
           - labels: [ifIndex]
             oid: 1.3.6.1.2.1.31.1.1.1.1
             labelname: ifName
+            type: DisplayString
+          - labels: [ifIndex]
+            oid: 1.3.6.1.2.1.2.2.1.2
+            labelname: ifDescr
             type: DisplayString
 
       # ifDescr as well as ifName: airMAX leaves ifName blank, and its
