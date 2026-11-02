@@ -36,12 +36,12 @@ tests:
       - series: 'link_interface_in_errors{job="link-interface-health",instance="10.0.0.2",ifIndex="2",ifName="",ifDescr="eth0",link_id="L2",endpoint="a",site="S",role="P2P",vendor="ubiquiti_airmax",link_name="L2-RADIO1"}'
         values: '0+60x40'
     promql_expr_test:
-      - expr: round(link_endpoint_health_score)
+      - expr: link_endpoint_health_score
         eval_time: 35m
         exp_samples:
-          - labels: '{link_id="L1",endpoint="a",site="S",role="P2P",vendor="ubiquiti_airmax",link_name="L1-RADIO1"}'
+          - labels: 'link_endpoint_health_score{link_id="L1",endpoint="a",site="S",role="P2P",vendor="ubiquiti_airmax",link_name="L1-RADIO1"}'
             value: 100
-          - labels: '{link_id="L2",endpoint="a",site="S",role="P2P",vendor="ubiquiti_airmax",link_name="L2-RADIO1"}'
+          - labels: 'link_endpoint_health_score{link_id="L2",endpoint="a",site="S",role="P2P",vendor="ubiquiti_airmax",link_name="L2-RADIO1"}'
             value: 90
     alert_rule_test:
       - eval_time: 35m
