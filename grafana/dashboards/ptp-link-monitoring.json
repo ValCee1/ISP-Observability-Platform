@@ -418,7 +418,7 @@
         {
             "id": 8,
             "type": "row",
-            "title": "SIGNAL & TRAFFIC",
+            "title": "TRAFFIC & SIGNAL",
             "gridPos": {
                 "h": 1,
                 "w": 24,
@@ -431,10 +431,10 @@
             "type": "timeseries",
             "title": "Signal / Noise / SNR",
             "gridPos": {
-                "h": 8,
-                "w": 12,
-                "x": 0,
-                "y": 7
+                "h": 5,
+                "w": 8,
+                "x": 16,
+                "y": 11
             },
             "datasource": "Prometheus",
             "targets": [
@@ -464,8 +464,8 @@
             "description": "Highest utilization observed in the selected time range.",
             "gridPos": {
                 "h": 4,
-                "w": 6,
-                "x": 12,
+                "w": 4,
+                "x": 16,
                 "y": 7
             },
             "datasource": "Prometheus",
@@ -525,8 +525,8 @@
             "description": "Vendor-reported link capacity (only SAF currently exposes this reliably - see link-schema-notes.md).",
             "gridPos": {
                 "h": 4,
-                "w": 6,
-                "x": 18,
+                "w": 4,
+                "x": 20,
                 "y": 7
             },
             "datasource": "Prometheus",
@@ -553,10 +553,10 @@
             "type": "timeseries",
             "title": "Traffic (TX/RX)",
             "gridPos": {
-                "h": 4,
-                "w": 12,
-                "x": 12,
-                "y": 11
+                "h": 9,
+                "w": 16,
+                "x": 0,
+                "y": 7
             },
             "datasource": "Prometheus",
             "targets": [
@@ -583,7 +583,7 @@
                 "h": 1,
                 "w": 24,
                 "x": 0,
-                "y": 15
+                "y": 16
             }
         },
         {
@@ -594,7 +594,7 @@
                 "h": 7,
                 "w": 6,
                 "x": 0,
-                "y": 16
+                "y": 17
             },
             "datasource": "Prometheus",
             "targets": [
@@ -617,7 +617,7 @@
                 "h": 7,
                 "w": 6,
                 "x": 6,
-                "y": 16
+                "y": 17
             },
             "datasource": "Prometheus",
             "targets": [
@@ -641,7 +641,7 @@
                 "h": 7,
                 "w": 12,
                 "x": 12,
-                "y": 16
+                "y": 17
             },
             "datasource": "Prometheus",
             "targets": [
@@ -663,7 +663,7 @@
                 "h": 1,
                 "w": 24,
                 "x": 0,
-                "y": 23
+                "y": 24
             }
         },
         {
@@ -675,7 +675,7 @@
                 "h": 5,
                 "w": 24,
                 "x": 0,
-                "y": 24
+                "y": 25
             },
             "datasource": "Prometheus",
             "targets": [
@@ -899,7 +899,7 @@
                 "h": 7,
                 "w": 24,
                 "x": 0,
-                "y": 29
+                "y": 30
             },
             "datasource": "Prometheus",
             "targets": [
@@ -959,7 +959,7 @@
                 "h": 1,
                 "w": 24,
                 "x": 0,
-                "y": 36
+                "y": 37
             },
             "panels": [
                 {
@@ -971,7 +971,7 @@
                         "h": 7,
                         "w": 12,
                         "x": 0,
-                        "y": 37
+                        "y": 38
                     },
                     "datasource": "Prometheus",
                     "targets": [
@@ -990,7 +990,7 @@
                         "h": 7,
                         "w": 12,
                         "x": 12,
-                        "y": 37
+                        "y": 38
                     },
                     "datasource": "Prometheus",
                     "targets": [
