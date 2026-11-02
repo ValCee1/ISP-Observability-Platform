@@ -551,7 +551,7 @@
         {
             "id": 24,
             "type": "timeseries",
-            "title": "Traffic (TX/RX)",
+            "title": "Traffic by direction",
             "gridPos": {
                 "h": 9,
                 "w": 16,
@@ -562,18 +562,16 @@
             "targets": [
                 {
                     "expr": "sum by (link_id, link_name, endpoint) (link_tx_bps{link_id=\"$link_id\"})",
-                    "legendFormat": "{{link_name}} TX"
-                },
-                {
-                    "expr": "sum by (link_id, link_name, endpoint) (link_rx_bps{link_id=\"$link_id\"})",
-                    "legendFormat": "{{link_name}} RX"
+                    "legendFormat": "From {{endpoint}}",
+                    "refId": "A"
                 }
             ],
             "fieldConfig": {
                 "defaults": {
                     "unit": "bps"
                 }
-            }
+            },
+            "description": "One line per direction: what each end sends over the air. The other radio's receive figure is the same traffic, so it isn't drawn twice. airFiber 5XHD reads the radio's own air counters; other radios their busiest interface."
         },
         {
             "id": 14,

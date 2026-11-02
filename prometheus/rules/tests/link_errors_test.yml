@@ -12,7 +12,9 @@ rule_files:
   - ../link-normalization.yml
   - ../link-alerts.yml
 
-evaluation_interval: 1m
+# 15s like link_score_test: the score reads link_up over [1m], which at a
+# 1m interval can be empty depending on which group runs first.
+evaluation_interval: 15s
 
 tests:
   # wifi0 drops (3/s) are ignored; errors on the cable port (eth0, 1/s)
