@@ -112,8 +112,9 @@
             ],
             "transformations": [
                 { "id": "filterFieldsByName", "options": { "include": { "pattern": "^(router|user|service|caller_id|address|Value)$" } } },
-                { "id": "organize", "options": { "renameByName": { "Value": "uptime (s)" } } }
-            ]
+                { "id": "organize", "options": { "renameByName": { "Value": "uptime" } } }
+            ],
+            "fieldConfig": { "defaults": {}, "overrides": [ { "matcher": { "id": "byName", "options": "uptime" }, "properties": [ { "id": "unit", "value": "s" } ] } ] }
         }
     ]
 }

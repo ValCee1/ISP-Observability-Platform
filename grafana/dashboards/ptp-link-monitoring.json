@@ -343,8 +343,15 @@
             "datasource": "Prometheus",
             "targets": [
                 {
-                    "expr": "link_quality_percent{link_id=\"$link_id\"} >= 0",
+                    "expr": "link_quality_percent{link_id=\"$link_id\", vendor!=\"ubiquiti_airfiber\"} >= 0",
                     "legendFormat": "{{link_name}}",
+                    "refId": "A",
+                    "instant": true
+                },
+                {
+                    "expr": "link_quality_percent{link_id=\"$link_id\", vendor=\"ubiquiti_airfiber\"} >= 0",
+                    "legendFormat": "{{link_name}}",
+                    "refId": "B",
                     "instant": true
                 }
             ],
@@ -387,9 +394,26 @@
                             }
                         }
                     ]
-                }
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byFrameRefID",
+                            "options": "B"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "mode": "fixed",
+                                    "fixedColor": "blue"
+                                }
+                            }
+                        ]
+                    }
+                ]
             },
-            "description": "airMAX: CCQ (share of frames sent without retry). airFiber 5XHD: received power as a share of the ideal for this link (no CCQ on that radio). SAF has neither - see its MSE under Vendor Diagnostics."
+            "description": "airMAX: CCQ (share of frames sent without retry), green from 90%, red below 70%. airFiber 5XHD (blue): received power as a share of the ideal for this link - no CCQ on that radio, so the CCQ colours don't apply to it. SAF has neither - see its MSE under Vendor Diagnostics."
         },
         {
             "id": 8,
@@ -707,7 +731,7 @@
             "id": 7,
             "type": "table",
             "title": "Endpoint Snapshot",
-            "description": "Current reading per radio endpoint (a/b) on this link. Temp is the hottest sensor the radio reports (SAF and MikroTik only; airMAX M and airFiber 5XHD expose none).",
+            "description": "Current reading per radio endpoint on this link. Uptime is time since the radio last restarted. Errors are interface errors counted over the last 24 hours (airMAX radios count frames the radio gave up on after retries as out errors). Temp is the hottest sensor the radio reports (SAF and MikroTik only; airMAX M and airFiber 5XHD expose none).",
             "gridPos": {
                 "h": 5,
                 "w": 24,
@@ -747,19 +771,19 @@
                     "format": "table"
                 },
                 {
-                    "expr": "sum by (link_id, link_name, endpoint) (link_uptime_seconds{link_id=\"$link_id\"}) / 86400",
-                    "refId": "UptimeDays",
+                    "expr": "max by (link_id, link_name, endpoint) (link_uptime_seconds{link_id=\"$link_id\"}) / 100",
+                    "refId": "Uptime",
                     "instant": true,
                     "format": "table"
                 },
                 {
-                    "expr": "sum by (link_id, link_name, endpoint) (link_interface_in_errors{link_id=\"$link_id\"})",
+                    "expr": "round(sum by (link_id, link_name, endpoint) (increase(link_interface_in_errors{link_id=\"$link_id\"}[24h])))",
                     "refId": "InErrors",
                     "instant": true,
                     "format": "table"
                 },
                 {
-                    "expr": "sum by (link_id, link_name, endpoint) (link_interface_out_errors{link_id=\"$link_id\"})",
+                    "expr": "round(sum by (link_id, link_name, endpoint) (increase(link_interface_out_errors{link_id=\"$link_id\"}[24h])))",
                     "refId": "OutErrors",
                     "instant": true,
                     "format": "table"
@@ -792,9 +816,9 @@
                             "Value #Signal": "Signal (dBm)",
                             "Value #Noise": "Noise (dBm)",
                             "Value #Quality": "Quality (%)",
-                            "Value #UptimeDays": "Uptime (days)",
-                            "Value #InErrors": "In Errors",
-                            "Value #OutErrors": "Out Errors",
+                            "Value #Uptime": "Uptime",
+                            "Value #InErrors": "In errors (24h)",
+                            "Value #OutErrors": "Out errors (24h)",
                             "link_name": "Radio",
                             "endpoint": "Endpoint",
                             "link_id": "Link",
@@ -909,6 +933,22 @@
                             {
                                 "id": "noValue",
                                 "value": "N/A"
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Uptime"
+                        },
+                        "properties": [
+                            {
+                                "id": "unit",
+                                "value": "s"
+                            },
+                            {
+                                "id": "decimals",
+                                "value": 1
                             }
                         ]
                     }

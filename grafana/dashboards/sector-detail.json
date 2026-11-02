@@ -551,7 +551,7 @@
           "format": "table"
         },
         {
-          "expr": "sector_cpe_session_uptime_seconds{sector=\"$sector\"} / 360000",
+          "expr": "sector_cpe_session_uptime_seconds{sector=\"$sector\"} / 100",
           "refId": "Session",
           "instant": true,
           "format": "table"
@@ -608,7 +608,7 @@
               "Value #ChainDelta": "Chain \u0394",
               "Value #Drift": "Drift 7d",
               "Value #TxPhy": "Tx PHY (Mbps)",
-              "Value #Session": "Session (h)"
+              "Value #Session": "Session"
             }
           }
         }
@@ -823,6 +823,22 @@
                   "type": "color-background",
                   "mode": "gradient"
                 }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Session"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "decimals",
+                "value": 1
               }
             ]
           }
