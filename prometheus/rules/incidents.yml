@@ -1,7 +1,8 @@
 # Turns the raw ALERTS stream into an "incidents" view for the NOC
 # Overview "Active Incidents" panel: one row per (object, alert), with a
 # unified `object` label (link_id / sector / router instance / router name /
-# pop) and the firing duration as the value.
+# pop), the dashboard the row links to (`dash` + `key`) and the firing
+# duration as the value.
 #
 # `object` precedence (most specific wins, applied last): pop -> router
 # (RouterOS API alerts) -> instance -> sector -> link_id. So a subscriber
@@ -18,16 +19,46 @@ groups:
   - name: incidents
     interval: 30s
     rules:
+      # Every firing alert with its unified `object`, before collapsing.
+      - record: incident:alert_seconds
+        expr: |
+          label_replace(label_replace(label_replace(label_replace(label_replace(
+            (time() - ALERTS_FOR_STATE{alertname!~"LinkDownProlonged|Watchdog"}) and ignoring(alertstate) ALERTS{alertstate="firing", alertname!~"LinkDownProlonged|Watchdog"},
+            "object", "$1", "pop", "(.+)"),
+            "object", "$1", "instance", "(.+)"),
+            "object", "$1", "router", "(.+)"),
+            "object", "$1", "sector", "(.+)"),
+            "object", "$1", "link_id", "(.+)")
+
+      # `dash` + `key` say where clicking the row goes: the dashboard for
+      # the alert's scope, and the value for its variable (a router's
+      # detail page is keyed by instance, not by the router name shown).
+      # Before, every row offered Sector Detail and PTP Link Monitoring
+      # whatever it was, so a router row opened a sector page. The scope
+      # selectors don't overlap, so each alert lands in exactly one branch.
       - record: incident:raw_seconds
         expr: |
-          max by (severity, object, alertname, alert_type, scope, cpe_name) (
-            label_replace(label_replace(label_replace(label_replace(label_replace(
-              (time() - ALERTS_FOR_STATE{alertname!~"LinkDownProlonged|Watchdog"}) and ignoring(alertstate) ALERTS{alertstate="firing", alertname!~"LinkDownProlonged|Watchdog"},
-              "object", "$1", "pop", "(.+)"),
-              "object", "$1", "instance", "(.+)"),
-              "object", "$1", "router", "(.+)"),
-              "object", "$1", "sector", "(.+)"),
-              "object", "$1", "link_id", "(.+)")
+          max by (severity, object, alertname, alert_type, scope, cpe_name, dash, key) (
+            label_replace(label_replace(incident:alert_seconds{scope="link"},
+              "dash", "/d/ptp-link-monitoring/ptp-link-monitoring?var-link_id=", "", ""),
+              "key", "$1", "link_id", "(.*)")
+            or label_replace(label_replace(incident:alert_seconds{scope=~"sector|cpe"},
+              "dash", "/d/sector-detail/sector-detail?var-sector=", "", ""),
+              "key", "$1", "sector", "(.*)")
+            or label_replace(label_replace(incident:alert_seconds{scope="router", job="snmp-mikrotik"},
+              "dash", "/d/mikrotik-router-overview/mikrotik-router-detail?var-instance=", "", ""),
+              "key", "$1", "instance", "(.*)")
+            or label_replace(incident:alert_seconds{scope="router", job!="snmp-mikrotik"},
+              "dash", "/d/mikrotik-fleet-overview/mikrotik-fleet-overview", "", "")
+            or label_replace(label_replace(incident:alert_seconds{scope=~"pop|subscriber", pop!=""},
+              "dash", "/d/subscriber-overview/subscriber-overview?var-pop=", "", ""),
+              "key", "$1", "pop", "(.*)")
+            or label_replace(incident:alert_seconds{scope=~"pop|subscriber", pop=""},
+              "dash", "/d/subscriber-overview/subscriber-overview", "", "")
+            or label_replace(incident:alert_seconds{scope=~"monitoring|deadman"},
+              "dash", "/d/server-health/server-health", "", "")
+            or label_replace(incident:alert_seconds{scope!~"link|sector|cpe|router|pop|subscriber|monitoring|deadman"},
+              "dash", "/d/noc-overview/noc-overview", "", "")
           )
 
       - record: incident:active_seconds

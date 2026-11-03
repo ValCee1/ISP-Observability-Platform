@@ -14,7 +14,7 @@
             "id": 31,
             "type": "table",
             "title": "Active incidents",
-            "description": "Every alert currently firing, one row per object + alert, longest-running first. Object is the link / sector / router it concerns. Two-tier duplicates (a warning + critical of the same alert) are collapsed to the critical. Symptom rows under a bigger incident (a link's packet loss while it is DOWN) are still shown here as context - Alertmanager is what suppresses those from Telegram.",
+            "description": "Every alert currently firing, one row per object + alert, longest-running first. Object is the link / sector / router it concerns; clicking it opens that link, sector or router's own page (subscriber and POP alerts open Subscriber Overview, monitoring alerts Server Health). Two-tier duplicates (a warning + critical of the same alert) are collapsed to the critical. Symptom rows under a bigger incident (a link's packet loss while it is DOWN) are still shown here as context - Alertmanager is what suppresses those from Telegram.",
             "gridPos": { "h": 9, "w": 24, "x": 0, "y": 1 },
             "datasource": "Prometheus",
             "options": { "sortBy": [ { "displayName": "Duration", "desc": true } ] },
@@ -25,13 +25,13 @@
                 }
             ],
             "transformations": [
-                { "id": "filterFieldsByName", "options": { "include": { "pattern": "^(severity|object|alertname|alert_type|scope|cpe_name|Value)$" } } },
+                { "id": "filterFieldsByName", "options": { "include": { "pattern": "^(severity|object|alertname|alert_type|scope|cpe_name|dash|key|Value)$" } } },
                 {
                     "id": "organize",
                     "options": {
                         "indexByName": {
                             "severity": 0, "object": 1, "alertname": 2, "alert_type": 3,
-                            "scope": 4, "cpe_name": 5, "Value": 6
+                            "scope": 4, "cpe_name": 5, "Value": 6, "dash": 7, "key": 8
                         },
                         "renameByName": {
                             "severity": "Severity", "object": "Object", "alertname": "Alert",
@@ -46,9 +46,12 @@
                     {
                         "matcher": { "id": "byName", "options": "Object" },
                         "properties": [ { "id": "links", "value": [
-                            { "title": "Sector Detail", "url": "/d/sector-detail/sector-detail?var-sector=${__data.fields.Object}", "targetBlank": false },
-                            { "title": "PTP Link Monitoring", "url": "/d/ptp-link-monitoring/ptp-link-monitoring?var-link_id=${__data.fields.Object}", "targetBlank": false }
+                            { "title": "Open ${__data.fields.Object}", "url": "${__data.fields.dash}${__data.fields.key:percentencode}", "targetBlank": false }
                         ] } ]
+                    },
+                    {
+                        "matcher": { "id": "byRegexp", "options": "^(dash|key)$" },
+                        "properties": [ { "id": "custom.hidden", "value": true } ]
                     },
                     {
                         "matcher": { "id": "byName", "options": "Duration" },
