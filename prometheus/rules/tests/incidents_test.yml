@@ -45,5 +45,5 @@ tests:
             value: 120
           - labels: 'incident:active_seconds{alertname="SectorOverThroughputBudget",severity="warning",scope="sector",alert_type="sector-throughput",object="5B",dash="/d/sector-detail/sector-detail?var-sector=",key="5B"}'
             value: 120
-          - labels: 'incident:active_seconds{alertname="AlertDeliveryFailing",severity="warning",scope="monitoring",alert_type="delivery-failing",dash="/d/server-health/server-health"}'
+          - labels: 'incident:active_seconds{alertname="AlertDeliveryFailing",severity="warning",scope="monitoring",alert_type="delivery-failing",object="Monitoring server",dash="/d/server-health/server-health"}'
             value: 120

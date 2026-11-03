@@ -4,7 +4,8 @@
 # pop), the dashboard the row links to (`dash` + `key`) and the firing
 # duration as the value.
 #
-# `object` precedence (most specific wins, applied last): pop -> router
+# `object` precedence (most specific wins, applied last): "Monitoring
+# server" for the monitoring stack's own alerts -> pop -> router
 # (RouterOS API alerts) -> instance -> sector -> link_id. So a subscriber
 # mass-outage row is keyed by its router, a POPIsolated row by its pop.
 #
@@ -22,8 +23,9 @@ groups:
       # Every firing alert with its unified `object`, before collapsing.
       - record: incident:alert_seconds
         expr: |
-          label_replace(label_replace(label_replace(label_replace(label_replace(
+          label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(
             (time() - ALERTS_FOR_STATE{alertname!~"LinkDownProlonged|Watchdog"}) and ignoring(alertstate) ALERTS{alertstate="firing", alertname!~"LinkDownProlonged|Watchdog"},
+            "object", "Monitoring server", "scope", "monitoring|deadman"),
             "object", "$1", "pop", "(.+)"),
             "object", "$1", "instance", "(.+)"),
             "object", "$1", "router", "(.+)"),
