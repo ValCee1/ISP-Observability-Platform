@@ -840,6 +840,10 @@
                                     "type": "color-background",
                                     "mode": "gradient"
                                 }
+                            },
+                            {
+                                "id": "custom.width",
+                                "value": 80
                             }
                         ]
                     },
@@ -902,6 +906,70 @@
                             {
                                 "id": "unit",
                                 "value": "dtdurations"
+                            },
+                            {
+                                "id": "custom.width",
+                                "value": 150
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Endpoint"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.width",
+                                "value": 90
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Radio"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.width",
+                                "value": 170
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Device name"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.width",
+                                "value": 200
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "In errors (24h)"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.width",
+                                "value": 125
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Out errors (24h)"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.width",
+                                "value": 130
                             }
                         ]
                     }
