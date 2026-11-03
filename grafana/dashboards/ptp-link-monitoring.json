@@ -792,8 +792,7 @@
                     "custom": {
                         "cellOptions": {
                             "type": "auto"
-                        },
-                        "minWidth": 80
+                        }
                     }
                 },
                 "overrides": [
@@ -843,7 +842,7 @@
                             },
                             {
                                 "id": "custom.width",
-                                "value": 80
+                                "value": 70
                             }
                         ]
                     },
@@ -894,6 +893,10 @@
                             {
                                 "id": "noValue",
                                 "value": "N/A"
+                            },
+                            {
+                                "id": "custom.width",
+                                "value": 85
                             }
                         ]
                     },
@@ -909,7 +912,7 @@
                             },
                             {
                                 "id": "custom.width",
-                                "value": 150
+                                "value": 105
                             }
                         ]
                     },
@@ -921,7 +924,7 @@
                         "properties": [
                             {
                                 "id": "custom.width",
-                                "value": 90
+                                "value": 80
                             }
                         ]
                     },
@@ -933,7 +936,7 @@
                         "properties": [
                             {
                                 "id": "custom.width",
-                                "value": 170
+                                "value": 150
                             }
                         ]
                     },
@@ -945,7 +948,7 @@
                         "properties": [
                             {
                                 "id": "custom.width",
-                                "value": 200
+                                "value": 170
                             }
                         ]
                     },
@@ -957,7 +960,7 @@
                         "properties": [
                             {
                                 "id": "custom.width",
-                                "value": 125
+                                "value": 115
                             }
                         ]
                     },
@@ -969,7 +972,43 @@
                         "properties": [
                             {
                                 "id": "custom.width",
-                                "value": 130
+                                "value": 120
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Signal (dBm)"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.width",
+                                "value": 95
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Noise (dBm)"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.width",
+                                "value": 95
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Quality (%)"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.width",
+                                "value": 90
                             }
                         ]
                     }

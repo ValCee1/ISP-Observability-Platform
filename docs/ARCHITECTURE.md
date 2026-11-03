@@ -220,7 +220,7 @@ Rule groups, by file:
 | `sector-thresholds.yml` | `sector-capacity-thresholds` | per-sector client/Mbps limits (default 15/20 clients, 20/25 Mbps) |
 | `sector-alerts.yml` | `sector-availability`, `sector-performance`, `sector-device`, `sector-cpe`, `sector-capacity` | SectorDown, SectorWideCPEDegradation, CPE\* alerts, capacity digest |
 | `capacity-rules.yml` | `capacity-links`, `capacity-routers` | busy-hour capacity-planning series |
-| `incidents.yml` | `incidents` | NOC "Active Incidents" feed |
+| `incidents.yml` | `incidents` | NOC "Active Incidents" feed - unified `object`, plus `dash` + `key` so each row links to its scope's dashboard |
 
 ---
 

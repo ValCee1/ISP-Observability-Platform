@@ -8,8 +8,10 @@
 | link_probe_failure_ratio | Availability | derived, windowed (recording rule) |
 | link_latency_variability_seconds | Availability | derived, windowed (recording rule) |
 | link_interface_state | Interface health | standard IF-MIB ifOperStatus |
-| link_interface_in/out_errors | Interface health | standard IF-MIB ifInErrors/ifOutErrors |
-| link_tx_bps / link_rx_bps | Interface health | derived from IF-MIB HC octet counters |
+| link_interface_in/out_errors | Interface health | standard IF-MIB ifInErrors/ifOutErrors, labelled ifName + ifDescr. airMAX wifi0 (dropped-after-retry frames) is left out of the health score and RisingInterfaceErrors |
+| link_tx_bps / link_rx_bps | Interface health | the radio's air side, from octet counters: 5XHD air counters, airMAX ath0 (ifDescr), SAF WAN; busiest interface otherwise (see link-normalization.yml) |
+| link_uptime_seconds | Device | sysUpTime - hundredths of a second despite the name; divide by 100 |
+| link_device_name -> link_device_info{device_name} | Device | sysName, the name configured on the radio; display only, link_name stays the key |
 | link_signal_dbm | Radio health | ubntWlStatSignal (1.3.6.1.4.1.41112.1.4.5.1.5) |
 | link_noise_dbm | Radio health | ubntWlStatNoiseFloor (.1.4.5.1.8) |
 | link_quality_percent | Radio health | ubntWlStatCcq (.1.4.5.1.7); airFiber 5XHD: afLTUStaRxPowerLevel0, see below; SAF: none (use link_mse_db) |
