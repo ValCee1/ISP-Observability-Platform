@@ -333,7 +333,7 @@
         {
             "id": 10,
             "type": "stat",
-            "title": "CCQ",
+            "title": "CCQ / quality",
             "gridPos": {
                 "h": 5,
                 "w": 4,
@@ -343,8 +343,15 @@
             "datasource": "Prometheus",
             "targets": [
                 {
-                    "expr": "link_quality_percent{link_id=\"$link_id\"}",
+                    "expr": "link_quality_percent{link_id=\"$link_id\", vendor!=\"ubiquiti_airfiber\"} >= 0",
                     "legendFormat": "{{link_name}}",
+                    "refId": "A",
+                    "instant": true
+                },
+                {
+                    "expr": "link_quality_percent{link_id=\"$link_id\", vendor=\"ubiquiti_airfiber\"} >= 0",
+                    "legendFormat": "{{link_name}}",
+                    "refId": "B",
                     "instant": true
                 }
             ],
@@ -387,13 +394,31 @@
                             }
                         }
                     ]
-                }
-            }
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byFrameRefID",
+                            "options": "B"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "mode": "fixed",
+                                    "fixedColor": "blue"
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            "description": "airMAX: CCQ (share of frames sent without retry), green from 90%, red below 70%. airFiber 5XHD (blue): received power as a share of the ideal for this link - no CCQ on that radio, so the CCQ colours don't apply to it; the Signal chart shows the same thing as dB below the ideal. SAF has neither - see its MSE under Vendor Diagnostics."
         },
         {
             "id": 8,
             "type": "row",
-            "title": "SIGNAL & TRAFFIC",
+            "title": "TRAFFIC & SIGNAL",
             "gridPos": {
                 "h": 1,
                 "w": 24,
@@ -406,16 +431,20 @@
             "type": "timeseries",
             "title": "Signal / Noise / SNR",
             "gridPos": {
-                "h": 8,
-                "w": 12,
-                "x": 0,
-                "y": 7
+                "h": 5,
+                "w": 8,
+                "x": 16,
+                "y": 11
             },
             "datasource": "Prometheus",
             "targets": [
                 {
                     "expr": "link_signal_dbm{link_id=\"$link_id\"}",
                     "legendFormat": "{{link_name}} signal"
+                },
+                {
+                    "expr": "link_ideal_signal_dbm{link_id=\"$link_id\"}",
+                    "legendFormat": "{{link_name}} ideal"
                 },
                 {
                     "expr": "link_noise_dbm{link_id=\"$link_id\"}",
@@ -429,69 +458,29 @@
             "fieldConfig": {
                 "defaults": {
                     "unit": "dBm"
-                }
-            }
-        },
-        {
-            "id": 21,
-            "type": "stat",
-            "title": "Current Util",
-            "description": "Current utilization = max(TX,RX) / capacity. Only available for vendors that report link capacity (SAF; AirFiber's capacity OID is currently broken on real hardware - see prometheus/rules/link-schema-notes.md. airMAX exposes no traffic-capacity data on this hardware at all).",
-            "gridPos": {
-                "h": 4,
-                "w": 4,
-                "x": 12,
-                "y": 7
-            },
-            "datasource": "Prometheus",
-            "targets": [
-                {
-                    "expr": "link_utilization_percent{link_id=\"$link_id\"}",
-                    "legendFormat": "{{link_name}}",
-                    "instant": true
-                }
-            ],
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "thresholds"
-                    },
-                    "unit": "percent",
-                    "min": 0,
-                    "max": 100,
-                    "noValue": "N/A",
-                    "mappings": [
-                        {
-                            "type": "special",
-                            "options": {
-                                "match": "null+nan",
-                                "result": {
-                                    "text": "N/A",
-                                    "color": "white",
-                                    "index": 0
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byRegexp",
+                            "options": ".* ideal$"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.lineStyle",
+                                "value": {
+                                    "fill": "dash",
+                                    "dash": [
+                                        10,
+                                        10
+                                    ]
                                 }
-                            }
-                        }
-                    ],
-                    "thresholds": {
-                        "mode": "absolute",
-                        "steps": [
-                            {
-                                "value": 0,
-                                "color": "green"
-                            },
-                            {
-                                "value": 70,
-                                "color": "yellow"
-                            },
-                            {
-                                "value": 85,
-                                "color": "red"
                             }
                         ]
                     }
-                }
-            }
+                ]
+            },
+            "description": "Received signal per radio. airFiber 5XHD also reports the ideal signal for the link's distance (dashed): a gap over 10 dB means alignment, an obstruction or reduced TX power, and fires Signal Below Ideal. Noise and SNR come from airMAX only."
         },
         {
             "id": 22,
@@ -589,27 +578,30 @@
             "type": "timeseries",
             "title": "Traffic (TX/RX)",
             "gridPos": {
-                "h": 4,
-                "w": 12,
-                "x": 12,
-                "y": 11
+                "h": 9,
+                "w": 16,
+                "x": 0,
+                "y": 7
             },
             "datasource": "Prometheus",
             "targets": [
                 {
-                    "expr": "sum by (link_id, link_name, endpoint) (link_tx_bps{link_id=\"$link_id\"})",
-                    "legendFormat": "{{link_name}} TX"
+                    "expr": "max by (link_id) (link_tx_bps{link_id=\"$link_id\", link_name=~\".*-RADIO1\"}) or max by (link_id) (link_rx_bps{link_id=\"$link_id\", link_name=~\".*-RADIO2\"})",
+                    "legendFormat": "TX",
+                    "refId": "A"
                 },
                 {
-                    "expr": "sum by (link_id, link_name, endpoint) (link_rx_bps{link_id=\"$link_id\"})",
-                    "legendFormat": "{{link_name}} RX"
+                    "expr": "max by (link_id) (link_rx_bps{link_id=\"$link_id\", link_name=~\".*-RADIO1\"}) or max by (link_id) (link_tx_bps{link_id=\"$link_id\", link_name=~\".*-RADIO2\"})",
+                    "legendFormat": "RX",
+                    "refId": "B"
                 }
             ],
             "fieldConfig": {
                 "defaults": {
                     "unit": "bps"
                 }
-            }
+            },
+            "description": "The link's traffic as seen from RADIO1: TX is what RADIO1 sends to RADIO2, RX what it receives. RADIO2's figures are the same traffic the other way round, so they are only used when RADIO1 can't be read. airFiber 5XHD reads the radio's own air counters; other radios their busiest interface."
         },
         {
             "id": 14,
@@ -619,7 +611,7 @@
                 "h": 1,
                 "w": 24,
                 "x": 0,
-                "y": 15
+                "y": 16
             }
         },
         {
@@ -630,7 +622,7 @@
                 "h": 7,
                 "w": 6,
                 "x": 0,
-                "y": 16
+                "y": 17
             },
             "datasource": "Prometheus",
             "targets": [
@@ -653,7 +645,7 @@
                 "h": 7,
                 "w": 6,
                 "x": 6,
-                "y": 16
+                "y": 17
             },
             "datasource": "Prometheus",
             "targets": [
@@ -677,7 +669,7 @@
                 "h": 7,
                 "w": 12,
                 "x": 12,
-                "y": 16
+                "y": 17
             },
             "datasource": "Prometheus",
             "targets": [
@@ -689,7 +681,8 @@
                     "expr": "sum by (link_id, link_name, endpoint) (rate(link_interface_out_errors{link_id=\"$link_id\"}[5m]))",
                     "legendFormat": "{{link_name}} out"
                 }
-            ]
+            ],
+            "description": "Errors per second on each radio's interfaces. On airMAX this includes frames the radio dropped after retries (its internal wifi0 interface), which the health score and the Interface Errors alert ignore."
         },
         {
             "id": 6,
@@ -699,25 +692,31 @@
                 "h": 1,
                 "w": 24,
                 "x": 0,
-                "y": 23
+                "y": 24
             }
         },
         {
             "id": 7,
             "type": "table",
             "title": "Endpoint Snapshot",
-            "description": "Current reading per radio endpoint (a/b) on this link.",
+            "description": "Current reading per radio endpoint on this link. Device name is the name configured on the radio itself. Uptime is time since the radio last restarted. Errors are interface errors counted over the last 24 hours (on airMAX this includes frames the radio dropped after retries, which the health score ignores). Temp is the hottest sensor the radio reports (SAF and MikroTik only; airMAX M and airFiber 5XHD expose none).",
             "gridPos": {
-                "h": 8,
+                "h": 5,
                 "w": 24,
                 "x": 0,
-                "y": 24
+                "y": 25
             },
             "datasource": "Prometheus",
             "targets": [
                 {
                     "expr": "sum by (link_id, link_name, endpoint) (max_over_time(link_up{link_id=\"$link_id\"}[1m]))",
                     "refId": "Up",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "max by (link_id, link_name, endpoint, device_name) (link_device_info{link_id=\"$link_id\"})",
+                    "refId": "Device",
                     "instant": true,
                     "format": "table"
                 },
@@ -734,25 +733,31 @@
                     "format": "table"
                 },
                 {
-                    "expr": "sum by (link_id, link_name, endpoint) (link_quality_percent{link_id=\"$link_id\"})",
+                    "expr": "sum by (link_id, link_name, endpoint) (link_quality_percent{link_id=\"$link_id\"} >= 0)",
                     "refId": "Quality",
                     "instant": true,
                     "format": "table"
                 },
                 {
-                    "expr": "sum by (link_id, link_name, endpoint) (link_uptime_seconds{link_id=\"$link_id\"}) / 86400",
-                    "refId": "UptimeDays",
+                    "expr": "max by (link_id, link_name, endpoint) (device_temperature_celsius{link_id=\"$link_id\"})",
+                    "refId": "Temp",
                     "instant": true,
                     "format": "table"
                 },
                 {
-                    "expr": "sum by (link_id, link_name, endpoint) (link_interface_in_errors{link_id=\"$link_id\"})",
+                    "expr": "max by (link_id, link_name, endpoint) (link_uptime_seconds{link_id=\"$link_id\"}) / 100",
+                    "refId": "Uptime",
+                    "instant": true,
+                    "format": "table"
+                },
+                {
+                    "expr": "round(sum by (link_id, link_name, endpoint) (increase(link_interface_in_errors{link_id=\"$link_id\"}[24h])))",
                     "refId": "InErrors",
                     "instant": true,
                     "format": "table"
                 },
                 {
-                    "expr": "sum by (link_id, link_name, endpoint) (link_interface_out_errors{link_id=\"$link_id\"})",
+                    "expr": "round(sum by (link_id, link_name, endpoint) (increase(link_interface_out_errors{link_id=\"$link_id\"}[24h])))",
                     "refId": "OutErrors",
                     "instant": true,
                     "format": "table"
@@ -776,19 +781,30 @@
                             "ifIndex": true,
                             "role": true,
                             "vendor": true,
-                            "site": true
+                            "site": true,
+                            "remote_mac": true,
+                            "link_id": true,
+                            "Value #Device": true
                         },
                         "renameByName": {
                             "Value #Up": "Status",
                             "Value #Signal": "Signal (dBm)",
                             "Value #Noise": "Noise (dBm)",
                             "Value #Quality": "Quality (%)",
-                            "Value #UptimeDays": "Uptime (days)",
-                            "Value #InErrors": "In Errors",
-                            "Value #OutErrors": "Out Errors",
+                            "Value #Uptime": "Uptime",
+                            "Value #InErrors": "In err (24h)",
+                            "Value #OutErrors": "Out err (24h)",
                             "link_name": "Radio",
                             "endpoint": "Endpoint",
-                            "link_id": "Link"
+                            "link_id": "Link",
+                            "Value #Temp": "Temp (°C)",
+                            "device_name": "Device name"
+                        },
+                        "indexByName": {
+                            "endpoint": 0,
+                            "link_name": 1,
+                            "device_name": 2,
+                            "Value #Up": 3
                         }
                     }
                 }
@@ -835,7 +851,7 @@
                                             "match": "null+nan",
                                             "result": {
                                                 "text": "NO DATA",
-                                                "color": "white",
+                                                "color": "transparent",
                                                 "index": 2
                                             }
                                         }
@@ -848,10 +864,240 @@
                                     "type": "color-background",
                                     "mode": "gradient"
                                 }
+                            },
+                            {
+                                "id": "custom.width",
+                                "value": 60
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Temp (°C)"
+                        },
+                        "properties": [
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        {
+                                            "value": null,
+                                            "color": "white"
+                                        },
+                                        {
+                                            "value": 0,
+                                            "color": "green"
+                                        },
+                                        {
+                                            "value": 60,
+                                            "color": "orange"
+                                        },
+                                        {
+                                            "value": 75,
+                                            "color": "red"
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "type": "color-text"
+                                }
+                            },
+                            {
+                                "id": "unit",
+                                "value": "celsius"
+                            },
+                            {
+                                "id": "decimals",
+                                "value": 0
+                            },
+                            {
+                                "id": "noValue",
+                                "value": "N/A"
+                            },
+                            {
+                                "id": "custom.width",
+                                "value": 80
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Uptime"
+                        },
+                        "properties": [
+                            {
+                                "id": "unit",
+                                "value": "dtdurations"
+                            },
+                            {
+                                "id": "custom.width",
+                                "value": 95
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Endpoint"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.width",
+                                "value": 70
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Radio"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.width",
+                                "value": 150
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Device name"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.width",
+                                "value": 195
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Signal (dBm)"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.width",
+                                "value": 85
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Noise (dBm)"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.width",
+                                "value": 85
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Quality (%)"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.width",
+                                "value": 85
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "In err (24h)"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.width",
+                                "value": 90
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Out err (24h)"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.width",
+                                "value": 95
                             }
                         ]
                     }
                 ]
+            }
+        },
+        {
+            "id": 27,
+            "type": "timeseries",
+            "title": "Radio temperature",
+            "description": "Every temperature sensor the radios report (SAF: radio, board, CPU). Dashed line: 75 °C alert level (DeviceTemperatureHigh, held 15 minutes). airMAX M and airFiber 5XHD have no sensor in their MIBs.",
+            "gridPos": {
+                "h": 7,
+                "w": 24,
+                "x": 0,
+                "y": 30
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "device_temperature_celsius{link_id=\"$link_id\"}",
+                    "legendFormat": "{{endpoint}} {{sensor}}"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "celsius",
+                    "decimals": 0,
+                    "noValue": "No sensor on these radios",
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "value": null,
+                                "color": "transparent"
+                            },
+                            {
+                                "value": 75,
+                                "color": "red"
+                            }
+                        ]
+                    },
+                    "custom": {
+                        "thresholdsStyle": {
+                            "mode": "dashed"
+                        },
+                        "fillOpacity": 10,
+                        "lineWidth": 2,
+                        "axisSoftMin": 20,
+                        "axisSoftMax": 80,
+                        "spanNulls": 600000
+                    }
+                }
+            },
+            "options": {
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "right",
+                    "showLegend": true
+                },
+                "tooltip": {
+                    "mode": "multi",
+                    "sort": "desc"
+                }
             }
         },
         {
@@ -863,7 +1109,7 @@
                 "h": 1,
                 "w": 24,
                 "x": 0,
-                "y": 32
+                "y": 37
             },
             "panels": [
                 {
@@ -875,7 +1121,7 @@
                         "h": 7,
                         "w": 12,
                         "x": 0,
-                        "y": 33
+                        "y": 38
                     },
                     "datasource": "Prometheus",
                     "targets": [
@@ -894,7 +1140,7 @@
                         "h": 7,
                         "w": 12,
                         "x": 12,
-                        "y": 33
+                        "y": 38
                     },
                     "datasource": "Prometheus",
                     "targets": [

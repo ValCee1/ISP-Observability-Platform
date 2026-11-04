@@ -52,8 +52,33 @@ groups:
       # same device are pushing similar throughput. Revisit with a proper
       # per-vendor ifName once each device's real radio ifName is
       # confirmed via snmpwalk.
+      #
+      # Superseded where the air-side interface is known, which is every
+      # radio in the lab (2026-11-02): picking the busiest interface for TX
+      # and RX separately lands on the heavy direction both times - it
+      # leaves through the air port and is delivered through the cable
+      # port - so a 37/4.7 Mb/s SAF link read 37/37 and an airMAX link
+      # 835/150 kb/s read ~800/800. In order of preference:
+      #   1. airFiber 5XHD: its air counters (airfiber_ltu_air_*_octets) -
+      #      it switches customer traffic in hardware, so no interface
+      #      sees it.
+      #   2. airMAX: ath0, the radio interface (ifDescr; ifName is blank).
+      #   3. SAF Integra: the WAN port, its radio side.
+      #   4. anything else: the busiest-interface pick above.
+      # Each `or on (link_id, endpoint)` keeps later choices out for an
+      # endpoint an earlier one already covers.
       - record: link_tx_bps
         expr: >
+          rate(airfiber_ltu_air_tx_octets[5m]) * 8
+          or on (link_id, endpoint)
+          (
+            rate(link_interface_out_octets{job="link-interface-health", ifDescr=~"ath[0-9]+"}[5m])
+            or
+            rate(link_interface_out_octets_32{job="link-interface-health", ifDescr=~"ath[0-9]+"}[5m])
+          ) * 8
+          or on (link_id, endpoint)
+          rate(link_interface_out_octets{job="link-interface-health", vendor="saf", ifName="WAN"}[5m]) * 8
+          or on (link_id, endpoint)
           topk by (link_id, endpoint, site, role, vendor, link_name) (
             1,
             (
@@ -65,6 +90,16 @@ groups:
 
       - record: link_rx_bps
         expr: >
+          rate(airfiber_ltu_air_rx_octets[5m]) * 8
+          or on (link_id, endpoint)
+          (
+            rate(link_interface_in_octets{job="link-interface-health", ifDescr=~"ath[0-9]+"}[5m])
+            or
+            rate(link_interface_in_octets_32{job="link-interface-health", ifDescr=~"ath[0-9]+"}[5m])
+          ) * 8
+          or on (link_id, endpoint)
+          rate(link_interface_in_octets{job="link-interface-health", vendor="saf", ifName="WAN"}[5m]) * 8
+          or on (link_id, endpoint)
           topk by (link_id, endpoint, site, role, vendor, link_name) (
             1,
             (
@@ -99,15 +134,25 @@ groups:
       - record: link_snr_db
         expr: link_signal_dbm - link_noise_dbm
 
+      # How far the received signal is below what the link should get at
+      # its distance (airFiber 5XHD only - the radio reports its ideal).
+      # 0-5 dB is a well-aimed link; a large gap means alignment, an
+      # obstruction or reduced TX power, and lower modulation/capacity.
+      - record: link_ideal_signal_dbm
+        expr: airfiber_ltu_ideal_rx_power_dbm
+      - record: link_signal_below_ideal_db
+        expr: link_ideal_signal_dbm - link_signal_dbm
+
       # Vendor-agnostic link capacity, built from each vendor's raw units
-      # (see snmp_exporter/snmp.yml): AirFiber's OID is already bits/sec;
-      # SAF's is kb/s and needs the x1000. Was link_capacity_bps
+      # (see snmp_exporter/snmp.yml): classic AirFiber's OID is already
+      # bits/sec; SAF's and the airFiber 5XHD's (UBNT-AFLTU-MIB) are kb/s
+      # and need the x1000. Was link_capacity_bps
       # previously produced directly by both SNMP modules under the same
       # name with DIFFERENT units - that made SAF's utilization read
       # ~6000% (confirmed live, 2026-08-23) once link_tx_bps started
       # working. Normalizing here, once, in one place, is the fix.
       - record: link_capacity_bps
-        expr: airfiber_rx_capacity_bps or (saf_modem_capacity_kbps * 1000)
+        expr: airfiber_rx_capacity_bps or (saf_modem_capacity_kbps * 1000) or (airfiber_ltu_rx_capacity_kbps * 1000)
 
       # SAF's raw MSE value is "the real number x10" per its MIB (e.g. raw
       # -320 means -32.0 dB) - never actually divided back down until now.
@@ -150,6 +195,11 @@ groups:
       # a link_up series but no SNR data, so every vendor now produces a
       # score. Once real per-vendor SNR data exists, this still prefers it
       # over the zero fallback.
+      #
+      # airMAX's internal radio interface (wifi0) is left out of the error
+      # penalties: its "out errors" are frames dropped after retries, ~3/s
+      # on a healthy link, which CCQ and SNR already reflect - counting
+      # them cost every airMAX link a flat 15 points (2026-11-02).
       - record: link_endpoint_health_score
         expr: >
           clamp_min(
@@ -160,11 +210,11 @@ groups:
                 or on(link_id, endpoint, site, role, vendor, link_name) (link_up * 0)
               )
             - on(link_id, endpoint, site, role, vendor, link_name) (
-                clamp_max(sum by (link_id, endpoint, site, role, vendor, link_name) (rate(link_interface_in_errors[5m])) * 10, 15)
+                clamp_max(sum by (link_id, endpoint, site, role, vendor, link_name) (rate(link_interface_in_errors{ifDescr!~"wifi[0-9]+"}[5m])) * 10, 15)
                 or on(link_id, endpoint, site, role, vendor, link_name) (link_up * 0)
               )
             - on(link_id, endpoint, site, role, vendor, link_name) (
-                clamp_max(sum by (link_id, endpoint, site, role, vendor, link_name) (rate(link_interface_out_errors[5m])) * 10, 15)
+                clamp_max(sum by (link_id, endpoint, site, role, vendor, link_name) (rate(link_interface_out_errors{ifDescr!~"wifi[0-9]+"}[5m])) * 10, 15)
                 or on(link_id, endpoint, site, role, vendor, link_name) (link_up * 0)
               )
             - on(link_id, endpoint, site, role, vendor, link_name) (1 - max_over_time(link_up[1m])) * 100,
@@ -177,3 +227,10 @@ groups:
       # what noc-overview.json's "All Links" table displays.
       - record: link_health_score
         expr: min by (link_id) (link_endpoint_health_score)
+
+  - name: link-device-names
+    rules:
+      # The radio's own name as a plain label, for display next to
+      # link_name (RADIO1/RADIO2), which stays the key.
+      - record: link_device_info
+        expr: max without (link_device_name) (label_replace(link_device_name, "device_name", "$1", "link_device_name", "(.*)"))

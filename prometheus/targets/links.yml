@@ -16,7 +16,7 @@
   labels:
     module: "ubiquiti_airfiber_link"
     auth: "public_v2"
-    link_name: "IKEJA-YABA"
+    link_name: "IKEJA-YABA-RADIO1"
     link_id: "IKEJA-YABA"
     endpoint: "IKEJA"
     site: "IKEJA"
@@ -27,7 +27,7 @@
   labels:
     module: "ubiquiti_airfiber_link"
     auth: "public_v2"
-    link_name: "IKEJA-YABA"
+    link_name: "IKEJA-YABA-RADIO2"
     link_id: "IKEJA-YABA"
     endpoint: "YABA"
     site: "YABA"
@@ -42,7 +42,7 @@
     auth: "saf_v3"
     link_name: "YABA-LEKKI-RADIO1"
     link_id: "YABA-LEKKI"
-    endpoint: "RADIO1"
+    endpoint: "YABA"
     site: "YABA"
     pop: "LEKKI"
     role: "Backhaul"

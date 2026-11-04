@@ -1,0 +1,49 @@
+# promtool unit tests for prometheus/rules/incidents.yml - where each
+# Active incidents row links to (`dash` + `key`). Run:
+#   docker run --rm --entrypoint promtool -v "$PWD/prometheus":/p \
+#     prom/prometheus:v3.13.2 test rules /p/rules/tests/incidents_test.yml
+#
+# Live finding (2026-11-03): every row offered Sector Detail and PTP Link
+# Monitoring whatever it was, so a router row opened a sector page.
+
+rule_files:
+  - ../incidents.yml
+
+evaluation_interval: 30s
+
+tests:
+  - interval: 30s
+    input_series:
+      # A link alert on one end: PTP page, keyed by link_id.
+      - series: 'ALERTS{alertname="LinkDown",alertstate="firing",severity="critical",scope="link",alert_type="link-down",link_id="P6-P2",instance="10.0.0.82",job="link-availability",pop="P2"}'
+        values: '1x4'
+      - series: 'ALERTS_FOR_STATE{alertname="LinkDown",severity="critical",scope="link",alert_type="link-down",link_id="P6-P2",instance="10.0.0.82",job="link-availability",pop="P2"}'
+        values: '0x4'
+      # An SNMP router alert: router detail page, keyed by instance (the
+      # name has a space and the page's variable is the IP).
+      - series: 'ALERTS{alertname="HighMemory",alertstate="firing",severity="warning",scope="router",alert_type="memory-high",router="Sam OFT",instance="192.168.11.1",job="snmp-mikrotik"}'
+        values: '1x4'
+      - series: 'ALERTS_FOR_STATE{alertname="HighMemory",severity="warning",scope="router",alert_type="memory-high",router="Sam OFT",instance="192.168.11.1",job="snmp-mikrotik"}'
+        values: '0x4'
+      # A sector-wide alert: sector page.
+      - series: 'ALERTS{alertname="SectorOverThroughputBudget",alertstate="firing",severity="warning",scope="sector",alert_type="sector-throughput",sector="5B"}'
+        values: '1x4'
+      - series: 'ALERTS_FOR_STATE{alertname="SectorOverThroughputBudget",severity="warning",scope="sector",alert_type="sector-throughput",sector="5B"}'
+        values: '0x4'
+      # A monitoring alert: Server Health, no variable.
+      - series: 'ALERTS{alertname="AlertDeliveryFailing",alertstate="firing",severity="warning",scope="monitoring",alert_type="delivery-failing"}'
+        values: '1x4'
+      - series: 'ALERTS_FOR_STATE{alertname="AlertDeliveryFailing",severity="warning",scope="monitoring",alert_type="delivery-failing"}'
+        values: '0x4'
+    promql_expr_test:
+      - expr: incident:active_seconds
+        eval_time: 2m
+        exp_samples:
+          - labels: 'incident:active_seconds{alertname="LinkDown",severity="critical",scope="link",alert_type="link-down",object="P6-P2",dash="/d/ptp-link-monitoring/ptp-link-monitoring?var-link_id=",key="P6-P2"}'
+            value: 120
+          - labels: 'incident:active_seconds{alertname="HighMemory",severity="warning",scope="router",alert_type="memory-high",object="Sam OFT",dash="/d/mikrotik-router-overview/mikrotik-router-detail?var-instance=",key="192.168.11.1"}'
+            value: 120
+          - labels: 'incident:active_seconds{alertname="SectorOverThroughputBudget",severity="warning",scope="sector",alert_type="sector-throughput",object="5B",dash="/d/sector-detail/sector-detail?var-sector=",key="5B"}'
+            value: 120
+          - labels: 'incident:active_seconds{alertname="AlertDeliveryFailing",severity="warning",scope="monitoring",alert_type="delivery-failing",object="Monitoring server",dash="/d/server-health/server-health"}'
+            value: 120

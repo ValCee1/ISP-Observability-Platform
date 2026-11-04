@@ -82,7 +82,7 @@
         {
             "id": 13,
             "type": "stat",
-            "title": "Sectors Over Capacity",
+            "title": "Over Capacity",
             "description": "Sectors at/over their warn threshold for client count OR throughput (thresholds from sector-thresholds.yml). These feed the 08:00 capacity digest.",
             "gridPos": {
                 "h": 4,
@@ -199,7 +199,7 @@
             "id": 1,
             "type": "table",
             "title": "All Sectors",
-            "description": "One row per sector. Clients / Mbps are colored against the default 15/20 and 20/25 thresholds - per-sector overrides in sector-thresholds.yml aren't reflected in the cell color, only in the alerts. Click a row to open Sector Detail.",
+            "description": "One row per sector. Clients / Mbps are colored against the default 15/20 and 20/25 thresholds - per-sector overrides in sector-thresholds.yml aren't reflected in the cell color, only in the alerts. Click a row to open Sector Detail. Temp °C is the sector radio's hottest sensor (N/A when it has none); DeviceTemperatureHigh warns above 75 °C.",
             "gridPos": {
                 "h": 16,
                 "w": 24,
@@ -263,6 +263,12 @@
                     "refId": "CPU",
                     "instant": true,
                     "format": "table"
+                },
+                {
+                    "expr": "max by (sector) (device_temperature_celsius{job=\"snmp-sectors\"})",
+                    "refId": "Temp",
+                    "instant": true,
+                    "format": "table"
                 }
             ],
             "transformations": [
@@ -299,7 +305,8 @@
                             "Value #WorstCPE": 5,
                             "Value #Misaligned": 6,
                             "Value #Flapping": 7,
-                            "Value #CPU": 8
+                            "Value #CPU": 8,
+                            "Value #Temp": 9
                         },
                         "renameByName": {
                             "sector": "Sector",
@@ -310,7 +317,8 @@
                             "Value #WorstCPE": "Worst CPE (dBm)",
                             "Value #Misaligned": "Misaligned CPEs",
                             "Value #Flapping": "Flapping CPEs",
-                            "Value #CPU": "CPU %"
+                            "Value #CPU": "CPU %",
+                            "Value #Temp": "Temp °C"
                         }
                     }
                 }
@@ -319,6 +327,9 @@
                 "defaults": {
                     "color": {
                         "mode": "thresholds"
+                    },
+                    "custom": {
+                        "minWidth": 80
                     }
                 },
                 "overrides": [
@@ -370,7 +381,7 @@
                                             "match": "null+nan",
                                             "result": {
                                                 "text": "NO DATA",
-                                                "color": "white",
+                                                "color": "transparent",
                                                 "index": 2
                                             }
                                         }
@@ -597,6 +608,53 @@
                                     "type": "color-background",
                                     "mode": "gradient"
                                 }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Temp °C"
+                        },
+                        "properties": [
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        {
+                                            "value": null,
+                                            "color": "transparent"
+                                        },
+                                        {
+                                            "value": 0,
+                                            "color": "green"
+                                        },
+                                        {
+                                            "value": 60,
+                                            "color": "orange"
+                                        },
+                                        {
+                                            "value": 75,
+                                            "color": "red"
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "type": "color-background",
+                                    "mode": "gradient"
+                                }
+                            },
+                            {
+                                "id": "decimals",
+                                "value": 0
+                            },
+                            {
+                                "id": "noValue",
+                                "value": "N/A"
                             }
                         ]
                     }

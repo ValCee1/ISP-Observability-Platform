@@ -1,0 +1,73 @@
+# promtool unit tests for prometheus/rules/device-temperature.yml. Run:
+#   docker run --rm --entrypoint promtool -v "$PWD/prometheus":/p \
+#     prom/prometheus:v3.13.2 test rules /p/rules/tests/temperature_test.yml
+#
+# Raw values are the ones read live on 2026-11-01: SAF Integra radio 370
+# (tenths of a degree), MikroTik sector gauge "temperature" 41 plus the
+# RouterOS 6 scalar 410 that RouterOS 7 still answers.
+
+rule_files:
+  - ../device-temperature.yml
+
+evaluation_interval: 1m
+
+tests:
+  # SAF tenths -> degrees, one series per sensor. RouterOS 7 sector: the
+  # gauge-table reading wins and the legacy scalar is not counted twice;
+  # the voltage gauge is ignored.
+  - interval: 1m
+    input_series:
+      - series: 'saf_radio_temperature_dc{job="link-radio-health",instance="10.0.0.90",link_id="P1-P7",link_name="P1-P7-r1",endpoint="RADIO1"}'
+        values: '370x5'
+      - series: 'saf_board_temperature_dc{job="link-radio-health",instance="10.0.0.90",link_id="P1-P7",link_name="P1-P7-r1",endpoint="RADIO1"}'
+        values: '400x5'
+      - series: 'sector_mikrotik_gauge{job="snmp-sectors",instance="10.0.13.1",sector="S1",gauge_index="14",sensor="temperature"}'
+        values: '41x5'
+      - series: 'sector_mikrotik_gauge{job="snmp-sectors",instance="10.0.13.1",sector="S1",gauge_index="13",sensor="voltage"}'
+        values: '226x5'
+      - series: 'sector_mikrotik_hl_temperature_dc{job="snmp-sectors",instance="10.0.13.1",sector="S1"}'
+        values: '410x5'
+      # RouterOS 6 router: only the legacy scalar.
+      - series: 'mikrotik_hl_temperature_dc{job="snmp-mikrotik",instance="10.0.0.1",router="R6"}'
+        values: '523x5'
+    promql_expr_test:
+      - expr: device_temperature_celsius
+        eval_time: 5m
+        exp_samples:
+          - labels: 'device_temperature_celsius{job="link-radio-health",instance="10.0.0.90",link_id="P1-P7",link_name="P1-P7-r1",endpoint="RADIO1",sensor="radio"}'
+            value: 37
+          - labels: 'device_temperature_celsius{job="link-radio-health",instance="10.0.0.90",link_id="P1-P7",link_name="P1-P7-r1",endpoint="RADIO1",sensor="board"}'
+            value: 40
+          - labels: 'device_temperature_celsius{job="snmp-sectors",instance="10.0.13.1",sector="S1",sensor="temperature"}'
+            value: 41
+          - labels: 'device_temperature_celsius{job="snmp-mikrotik",instance="10.0.0.1",router="R6",sensor="temperature"}'
+            value: 52.3
+
+  # 80 C for 20 minutes fires once it has held 15; a 10-minute spike does not.
+  - interval: 1m
+    input_series:
+      - series: 'saf_radio_temperature_dc{job="link-radio-health",instance="10.0.0.91",link_id="P1-P7",link_name="P1-P7-p7",endpoint="POP7"}'
+        values: '800x25'
+      - series: 'sector_mikrotik_gauge{job="snmp-sectors",instance="10.0.13.1",sector="S1",gauge_index="14",sensor="temperature"}'
+        values: '50x5 80x10 50x10'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: DeviceTemperatureHigh
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: DeviceTemperatureHigh
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              category: health
+              scope: link
+              alert_type: temperature-high
+              job: link-radio-health
+              instance: 10.0.0.91
+              link_id: P1-P7
+              link_name: P1-P7-p7
+              endpoint: POP7
+              sensor: radio
+            exp_annotations:
+              summary: "🌡️ Link radio running hot"
+              description: "P1-P7-p7: POP7 end (10.0.0.91) radio sensor has read 80 C for 15 minutes (alert above 75 C)."

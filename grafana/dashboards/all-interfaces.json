@@ -207,7 +207,7 @@
         {
             "id": 101,
             "type": "row",
-            "title": "STORAGE",
+            "title": "STORAGE & TEMPERATURE",
             "gridPos": {
                 "h": 1,
                 "w": 24,
@@ -220,8 +220,8 @@
             "type": "gauge",
             "title": "Disk Used %",
             "gridPos": {
-                "h": 4,
-                "w": 8,
+                "h": 5,
+                "w": 6,
                 "x": 0,
                 "y": 6
             },
@@ -258,6 +258,122 @@
             }
         },
         {
+            "id": 103,
+            "type": "gauge",
+            "title": "Temperature",
+            "description": "Hottest temperature sensor on the router right now. DeviceTemperatureHigh warns above 75 °C held for 15 minutes. Boards without a sensor (hAP, hEX) show 'No sensor'.",
+            "gridPos": {
+                "h": 5,
+                "w": 6,
+                "x": 6,
+                "y": 6
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "max by (instance) (device_temperature_celsius{job=\"snmp-mikrotik\", instance=\"$instance\"})",
+                    "instant": true
+                }
+            ],
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "showThresholdMarkers": true,
+                "showThresholdLabels": false
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "celsius",
+                    "min": 0,
+                    "max": 100,
+                    "decimals": 0,
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "value": null,
+                                "color": "green"
+                            },
+                            {
+                                "value": 60,
+                                "color": "orange"
+                            },
+                            {
+                                "value": 75,
+                                "color": "red"
+                            }
+                        ]
+                    },
+                    "noValue": "No sensor"
+                }
+            }
+        },
+        {
+            "id": 104,
+            "type": "timeseries",
+            "title": "Temperature trend",
+            "description": "Every temperature sensor the router reports (e.g. CPU, board). Dashed line: 75 °C alert level.",
+            "gridPos": {
+                "h": 5,
+                "w": 12,
+                "x": 12,
+                "y": 6
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "device_temperature_celsius{job=\"snmp-mikrotik\", instance=\"$instance\"}",
+                    "legendFormat": "{{sensor}}"
+                }
+            ],
+            "options": {
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "right",
+                    "showLegend": true
+                },
+                "tooltip": {
+                    "mode": "multi",
+                    "sort": "desc"
+                }
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "celsius",
+                    "decimals": 0,
+                    "noValue": "No sensor",
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "value": null,
+                                "color": "transparent"
+                            },
+                            {
+                                "value": 75,
+                                "color": "red"
+                            }
+                        ]
+                    },
+                    "custom": {
+                        "thresholdsStyle": {
+                            "mode": "dashed"
+                        },
+                        "fillOpacity": 10,
+                        "lineWidth": 2,
+                        "axisSoftMin": 20,
+                        "axisSoftMax": 80,
+                        "spanNulls": 600000
+                    }
+                }
+            }
+        },
+        {
             "id": 102,
             "type": "row",
             "title": "INTERFACES",
@@ -265,7 +381,7 @@
                 "h": 1,
                 "w": 24,
                 "x": 0,
-                "y": 10
+                "y": 11
             }
         },
         {
@@ -276,7 +392,7 @@
                 "h": 8,
                 "w": 12,
                 "x": 0,
-                "y": 11
+                "y": 12
             },
             "datasource": "Prometheus",
             "targets": [
@@ -299,7 +415,7 @@
                 "h": 8,
                 "w": 12,
                 "x": 12,
-                "y": 11
+                "y": 12
             },
             "datasource": "Prometheus",
             "targets": [
@@ -322,7 +438,7 @@
                 "h": 6,
                 "w": 24,
                 "x": 0,
-                "y": 19
+                "y": 20
             },
             "datasource": "Prometheus",
             "targets": [
@@ -359,12 +475,12 @@
             "id": 9,
             "type": "table",
             "title": "PPP Subscriber Sessions",
-            "description": "One row per live PPP/PPPoE server session on this router (dynamic \"<pppoe-USER>\" interfaces from the IF-MIB). Session uptime / Last flap / averages are derived - RouterOS SNMP has no /ppp active table. \"Last flap\" is the most recent reconnect edge and is blank when the user hasn't dropped in 2d; a true disconnect timestamp + reason has to be pushed off the router. Avg down/up are mean throughput over the current session's life. Defined in prometheus/rules/ppp-sessions.yml.",
+            "description": "One row per live PPP/PPPoE server session on this router (dynamic \"<pppoe-USER>\" interfaces from the IF-MIB). Reconnects / Session uptime / Last flap / averages are derived - RouterOS SNMP has no /ppp active table. State is DOWN for a user whose session ended in the last 2d (no uptime shown). \"Last flap\" is the most recent reconnect edge (roughly the last disconnect) and is blank when the user hasn't dropped in 2d; a true disconnect timestamp + reason has to be pushed off the router. Avg down/up are mean throughput over the current session's life. Defined in prometheus/rules/ppp-sessions.yml.",
             "gridPos": {
                 "h": 10,
                 "w": 24,
                 "x": 0,
-                "y": 25
+                "y": 26
             },
             "datasource": "Prometheus",
             "options": {
@@ -388,55 +504,49 @@
             },
             "targets": [
                 {
-                    "expr": "ppp:session:up{instance=\"$instance\"}",
+                    "expr": "max by (user) (ppp:session:up{instance=\"$instance\"}) or 0 * max by (user) (ppp:session:start_timestamp{instance=\"$instance\"})",
                     "refId": "A",
                     "instant": true,
                     "format": "table"
                 },
                 {
-                    "expr": "ppp:session:start_timestamp{instance=\"$instance\"} * 1000",
-                    "refId": "B",
-                    "instant": true,
-                    "format": "table"
-                },
-                {
-                    "expr": "time() - ppp:session:start_timestamp{instance=\"$instance\"}",
+                    "expr": "max by (user) (time() - ppp:session:start_timestamp{instance=\"$instance\"}) and on (user) max by (user) (ppp:session:up{instance=\"$instance\"} == 1)",
                     "refId": "C",
                     "instant": true,
                     "format": "table"
                 },
                 {
-                    "expr": "ppp:session:last_connect_timestamp{instance=\"$instance\"} * 1000",
+                    "expr": "max by (user) (ppp:session:last_connect_timestamp{instance=\"$instance\"} * 1000)",
                     "refId": "D",
                     "instant": true,
                     "format": "table"
                 },
                 {
-                    "expr": "ppp:session:avg_rx_bps{instance=\"$instance\"}",
+                    "expr": "max by (user) (ppp:session:avg_rx_bps{instance=\"$instance\"})",
                     "refId": "E",
                     "instant": true,
                     "format": "table"
                 },
                 {
-                    "expr": "ppp:session:avg_tx_bps{instance=\"$instance\"}",
+                    "expr": "max by (user) (ppp:session:avg_tx_bps{instance=\"$instance\"})",
                     "refId": "F",
                     "instant": true,
                     "format": "table"
                 },
                 {
-                    "expr": "8 * max without (ifIndex, ifName) (label_replace(rate(ifHCInOctets{job=\"snmp-mikrotik\", instance=\"$instance\", ifName=~\"<(pppoe|l2tp|pptp|sstp|ovpn)-.+>\"}[5m]), \"user\", \"$1\", \"ifName\", \"<[a-z0-9]+-(.+)>\"))",
+                    "expr": "8 * max by (user) (label_replace(rate(ifHCInOctets{job=\"snmp-mikrotik\", instance=\"$instance\", ifName=~\"<(pppoe|l2tp|pptp|sstp|ovpn)-.+>\"}[5m]), \"user\", \"$1\", \"ifName\", \"<[a-z0-9]+-(.+)>\"))",
                     "refId": "G",
                     "instant": true,
                     "format": "table"
                 },
                 {
-                    "expr": "8 * max without (ifIndex, ifName) (label_replace(rate(ifHCOutOctets{job=\"snmp-mikrotik\", instance=\"$instance\", ifName=~\"<(pppoe|l2tp|pptp|sstp|ovpn)-.+>\"}[5m]), \"user\", \"$1\", \"ifName\", \"<[a-z0-9]+-(.+)>\"))",
+                    "expr": "8 * max by (user) (label_replace(rate(ifHCOutOctets{job=\"snmp-mikrotik\", instance=\"$instance\", ifName=~\"<(pppoe|l2tp|pptp|sstp|ovpn)-.+>\"}[5m]), \"user\", \"$1\", \"ifName\", \"<[a-z0-9]+-(.+)>\"))",
                     "refId": "H",
                     "instant": true,
                     "format": "table"
                 },
                 {
-                    "expr": "ppp:session:reconnects_24h{instance=\"$instance\"}",
+                    "expr": "max by (user) (ppp:session:reconnects_24h{instance=\"$instance\"})",
                     "refId": "I",
                     "instant": true,
                     "format": "table"
@@ -444,8 +554,11 @@
             ],
             "transformations": [
                 {
-                    "id": "merge",
-                    "options": {}
+                    "id": "joinByField",
+                    "options": {
+                        "byField": "user",
+                        "mode": "outer"
+                    }
                 },
                 {
                     "id": "organize",
@@ -459,26 +572,34 @@
                             "site": true,
                             "role": true,
                             "ifName": true,
-                            "ifIndex": true
+                            "ifIndex": true,
+                            "router": true,
+                            "wan_ifname": true,
+                            "Time 1": true,
+                            "Time 2": true,
+                            "Time 3": true,
+                            "Time 4": true,
+                            "Time 5": true,
+                            "Time 6": true,
+                            "Time 7": true,
+                            "Time 8": true
                         },
                         "indexByName": {
                             "user": 0,
                             "Value #A": 1,
-                            "Value #C": 2,
-                            "Value #B": 3,
+                            "Value #I": 2,
+                            "Value #C": 3,
                             "Value #D": 4,
-                            "Value #E": 5,
-                            "Value #F": 6,
-                            "Value #G": 7,
-                            "Value #H": 8,
-                            "Value #I": 9
+                            "Value #G": 5,
+                            "Value #H": 6,
+                            "Value #E": 7,
+                            "Value #F": 8
                         },
                         "renameByName": {
                             "user": "Client",
                             "Value #A": "State",
-                            "Value #B": "Connected since",
                             "Value #C": "Session uptime",
-                            "Value #D": "Last flap (≈ disconnect)",
+                            "Value #D": "Last flap",
                             "Value #E": "Avg ⬇ (bps)",
                             "Value #F": "Avg ⬆ (bps)",
                             "Value #G": "Now ⬇ (bps)",
@@ -533,13 +654,21 @@
                                     "type": "color-background",
                                     "mode": "basic"
                                 }
+                            },
+                            {
+                                "id": "custom.width",
+                                "value": 90
+                            },
+                            {
+                                "id": "custom.align",
+                                "value": "center"
                             }
                         ]
                     },
                     {
                         "matcher": {
                             "id": "byRegexp",
-                            "options": "Connected since|Last flap.*"
+                            "options": "Last flap.*"
                         },
                         "properties": [
                             {

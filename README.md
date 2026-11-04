@@ -145,11 +145,15 @@ Per ISP, the devices below are listed in the site folder's `vars.yml`
 ## Dashboards (`grafana/dashboards/`, auto-provisioned)
 
 - **NOC Overview** — the front door: an **Active Incidents** table (every firing
-  alert, one row per object, longest-running first), link/router/sector state
-  counts, then color-coded per-object health tables for links and sectors, each
-  linking through to its detail view.
+  alert, one row per object, longest-running first; clicking the object opens
+  that link, sector or router's own page), link/router/sector state counts, then
+  color-coded per-object health tables for links and sectors, each linking
+  through to its detail view.
 - **PTP Link Monitoring** — drill-down for one link: status, latency, packet loss,
-  RF signal/noise/quality, capacity/utilization, vendor-specific diagnostics.
+  the link's TX/RX as seen from RADIO1 (read on each radio's air side),
+  capacity/utilization, RF signal/noise/quality, a per-radio snapshot (the radio's
+  own configured name, uptime, errors over 24 h, temperature), vendor-specific
+  diagnostics.
 - **MikroTik Router Overview** — reachability, CPU, memory, storage, interface traffic
   and state for core routers.
 - **Sector Fleet Overview** — one row per PtMP sector: clients / throughput vs

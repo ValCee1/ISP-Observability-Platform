@@ -551,7 +551,7 @@
           "format": "table"
         },
         {
-          "expr": "sector_cpe_session_uptime_seconds{sector=\"$sector\"} / 360000",
+          "expr": "sector_cpe_session_uptime_seconds{sector=\"$sector\"} / 100",
           "refId": "Session",
           "instant": true,
           "format": "table"
@@ -608,7 +608,7 @@
               "Value #ChainDelta": "Chain \u0394",
               "Value #Drift": "Drift 7d",
               "Value #TxPhy": "Tx PHY (Mbps)",
-              "Value #Session": "Session (h)"
+              "Value #Session": "Session"
             }
           }
         }
@@ -622,7 +622,8 @@
           "custom": {
             "cellOptions": {
               "type": "auto"
-            }
+            },
+            "minWidth": 70
           }
         },
         "overrides": [
@@ -822,6 +823,22 @@
                   "type": "color-background",
                   "mode": "gradient"
                 }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Session"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "decimals",
+                "value": 1
               }
             ]
           }
@@ -1213,7 +1230,7 @@
     {
       "id": 37,
       "type": "barchart",
-      "title": "Throughput & clients by hour of day (7-day avg, Lagos)",
+      "title": "Throughput & clients by hour of day (7-day avg, local)",
       "description": "Average sector throughput and client count for each local hour, over the last 7 days.",
       "gridPos": {
         "h": 9,
@@ -1508,14 +1525,16 @@
       "title": "CPU",
       "gridPos": {
         "h": 7,
-        "w": 12,
+        "w": 8,
         "x": 0,
         "y": 74
       },
       "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
-          "unit": "percent"
+          "unit": "percent",
+          "min": 0,
+          "max": 100
         }
       },
       "targets": [
@@ -1531,14 +1550,16 @@
       "title": "Memory used",
       "gridPos": {
         "h": 7,
-        "w": 12,
-        "x": 12,
+        "w": 8,
+        "x": 8,
         "y": 74
       },
       "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
-          "unit": "percent"
+          "unit": "percent",
+          "min": 0,
+          "max": 100
         }
       },
       "targets": [
@@ -1547,6 +1568,55 @@
           "legendFormat": "memory"
         }
       ]
+    },
+    {
+      "id": 43,
+      "type": "timeseries",
+      "title": "Temperature",
+      "description": "Temperature sensors on the sector radio. Dashed line: 75 \u00b0C alert level (DeviceTemperatureHigh, held 15 minutes).",
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 74
+      },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "device_temperature_celsius{sector=\"$sector\"}",
+          "legendFormat": "{{sensor}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "decimals": 0,
+          "noValue": "No sensor",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "transparent"
+              },
+              {
+                "value": 75,
+                "color": "red"
+              }
+            ]
+          },
+          "custom": {
+            "thresholdsStyle": {
+              "mode": "dashed"
+            },
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "axisSoftMin": 20,
+            "axisSoftMax": 80,
+            "spanNulls": 600000
+          }
+        }
+      }
     }
   ],
   "annotations": {

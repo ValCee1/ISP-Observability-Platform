@@ -206,6 +206,7 @@ Rule groups, by file:
 | `link-normalization.yml` | `link-availability`, `link-interface-health`, `link-derived-metrics` | raw SNMP/ICMP → `link_*` |
 | `link-alerts.yml` | `link-state`, `link-health`, `link-degrading`, `link-composite-health` | LinkDown, WeakSignal, PacketLoss, LinkUpButDegrading, `link_health_score` |
 | `mikrotik-alerts.yml` | `mikrotik-core` | CoreRouterDown, HighCPU, HighMemory, WANInterfaceDown |
+| `device-temperature.yml` | `device-temperature`, `device-temperature-alerts` | `device_temperature_celsius` (MikroTik, SAF); DeviceTemperatureHigh above 75 °C for 15 min |
 | `exporter-health.yml` | `exporter-health` | ExporterDown (snmp / blackbox / routeros exporters, node-exporter, alertmanager, grafana, whatsapp-bridge); Alertmanager inhibits the per-device alerts behind a down exporter |
 | `server-health.yml` | `server-health` | the monitoring server itself: disk, memory, CPU, clock, rule failures, alert-delivery failures — see [server-monitoring.md](server-monitoring.md) |
 | `deadman.yml` | `deadman` | Watchdog (always firing) → outside heartbeat check; alerts when the whole stack goes silent — see [deadman.md](deadman.md) |
@@ -219,7 +220,7 @@ Rule groups, by file:
 | `sector-thresholds.yml` | `sector-capacity-thresholds` | per-sector client/Mbps limits (default 15/20 clients, 20/25 Mbps) |
 | `sector-alerts.yml` | `sector-availability`, `sector-performance`, `sector-device`, `sector-cpe`, `sector-capacity` | SectorDown, SectorWideCPEDegradation, CPE\* alerts, capacity digest |
 | `capacity-rules.yml` | `capacity-links`, `capacity-routers` | busy-hour capacity-planning series |
-| `incidents.yml` | `incidents` | NOC "Active Incidents" feed |
+| `incidents.yml` | `incidents` | NOC "Active Incidents" feed - unified `object`, plus `dash` + `key` so each row links to its scope's dashboard |
 
 ---
 

@@ -1,0 +1,96 @@
+# promtool unit tests for link_tx_bps / link_rx_bps
+# (prometheus/rules/link-normalization.yml). Run:
+#   docker run --rm --entrypoint promtool -v "$PWD/prometheus":/p \
+#     prom/prometheus:v3.13.2 test rules /p/rules/tests/link_traffic_test.yml
+#
+# Live finding (2026-11-01): an airFiber 5XHD link carrying ~40 Mb/s showed
+# ~5 kb/s, because its IF-MIB interfaces only see management traffic.
+
+rule_files:
+  - ../link-normalization.yml
+
+evaluation_interval: 1m
+
+tests:
+  # 5XHD end: the air counters win (5 MB/min = 666.7 kb/s, 1 MB/min =
+  # 133.3 kb/s) and the busy-looking ath0 interface is ignored.
+  # Other vendors keep the busiest-interface pick.
+  - interval: 1m
+    input_series:
+      - series: 'airfiber_ltu_air_tx_octets{job="link-radio-health",instance="10.0.0.82",link_id="P6-P2",endpoint="P2",site="P2",role="Backhaul",vendor="ubiquiti_airfiber",link_name="P6-P2-RADIO1"}'
+        values: '0+5000000x10'
+      - series: 'airfiber_ltu_air_rx_octets{job="link-radio-health",instance="10.0.0.82",link_id="P6-P2",endpoint="P2",site="P2",role="Backhaul",vendor="ubiquiti_airfiber",link_name="P6-P2-RADIO1"}'
+        values: '0+1000000x10'
+      - series: 'link_interface_out_octets{job="link-interface-health",instance="10.0.0.82",ifName="ath0",link_id="P6-P2",endpoint="P2",site="P2",role="Backhaul",vendor="ubiquiti_airfiber",link_name="P6-P2-RADIO1"}'
+        values: '0+600x10'
+      - series: 'link_interface_out_octets{job="link-interface-health",instance="10.0.0.90",ifName="eth1",link_id="P1-P7",endpoint="P1",site="P1",role="Backhaul",vendor="saf",link_name="P1-P7-RADIO1"}'
+        values: '0+60000x10'
+    promql_expr_test:
+      - expr: round(sum by (link_id) (link_tx_bps))
+        eval_time: 10m
+        exp_samples:
+          - labels: '{link_id="P6-P2"}'
+            value: 666667
+          - labels: '{link_id="P1-P7"}'
+            value: 8000
+      - expr: round(sum by (link_id) (link_rx_bps))
+        eval_time: 10m
+        exp_samples:
+          - labels: '{link_id="P6-P2"}'
+            value: 133333
+
+  # The air-side interface carries both directions (2026-11-02): a SAF
+  # link sending 37 Mb/s one way and 4.7 the other read 37/37 when TX and
+  # RX each took the busiest port. SAF reads WAN, airMAX ath0 (by ifDescr;
+  # its ifName is blank), whatever the cable port shows.
+  - interval: 1m
+    input_series:
+      # SAF: WAN out 4.5 MB/min (600 kb/s), WAN in 0.6 MB/min (80 kb/s);
+      # LAN1 is the mirror image and must be ignored.
+      - series: 'link_interface_out_octets{job="link-interface-health",instance="10.0.0.90",ifIndex="4",ifName="WAN",ifDescr="WAN",link_id="P1-P7",endpoint="P1",site="P1",role="Backhaul",vendor="saf",link_name="P1-P7-RADIO1"}'
+        values: '0+4500000x10'
+      - series: 'link_interface_in_octets{job="link-interface-health",instance="10.0.0.90",ifIndex="4",ifName="WAN",ifDescr="WAN",link_id="P1-P7",endpoint="P1",site="P1",role="Backhaul",vendor="saf",link_name="P1-P7-RADIO1"}'
+        values: '0+600000x10'
+      - series: 'link_interface_out_octets{job="link-interface-health",instance="10.0.0.90",ifIndex="1",ifName="LAN1",ifDescr="LAN1",link_id="P1-P7",endpoint="P1",site="P1",role="Backhaul",vendor="saf",link_name="P1-P7-RADIO1"}'
+        values: '0+600000x10'
+      - series: 'link_interface_in_octets{job="link-interface-health",instance="10.0.0.90",ifIndex="1",ifName="LAN1",ifDescr="LAN1",link_id="P1-P7",endpoint="P1",site="P1",role="Backhaul",vendor="saf",link_name="P1-P7-RADIO1"}'
+        values: '0+4500000x10'
+      # airMAX (32-bit counters only): ath0 out 6 MB/min, in 1.2 MB/min;
+      # eth0 the mirror image.
+      - series: 'link_interface_out_octets_32{job="link-interface-health",instance="10.0.0.2",ifIndex="5",ifName="",ifDescr="ath0",link_id="H-G",endpoint="H",site="H",role="P2P",vendor="ubiquiti_airmax",link_name="H-G-RADIO1"}'
+        values: '0+6000000x10'
+      - series: 'link_interface_in_octets_32{job="link-interface-health",instance="10.0.0.2",ifIndex="5",ifName="",ifDescr="ath0",link_id="H-G",endpoint="H",site="H",role="P2P",vendor="ubiquiti_airmax",link_name="H-G-RADIO1"}'
+        values: '0+1200000x10'
+      - series: 'link_interface_out_octets_32{job="link-interface-health",instance="10.0.0.2",ifIndex="2",ifName="",ifDescr="eth0",link_id="H-G",endpoint="H",site="H",role="P2P",vendor="ubiquiti_airmax",link_name="H-G-RADIO1"}'
+        values: '0+1200000x10'
+      - series: 'link_interface_in_octets_32{job="link-interface-health",instance="10.0.0.2",ifIndex="2",ifName="",ifDescr="eth0",link_id="H-G",endpoint="H",site="H",role="P2P",vendor="ubiquiti_airmax",link_name="H-G-RADIO1"}'
+        values: '0+6000000x10'
+    promql_expr_test:
+      - expr: round(sum by (link_id) (link_tx_bps))
+        eval_time: 10m
+        exp_samples:
+          - labels: '{link_id="P1-P7"}'
+            value: 600000
+          - labels: '{link_id="H-G"}'
+            value: 800000
+      - expr: round(sum by (link_id) (link_rx_bps))
+        eval_time: 10m
+        exp_samples:
+          - labels: '{link_id="P1-P7"}'
+            value: 80000
+          - labels: '{link_id="H-G"}'
+            value: 160000
+
+  # 5XHD ideal signal -> how far below it the link runs.
+  - interval: 1m
+    input_series:
+      - series: 'link_signal_dbm{job="link-radio-health",instance="10.0.0.82",remote_mac="18:E8:29:1F:00:78",link_id="P6-P2",endpoint="P2",link_name="P6-P2-RADIO1",vendor="ubiquiti_airfiber"}'
+        values: '-53x5'
+      - series: 'airfiber_ltu_ideal_rx_power_dbm{job="link-radio-health",instance="10.0.0.82",remote_mac="18:E8:29:1F:00:78",link_id="P6-P2",endpoint="P2",link_name="P6-P2-RADIO1",vendor="ubiquiti_airfiber"}'
+        values: '-32x5'
+    promql_expr_test:
+      - expr: link_signal_below_ideal_db
+        eval_time: 5m
+        exp_samples:
+          - labels: 'link_signal_below_ideal_db{job="link-radio-health",instance="10.0.0.82",remote_mac="18:E8:29:1F:00:78",link_id="P6-P2",endpoint="P2",link_name="P6-P2-RADIO1",vendor="ubiquiti_airfiber"}'
+            value: 21

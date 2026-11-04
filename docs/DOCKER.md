@@ -26,7 +26,7 @@ The build fails if the bundled config or rules don't parse
 
 > **Image name.** Docker image references can't contain spaces or uppercase, so
 > the repository is `isp-observability` (not "isp observability"). Full
-> reference: `<dockerhub-namespace>/isp-observability:v1.4`.
+> reference: `<dockerhub-namespace>/isp-observability:v1.5`.
 
 ## Files
 
@@ -40,20 +40,20 @@ The build fails if the bundled config or rules don't parse
 
 ```bash
 # from the repo root
-docker build -t chikere/isp-observability:v1.4 .
+docker build -t chikere/isp-observability:v1.5 .
 ```
 
 Override the Prometheus base version if needed:
 
 ```bash
-docker build --build-arg PROMETHEUS_VERSION=v3.13.2 -t chikere/isp-observability:v1.4 .
+docker build --build-arg PROMETHEUS_VERSION=v3.13.2 -t chikere/isp-observability:v1.5 .
 ```
 
 Verify before pushing:
 
 ```bash
-docker run --rm chikere/isp-observability:v1.4 --version
-docker run --rm --entrypoint promtool chikere/isp-observability:v1.4 \
+docker run --rm chikere/isp-observability:v1.5 --version
+docker run --rm --entrypoint promtool chikere/isp-observability:v1.5 \
   check config /etc/prometheus/prometheus.yml
 ```
 
@@ -72,13 +72,13 @@ docker run --rm --entrypoint promtool chikere/isp-observability:v1.4 \
 3. **Tag** (skip if you already built with the final name above):
 
    ```bash
-   docker tag isp-observability:v1.4 chikere/isp-observability:v1.4
+   docker tag isp-observability:v1.5 chikere/isp-observability:v1.5
    ```
 
 4. **Push:**
 
    ```bash
-   docker push chikere/isp-observability:v1.4
+   docker push chikere/isp-observability:v1.5
    ```
 
 The repo stays private — anyone pulling it (including other hosts running this
@@ -91,7 +91,7 @@ If your monitoring host is arm64 (or mixed):
 ```bash
 docker buildx create --use --name isp-obs 2>/dev/null || docker buildx use isp-obs
 docker buildx build --platform linux/amd64,linux/arm64 \
-  -t chikere/isp-observability:v1.4 --push .
+  -t chikere/isp-observability:v1.5 --push .
 ```
 
 ## Run the stack from the image
@@ -109,7 +109,7 @@ targets, and leaves the other services untouched. Secrets (`secrets/grafana_admi
 Point at another tag or registry without editing files:
 
 ```bash
-ISP_OBS_IMAGE=chikere/isp-observability:v1.4 \
+ISP_OBS_IMAGE=chikere/isp-observability:v1.5 \
   docker compose -f docker-compose.yml -f docker-compose.image.yml up -d
 ```
 
@@ -117,7 +117,7 @@ ISP_OBS_IMAGE=chikere/isp-observability:v1.4 \
 
 Baked config is immutable per tag. Two options:
 
-- **New tag** — edit `prometheus/**`, `docker build -t chikere/isp-observability:v1.4 .`,
+- **New tag** — edit `prometheus/**`, `docker build -t chikere/isp-observability:v1.5 .`,
   push, bump `ISP_OBS_IMAGE`. Preferred.
 - **Targets** need no new tag: they are mounted from `prometheus/targets/`
   (written by the Ansible deploy from the site folder) and reload within 1 min.
