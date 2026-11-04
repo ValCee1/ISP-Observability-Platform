@@ -439,20 +439,20 @@
             "datasource": "Prometheus",
             "targets": [
                 {
-                    "expr": "link_signal_dbm{link_id=\"$link_id\"}",
-                    "legendFormat": "{{link_name}} signal"
+                    "expr": "label_replace(link_signal_dbm{link_id=\"$link_id\"}, \"radio\", \"$1$2\", \"link_name\", \"(?:.*-)?(RADIO[0-9]+)|(.+)\")",
+                    "legendFormat": "{{radio}} signal"
                 },
                 {
-                    "expr": "link_ideal_signal_dbm{link_id=\"$link_id\"}",
-                    "legendFormat": "{{link_name}} ideal"
+                    "expr": "max by (link_id) (link_ideal_signal_dbm{link_id=\"$link_id\"})",
+                    "legendFormat": "Ideal"
                 },
                 {
-                    "expr": "link_noise_dbm{link_id=\"$link_id\"}",
-                    "legendFormat": "{{link_name}} noise"
+                    "expr": "label_replace(link_noise_dbm{link_id=\"$link_id\"}, \"radio\", \"$1$2\", \"link_name\", \"(?:.*-)?(RADIO[0-9]+)|(.+)\")",
+                    "legendFormat": "{{radio}} noise"
                 },
                 {
-                    "expr": "link_snr_db{link_id=\"$link_id\"}",
-                    "legendFormat": "{{link_name}} SNR"
+                    "expr": "label_replace(link_snr_db{link_id=\"$link_id\"}, \"radio\", \"$1$2\", \"link_name\", \"(?:.*-)?(RADIO[0-9]+)|(.+)\")",
+                    "legendFormat": "{{radio}} SNR"
                 }
             ],
             "fieldConfig": {
@@ -462,8 +462,8 @@
                 "overrides": [
                     {
                         "matcher": {
-                            "id": "byRegexp",
-                            "options": ".* ideal$"
+                            "id": "byName",
+                            "options": "Ideal"
                         },
                         "properties": [
                             {
@@ -480,7 +480,7 @@
                     }
                 ]
             },
-            "description": "Received signal per radio. airFiber 5XHD also reports the ideal signal for the link's distance (dashed): a gap over 10 dB means alignment, an obstruction or reduced TX power, and fires Signal Below Ideal. Noise and SNR come from airMAX only."
+            "description": "Received signal per radio. airFiber 5XHD also reports the ideal signal for the link's distance (dashed, one line - both ends share it): a gap over 10 dB means alignment, an obstruction or reduced TX power, and fires Signal Below Ideal. Noise and SNR come from airMAX only."
         },
         {
             "id": 22,
