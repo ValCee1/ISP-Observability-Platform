@@ -134,6 +134,15 @@ groups:
       - record: link_snr_db
         expr: link_signal_dbm - link_noise_dbm
 
+      # How far the received signal is below what the link should get at
+      # its distance (airFiber 5XHD only - the radio reports its ideal).
+      # 0-5 dB is a well-aimed link; a large gap means alignment, an
+      # obstruction or reduced TX power, and lower modulation/capacity.
+      - record: link_ideal_signal_dbm
+        expr: airfiber_ltu_ideal_rx_power_dbm
+      - record: link_signal_below_ideal_db
+        expr: link_ideal_signal_dbm - link_signal_dbm
+
       # Vendor-agnostic link capacity, built from each vendor's raw units
       # (see snmp_exporter/snmp.yml): classic AirFiber's OID is already
       # bits/sec; SAF's and the airFiber 5XHD's (UBNT-AFLTU-MIB) are kb/s

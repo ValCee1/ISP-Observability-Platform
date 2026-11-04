@@ -80,3 +80,17 @@ tests:
             value: 80000
           - labels: '{link_id="H-G"}'
             value: 160000
+
+  # 5XHD ideal signal -> how far below it the link runs.
+  - interval: 1m
+    input_series:
+      - series: 'link_signal_dbm{job="link-radio-health",instance="10.0.0.82",remote_mac="18:E8:29:1F:00:78",link_id="P6-P2",endpoint="P2",link_name="P6-P2-RADIO1",vendor="ubiquiti_airfiber"}'
+        values: '-53x5'
+      - series: 'airfiber_ltu_ideal_rx_power_dbm{job="link-radio-health",instance="10.0.0.82",remote_mac="18:E8:29:1F:00:78",link_id="P6-P2",endpoint="P2",link_name="P6-P2-RADIO1",vendor="ubiquiti_airfiber"}'
+        values: '-32x5'
+    promql_expr_test:
+      - expr: link_signal_below_ideal_db
+        eval_time: 5m
+        exp_samples:
+          - labels: 'link_signal_below_ideal_db{job="link-radio-health",instance="10.0.0.82",remote_mac="18:E8:29:1F:00:78",link_id="P6-P2",endpoint="P2",link_name="P6-P2-RADIO1",vendor="ubiquiti_airfiber"}'
+            value: 21

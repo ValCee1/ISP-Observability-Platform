@@ -413,7 +413,7 @@
                     }
                 ]
             },
-            "description": "airMAX: CCQ (share of frames sent without retry), green from 90%, red below 70%. airFiber 5XHD (blue): received power as a share of the ideal for this link - no CCQ on that radio, so the CCQ colours don't apply to it. SAF has neither - see its MSE under Vendor Diagnostics."
+            "description": "airMAX: CCQ (share of frames sent without retry), green from 90%, red below 70%. airFiber 5XHD (blue): received power as a share of the ideal for this link - no CCQ on that radio, so the CCQ colours don't apply to it; the Signal chart shows the same thing as dB below the ideal. SAF has neither - see its MSE under Vendor Diagnostics."
         },
         {
             "id": 8,
@@ -443,6 +443,10 @@
                     "legendFormat": "{{link_name}} signal"
                 },
                 {
+                    "expr": "link_ideal_signal_dbm{link_id=\"$link_id\"}",
+                    "legendFormat": "{{link_name}} ideal"
+                },
+                {
                     "expr": "link_noise_dbm{link_id=\"$link_id\"}",
                     "legendFormat": "{{link_name}} noise"
                 },
@@ -454,8 +458,29 @@
             "fieldConfig": {
                 "defaults": {
                     "unit": "dBm"
-                }
-            }
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byRegexp",
+                            "options": ".* ideal$"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.lineStyle",
+                                "value": {
+                                    "fill": "dash",
+                                    "dash": [
+                                        10,
+                                        10
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            "description": "Received signal per radio. airFiber 5XHD also reports the ideal signal for the link's distance (dashed): a gap over 10 dB means alignment, an obstruction or reduced TX power, and fires Signal Below Ideal. Noise and SNR come from airMAX only."
         },
         {
             "id": 22,

@@ -835,6 +835,16 @@ modules:
         indexes:
           - labelname: remote_mac
             type: PhysAddress48
+      # The receive power this link should get at its distance with the
+      # radios aimed and nothing in the path (dBm). The gap to
+      # link_signal_dbm is the real measure of a 5XHD link's health - the
+      # lab's POP6-POP2 reads -53 against an ideal of -32 (2026-11-04).
+      - name: airfiber_ltu_ideal_rx_power_dbm
+        oid: 1.3.6.1.4.1.41112.1.10.1.4.1.7 # afLTUStaIdealRxPower0
+        type: gauge
+        indexes:
+          - labelname: remote_mac
+            type: PhysAddress48
       - name: airfiber_ltu_rx_capacity_kbps
         oid: 1.3.6.1.4.1.41112.1.10.1.4.1.4 # afLTUStaRxCapacity, kb/s
         type: gauge
