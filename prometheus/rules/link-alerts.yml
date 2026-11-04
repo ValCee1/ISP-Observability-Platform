@@ -66,10 +66,14 @@ groups:
           summary: "🟠 Weak Signal"
           description: "{{ if $labels.endpoint }}{{ $labels.endpoint }} end{{ with $labels.instance }} ({{ . }}){{ end }}{{ else }}{{ $labels.link_name }}{{ end }} signal has been below -80 dBm for most of the last 30 minutes (currently {{ $value }} dBm)."
 
+      # airMAX CCQ only. The airFiber 5XHD's link_quality_percent is rx
+      # power as a share of the ideal, not CCQ: a healthy -54 dBm link sits
+      # at a steady 65% and fired this around the clock (2026-11-04). Its
+      # signal is covered by WeakSignal.
       - alert: LowLinkQuality
         expr: |
-          link_quality_percent < 70
-          and sum_over_time((link_quality_percent < bool 70)[30m:1m]) >= 24
+          link_quality_percent{vendor!="ubiquiti_airfiber"} < 70
+          and sum_over_time((link_quality_percent{vendor!="ubiquiti_airfiber"} < bool 70)[30m:1m]) >= 24
         keep_firing_for: 10m
         labels:
           severity: warning

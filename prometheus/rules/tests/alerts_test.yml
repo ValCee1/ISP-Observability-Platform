@@ -116,6 +116,17 @@ tests:
   # LinkUpButDegrading: compound (signal OR quality OR probe-failure) rule.
   # Quiet at 20m, fires by 35m of continuous weak signal while link_up==1.
   # ------------------------------------------------------------------
+  # airFiber 5XHD quality (rx power vs ideal, steady 65% on a healthy
+  # link) is not CCQ and never fires LowLinkQuality.
+  - interval: 1m
+    input_series:
+      - series: 'link_quality_percent{link_id="LINK-AF", link_name="af-a", vendor="ubiquiti_airfiber"}'
+        values: '65x40'
+    alert_rule_test:
+      - eval_time: 35m
+        alertname: LowLinkQuality
+        exp_alerts: []
+
   - interval: 1m
     input_series:
       - series: 'link_up{link_id="LINK-T", link_name="t-a", endpoint="a", site="S", role="P2P", vendor="t"}'
