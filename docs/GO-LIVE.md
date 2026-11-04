@@ -70,8 +70,9 @@ playbook writes the files with the right modes and refuses placeholder values.
 
 - [ ] `secrets/grafana_admin_password.txt` - strong password (not the
       `change-me-now` placeholder); create Viewer accounts for NOC staff.
-- [ ] Telegram: production bot token (`telegram_bot_token`, vault), and the
-      **production NOC group id** as `telegram_chat_id` in the site's
+- [ ] Telegram: bot token (`telegram_bot_token`, vault; the lab's bot may
+      be reused), and the **production NOC group id** - never the lab's - as
+      `telegram_chat_id` in the site's
       `vars.yml` (the deploy writes it into `alertmanager/alertmanager.yml`
       for both `telegram` and `telegram-warnings`). The product file holds an
       example id.
@@ -123,9 +124,13 @@ docker compose up -d --build && docker compose ps
 - [ ] Image: publish a tag that includes the current rules (v1.4+) before using
       `docker-compose.image.yml` ([DOCKER.md](DOCKER.md)).
 - [ ] A named owner for tuning and upgrades; NOC trained on the Operations Manual.
-- [ ] Dead-man's switch on: healthchecks.io check, URL in
-      `secrets/deadman_url.txt`, Watchdog route receiver `deadman`
-      ([deadman.md](deadman.md)); `docker compose stop alertmanager` test passes.
+- [ ] Dead-man's switch on: a **new** healthchecks.io check for this server
+      (never the lab's), URL as `deadman_url` in the vault, Watchdog route
+      receiver `deadman` ([deadman.md](deadman.md)); `docker compose stop
+      alertmanager` test passes.
+- [ ] The lab no longer posts to the production NOC group: give it a test
+      group of its own, or stop it, before cut-over (both servers poll the
+      same devices otherwise, and every alert arrives twice).
 - [ ] Rollback plan: `scripts/deploy.sh --site <folder> <previous deploy-<isp>-... tag>`;
       site data by checking out the site repo's `deploy-...` tag (or by hand:
       `git revert` the change, `docker compose up -d`, restart the changed
