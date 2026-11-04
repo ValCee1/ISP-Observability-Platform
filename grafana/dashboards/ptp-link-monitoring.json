@@ -461,7 +461,10 @@
             ],
             "fieldConfig": {
                 "defaults": {
-                    "unit": "dBm"
+                    "unit": "dBm",
+                    "custom": {
+                        "lineWidth": 2
+                    }
                 },
                 "overrides": [
                     {
@@ -479,6 +482,17 @@
                                         10
                                     ]
                                 }
+                            },
+                            {
+                                "id": "color",
+                                "value": {
+                                    "mode": "fixed",
+                                    "fixedColor": "yellow"
+                                }
+                            },
+                            {
+                                "id": "custom.lineWidth",
+                                "value": 2
                             }
                         ]
                     }
