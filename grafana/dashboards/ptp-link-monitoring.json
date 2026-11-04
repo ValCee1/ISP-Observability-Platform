@@ -767,8 +767,8 @@
                             "Value #Noise": "Noise (dBm)",
                             "Value #Quality": "Quality (%)",
                             "Value #Uptime": "Uptime",
-                            "Value #InErrors": "In errors (24h)",
-                            "Value #OutErrors": "Out errors (24h)",
+                            "Value #InErrors": "In err (24h)",
+                            "Value #OutErrors": "Out err (24h)",
                             "link_name": "Radio",
                             "endpoint": "Endpoint",
                             "link_id": "Link",
@@ -842,7 +842,7 @@
                             },
                             {
                                 "id": "custom.width",
-                                "value": 70
+                                "value": 60
                             }
                         ]
                     },
@@ -896,7 +896,7 @@
                             },
                             {
                                 "id": "custom.width",
-                                "value": 85
+                                "value": 80
                             }
                         ]
                     },
@@ -912,7 +912,7 @@
                             },
                             {
                                 "id": "custom.width",
-                                "value": 105
+                                "value": 95
                             }
                         ]
                     },
@@ -924,7 +924,7 @@
                         "properties": [
                             {
                                 "id": "custom.width",
-                                "value": 80
+                                "value": 70
                             }
                         ]
                     },
@@ -948,31 +948,7 @@
                         "properties": [
                             {
                                 "id": "custom.width",
-                                "value": 170
-                            }
-                        ]
-                    },
-                    {
-                        "matcher": {
-                            "id": "byName",
-                            "options": "In errors (24h)"
-                        },
-                        "properties": [
-                            {
-                                "id": "custom.width",
-                                "value": 115
-                            }
-                        ]
-                    },
-                    {
-                        "matcher": {
-                            "id": "byName",
-                            "options": "Out errors (24h)"
-                        },
-                        "properties": [
-                            {
-                                "id": "custom.width",
-                                "value": 120
+                                "value": 195
                             }
                         ]
                     },
@@ -984,7 +960,7 @@
                         "properties": [
                             {
                                 "id": "custom.width",
-                                "value": 95
+                                "value": 85
                             }
                         ]
                     },
@@ -996,7 +972,7 @@
                         "properties": [
                             {
                                 "id": "custom.width",
-                                "value": 95
+                                "value": 85
                             }
                         ]
                     },
@@ -1008,7 +984,31 @@
                         "properties": [
                             {
                                 "id": "custom.width",
+                                "value": 85
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "In err (24h)"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.width",
                                 "value": 90
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Out err (24h)"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.width",
+                                "value": 95
                             }
                         ]
                     }
