@@ -18,23 +18,31 @@ from *inside* the stack. The heartbeat is the opposite direction: an
 server cannot ping its gateway or send that alert, so only something outside
 can catch it.
 
-It is **off by default**: until a real URL is set, Watchdog goes to the
-`deadman-off` receiver and is dropped. (A placeholder URL would fail every
-minute and set off `AlertDeliveryFailing`.)
+It is **on**: Watchdog goes to the `deadman` receiver, and the install
+refuses to run with the placeholder URL. Every server needs its own check -
+never share one between the lab and production, or a lab test or pause can
+hide a production outage.
 
-## Switch it on (healthchecks.io, free tier)
+## Set it up (healthchecks.io, free tier)
 
-1. Create a check at https://healthchecks.io: **Period 5 minutes, Grace
-   5 minutes**. Add the NOC's notification channels to it (email at minimum;
-   it can also post to Telegram). Use a channel that does **not** depend on
-   this server.
-2. Put the check's ping URL (`https://hc-ping.com/<uuid>`) in
-   `secrets/deadman_url.txt`, one line. The URL is a secret: anyone with it
-   can fake a heartbeat.
-3. In `alertmanager/alertmanager.yml`, Watchdog route: change
-   `receiver: deadman-off` to `receiver: deadman`.
-4. `docker compose up -d alertmanager`. Within a couple of minutes the check
-   turns green on healthchecks.io.
+Step by step:
+[SETUP-INPUTS.md, section D](SETUP-INPUTS.md#dead-mans-switch-on-healthchecksio-from-scratch-about-10-minutes).
+In short:
+
+1. Create a check at https://healthchecks.io: **Period 1 minute, Grace
+   5 minutes** (Alertmanager pings every minute). Add the NOC's notification
+   channels to it (email at minimum; it can also post to Telegram). Use a
+   channel that does **not** depend on this server.
+2. Put the check's ping URL (`https://hc-ping.com/<uuid>`) in the vault as
+   `deadman_url` (by hand: `secrets/deadman_url.txt`, one line). The URL is a
+   secret: anyone with it can fake a heartbeat.
+3. Deploy (by hand: `docker compose up -d alertmanager`). Within a couple of
+   minutes the check turns green on healthchecks.io.
+
+**Switching it off** (e.g. a server with no check yet): in
+`alertmanager/alertmanager.yml`, Watchdog route, set `receiver: deadman-off`.
+A placeholder URL would otherwise fail every minute and set off
+`AlertDeliveryFailing`.
 
 Any service that accepts an HTTP POST and alerts on missing pings works the
 same way (Uptime Kuma push monitor, Better Stack heartbeat, Cronitor).
@@ -42,7 +50,7 @@ same way (Uptime Kuma push monitor, Better Stack heartbeat, Cronitor).
 ## Test it
 
 `docker compose stop alertmanager` - the check should go red and notify you
-after Period + Grace (about 10 minutes). `docker compose start alertmanager`
+after Period + Grace (about 6 minutes). `docker compose start alertmanager`
 to recover.
 
 Watchdog does not appear on the NOC Overview incident board

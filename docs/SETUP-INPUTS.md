@@ -90,6 +90,68 @@ By hand, a router name must match in three places: `mikrotik-routers.yml`
 
 ## D. Alert delivery
 
+### Lab vs production: what can be reused
+
+| Item | Reuse the lab's? | Why |
+|---|---|---|
+| Telegram **bot** (token) | yes | a bot can post to any number of groups |
+| Telegram **NOC group** (`telegram_chat_id`) | **no** - production gets the real NOC group, and the lab moves to a test group of its own | otherwise the NOC sees every alert twice, half of them from the lab |
+| healthchecks.io **account / project** | yes | one account can hold one project per ISP |
+| healthchecks.io **check** (`deadman_url`) | **no** - one check per server | a lab test, pause or outage must never hide a production one |
+
+### Telegram bot and NOC group, from scratch (about 10 minutes)
+
+1. **Create the bot.** In Telegram open **@BotFather** (blue tick) and send
+   `/newbot`. Give it a display name (e.g. `ACME NOC Alerts`) and a username
+   that ends in `bot` (e.g. `acme_noc_alerts_bot`). BotFather replies with
+   the **token**, `123456789:AA...`. It is a password: put it straight into
+   the vault as `telegram_bot_token` (`scripts/edit-secrets.sh --site
+   <folder>`) and never paste it into a chat or email.
+2. **Create or pick the NOC group** and add the bot as a member (group
+   info -> Add members -> its username). It needs no admin rights, only
+   permission to send messages.
+3. **Find the group id.** Bots in groups only see commands addressed to
+   them, so a plain "hello" may never show up. In the group send
+   `/start@<bot username>`, then open
+   `https://api.telegram.org/bot<token>/getUpdates` in a browser and find
+   `"chat":{"id":-100...,"title":"<your group>"}`. The id is negative.
+   - Empty `"result":[]`? Send the `/start@...` command again and reload.
+   - If the response shows `"migrate_to_chat_id"`, Telegram upgraded the
+     group to a supergroup and changed its id: use the new `-100...` one.
+4. **Test before deploying** (the space before `curl` keeps the token out
+   of the shell history in most shells):
+   ```bash
+    curl -s "https://api.telegram.org/bot<token>/sendMessage" -d chat_id=<id> -d text="NOC alert test"
+   ```
+   The message must appear in the group. `"ok":false` with `chat not found`
+   means a wrong id or the bot is not in the group.
+5. **Ansible:** `telegram_chat_id: "-100..."` in the site's `vars.yml`
+   (the token is already in the vault). Commit, push, deploy.
+
+### Dead-man's switch on healthchecks.io, from scratch (about 10 minutes)
+
+1. Sign up at https://healthchecks.io (the free plan is enough) and create a
+   **project** for the ISP.
+2. **Add Check**: name it after the server (e.g. `acme monitoring server`);
+   Schedule **Simple**, **Period 1 minute**, **Grace 5 minutes**.
+   Alertmanager pings it every minute, so a dead server is reported about
+   6 minutes after its last ping.
+3. **Integrations**: add how the NOC is told - email to the on-call lead at
+   minimum; healthchecks.io can also post to Telegram through its own bot
+   (follow its Telegram integration page). Pick channels that do **not**
+   depend on the monitoring server. Make sure the integration is ticked on
+   the check.
+4. Copy the check's **ping URL** (`https://hc-ping.com/<uuid>`) into the
+   vault as `deadman_url`. It is a secret: anyone with it can fake a
+   heartbeat.
+5. Deploy. Within two minutes the check shows "Last ping: a minute ago" and
+   turns green.
+6. **Test it** once: on the server `sudo docker stop alertmanager`; about 6
+   minutes later the integration reports the check DOWN.
+   `sudo docker start alertmanager` and it reports UP.
+
+Details and how to switch it off: [deadman.md](deadman.md).
+
 **Changing the Telegram group (any time):**
 
 1. Add the bot to the new group (and make it able to post there).
