@@ -429,7 +429,7 @@
         {
             "id": 9,
             "type": "timeseries",
-            "title": "Signal / Noise / SNR",
+            "title": "Signal / Noise / SNR (worse end)",
             "gridPos": {
                 "h": 5,
                 "w": 8,
@@ -439,20 +439,24 @@
             "datasource": "Prometheus",
             "targets": [
                 {
-                    "expr": "label_replace(link_signal_dbm{link_id=\"$link_id\"}, \"radio\", \"$1$2\", \"link_name\", \"(?:.*-)?(RADIO[0-9]+)|(.+)\")",
-                    "legendFormat": "{{radio}} signal"
+                    "expr": "min by (link_id) (link_signal_dbm{link_id=\"$link_id\"})",
+                    "legendFormat": "Signal",
+                    "refId": "A"
                 },
                 {
                     "expr": "max by (link_id) (link_ideal_signal_dbm{link_id=\"$link_id\"})",
-                    "legendFormat": "Ideal"
+                    "legendFormat": "Ideal",
+                    "refId": "B"
                 },
                 {
-                    "expr": "label_replace(link_noise_dbm{link_id=\"$link_id\"}, \"radio\", \"$1$2\", \"link_name\", \"(?:.*-)?(RADIO[0-9]+)|(.+)\")",
-                    "legendFormat": "{{radio}} noise"
+                    "expr": "max by (link_id) (link_noise_dbm{link_id=\"$link_id\"})",
+                    "legendFormat": "Noise",
+                    "refId": "C"
                 },
                 {
-                    "expr": "label_replace(link_snr_db{link_id=\"$link_id\"}, \"radio\", \"$1$2\", \"link_name\", \"(?:.*-)?(RADIO[0-9]+)|(.+)\")",
-                    "legendFormat": "{{radio}} SNR"
+                    "expr": "min by (link_id) (link_snr_db{link_id=\"$link_id\"})",
+                    "legendFormat": "SNR",
+                    "refId": "D"
                 }
             ],
             "fieldConfig": {
@@ -480,7 +484,7 @@
                     }
                 ]
             },
-            "description": "Received signal per radio. airFiber 5XHD also reports the ideal signal for the link's distance (dashed, one line - both ends share it): a gap over 10 dB means alignment, an obstruction or reduced TX power, and fires Signal Below Ideal. Noise and SNR come from airMAX only."
+            "description": "One line per measure, from whichever end is worse at that moment: the weaker signal, the higher noise, the lower SNR. The two ends usually agree within 1-3 dB; each radio's own reading is in the Endpoint Snapshot, and Weak Signal checks each end on its own. airFiber 5XHD also reports the ideal signal for the link's distance (dashed): a gap over 10 dB means alignment, an obstruction or reduced TX power, and fires Signal Below Ideal. Noise and SNR come from airMAX only."
         },
         {
             "id": 22,
